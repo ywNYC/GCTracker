@@ -17,6 +17,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ============================================================
 // CONFIG
@@ -159,7 +160,7 @@ function findHeading(html, markerRegex, startOffset = 0) {
   return startOffset + match.index;
 }
 
-function parseVisaBulletinHTML(html, targetMonth) {
+export function parseVisaBulletinHTML(html, targetMonth) {
   // Collapse non-breaking spaces to ordinary ones before any offset-based searching.
   // Every subsequent index (headings, tables) refers to this normalized string, so the
   // offsets stay internally consistent.
@@ -215,7 +216,7 @@ function parseVisaBulletinHTML(html, targetMonth) {
   return result;
 }
 
-function validateParsedBulletin(data) {
+export function validateParsedBulletin(data) {
   const errors = [];
   if (!data.month || !/^\d{4}-\d{2}$/.test(data.month)) errors.push(`Invalid month: ${data.month}`);
   const expectedCats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
@@ -256,7 +257,7 @@ const currentMonthTarget = () => monthTargetFromOffset(0);
 // Needed because normal mode only ever looks at "next month", so any gap left by a
 // stalled cron is never filled in — and a stale `previous` silently corrupts the
 // month-over-month movement the frontend derives from it.
-function monthTargetFromKey(key) {
+export function monthTargetFromKey(key) {
   const m = /^(\d{4})-(\d{2})$/.exec(key);
   if (!m) throw new Error(`--month expects YYYY-MM, got: ${key}`);
   const year = Number(m[1]);
@@ -270,8 +271,16 @@ function monthTargetFromKey(key) {
   };
 }
 
+// The path segment is the US FISCAL year, not the calendar year: FY2026 runs
+// 2025-10-01 → 2026-09-30, so the October/November/December 2025 bulletins live under
+// /2026/ while the file name keeps the calendar year. Using the calendar year for the
+// directory 404s for three months of every year — verified 2026-08-06:
+//   /2025/visa-bulletin-for-november-2025.html → 404
+//   /2026/visa-bulletin-for-november-2025.html → 200
 function buildBulletinUrl(host, year, monthName) {
-  return `${host}/content/travel/en/legal/visa-law0/visa-bulletin/${year}/visa-bulletin-for-${monthName}-${year}.html`;
+  const monthIdx = MONTH_NAMES_LOWER.indexOf(monthName); // 0-based; 9 = October
+  const fiscalYear = monthIdx >= 9 ? year + 1 : year;
+  return `${host}/content/travel/en/legal/visa-law0/visa-bulletin/${fiscalYear}/visa-bulletin-for-${monthName}-${year}.html`;
 }
 
 // Tries each host in BULLETIN_HOSTS until one answers 200.
@@ -279,7 +288,7 @@ function buildBulletinUrl(host, year, monthName) {
 // host), so it is reported rather than treated as a host failure. Anything else
 // (403 bot-block, 5xx) moves on to the next host; if none succeed, throw so the
 // caller exits 1 and the next cron run retries.
-async function fetchBulletinHTML(year, monthName) {
+export async function fetchBulletinHTML(year, monthName) {
   const failures = [];
   let sawNotFound = null;
 
@@ -413,8 +422,15 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error('💥 Unexpected error:', err.message);
-  console.error(err.stack);
-  process.exit(1);
-});
+// Only run when executed directly — this module is also imported by
+// scripts/backfill-history.mjs for its parser.
+const isDirectRun = process.argv[1]
+  && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error('💥 Unexpected error:', err.message);
+    console.error(err.stack);
+    process.exit(1);
+  });
+}
