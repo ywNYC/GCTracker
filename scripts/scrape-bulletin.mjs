@@ -22,8 +22,21 @@ import path from 'node:path';
 // CONFIG
 // ============================================================
 
-const BULLETIN_JSON_PATH = 'bulletin.json'; // at repo root -> served at /bulletin.json
+// Vite serves everything in public/ at the site root, so /bulletin.json comes from
+// public/bulletin.json — NOT from a file at the repo root. Writing to the repo root
+// silently has no effect on the deployed site.
+const BULLETIN_JSON_PATH = 'public/bulletin.json';
 const USER_AGENT = 'VisaBulletinAutoScraper/1.0 (GitHub Action; informational tool)';
+
+// travel.state.gov sits behind Cloudflare bot management and returns 403 to every
+// non-browser client (verified 2026-08-06 from two independent networks, including
+// the site root). adoption.state.gov is a State Department host that mirrors the same
+// bulletin pages at an identical path and answers plain requests with 200.
+// Ordered by preference; the first host that returns 200 wins.
+const BULLETIN_HOSTS = [
+  'https://adoption.state.gov',
+  'https://travel.state.gov',
+];
 
 // ============================================================
 // PARSER (inlined, no external deps)
@@ -147,6 +160,11 @@ function findHeading(html, markerRegex, startOffset = 0) {
 }
 
 function parseVisaBulletinHTML(html, targetMonth) {
+  // Collapse non-breaking spaces to ordinary ones before any offset-based searching.
+  // Every subsequent index (headings, tables) refers to this normalized string, so the
+  // offsets stay internally consistent.
+  html = html.replace(/&nbsp;|&#160;|&#xa0;| /gi, ' ');
+
   const result = {
     month: targetMonth || '',
     scrapedAt: new Date().toISOString(),
@@ -163,22 +181,35 @@ function parseVisaBulletinHTML(html, targetMonth) {
     if (monthNum) result.month = `${year}-${monthNum}`;
   }
 
+  // Real headings read e.g. "FINAL ACTION DATES FOR&nbsp;EMPLOYMENT-BASED&nbsp;PREFERENCE
+  // CASES" — the words are joined by &nbsp;, which \s+ does not match, and there is no
+  // "A." / "B." numbering. Each section is located independently rather than with a
+  // forward-only cursor, because the document lists family before employment and a
+  // monotonic cursor silently loses whichever pair is searched second.
   const sections = [
-    { marker: /a\.?\s*final\s+action\s+dates?\s+for\s+employment/i, kind: 'employment', target: 'finalAction' },
-    { marker: /b\.?\s*dates?\s+for\s+filing\s+of\s+employment/i,    kind: 'employment', target: 'filing' },
-    { marker: /a\.?\s*final\s+action\s+dates?\s+for\s+family/i,      kind: 'family',     target: 'finalAction' },
-    { marker: /b\.?\s*dates?\s+for\s+filing\s+(?:applications\s+)?(?:for\s+)?family/i, kind: 'family', target: 'filing' },
+    { marker: /final\s+action\s+dates\s+for\s+employment/i, kind: 'employment', target: 'finalAction' },
+    { marker: /dates\s+for\s+filing\s+of\s+employment/i,    kind: 'employment', target: 'filing' },
+    { marker: /final\s+action\s+dates\s+for\s+family/i,     kind: 'family',     target: 'finalAction' },
+    { marker: /dates\s+for\s+filing\s+family/i,             kind: 'family',     target: 'filing' },
   ];
 
-  let cursor = 0;
   for (const sec of sections) {
-    const headingIdx = findHeading(html, sec.marker, cursor);
-    if (headingIdx === -1) continue;
+    const headingIdx = findHeading(html, sec.marker, 0);
+    if (headingIdx === -1) {
+      console.warn(`  ! section not found: ${sec.kind}/${sec.target}`);
+      continue;
+    }
     const tableInfo = findNextTable(html, headingIdx);
-    if (!tableInfo) continue;
+    if (!tableInfo) {
+      console.warn(`  ! no table after heading: ${sec.kind}/${sec.target}`);
+      continue;
+    }
     const parsed = parseTable(tableInfo.html, sec.kind);
-    if (parsed) result[sec.target] = { ...result[sec.target], ...parsed };
-    cursor = tableInfo.endOffset;
+    if (parsed) {
+      result[sec.target] = { ...result[sec.target], ...parsed };
+    } else {
+      console.warn(`  ! table did not parse: ${sec.kind}/${sec.target}`);
+    }
   }
 
   return result;
@@ -221,18 +252,67 @@ function monthTargetFromOffset(offsetMonths) {
 const nextMonthTarget = () => monthTargetFromOffset(1);
 const currentMonthTarget = () => monthTargetFromOffset(0);
 
-function buildBulletinUrl(year, monthName) {
-  return `https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/${year}/visa-bulletin-for-${monthName}-${year}.html`;
+// Explicit YYYY-MM target, for backfilling a month the offset helpers can't reach.
+// Needed because normal mode only ever looks at "next month", so any gap left by a
+// stalled cron is never filled in — and a stale `previous` silently corrupts the
+// month-over-month movement the frontend derives from it.
+function monthTargetFromKey(key) {
+  const m = /^(\d{4})-(\d{2})$/.exec(key);
+  if (!m) throw new Error(`--month expects YYYY-MM, got: ${key}`);
+  const year = Number(m[1]);
+  const monthIdx = Number(m[2]) - 1;
+  if (monthIdx < 0 || monthIdx > 11) throw new Error(`--month has an invalid month: ${key}`);
+  const monthName = MONTH_NAMES_LOWER[monthIdx];
+  return {
+    year, monthIdx, monthName,
+    monthKey: key,
+    monthLabel: `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`,
+  };
 }
 
+function buildBulletinUrl(host, year, monthName) {
+  return `${host}/content/travel/en/legal/visa-law0/visa-bulletin/${year}/visa-bulletin-for-${monthName}-${year}.html`;
+}
+
+// Tries each host in BULLETIN_HOSTS until one answers 200.
+// A 404 means the bulletin for that month is not published yet (same path on every
+// host), so it is reported rather than treated as a host failure. Anything else
+// (403 bot-block, 5xx) moves on to the next host; if none succeed, throw so the
+// caller exits 1 and the next cron run retries.
 async function fetchBulletinHTML(year, monthName) {
-  const url = buildBulletinUrl(year, monthName);
-  console.log(`→ Fetching: ${url}`);
-  const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html' } });
-  if (response.status === 404) return { html: null, status: 404, url };
-  if (!response.ok) throw new Error(`Fetch failed ${response.status}: ${response.statusText}`);
-  const html = await response.text();
-  return { html, status: 200, url };
+  const failures = [];
+  let sawNotFound = null;
+
+  for (const host of BULLETIN_HOSTS) {
+    const url = buildBulletinUrl(host, year, monthName);
+    console.log(`→ Fetching: ${url}`);
+    let response;
+    try {
+      response = await fetch(url, { headers: { 'User-Agent': USER_AGENT, 'Accept': 'text/html' } });
+    } catch (e) {
+      console.warn(`  ✗ ${host} — network error: ${e.message}`);
+      failures.push(`${host}: ${e.message}`);
+      continue;
+    }
+
+    if (response.ok) {
+      const html = await response.text();
+      console.log(`  ✓ ${host} — 200, ${html.length} bytes`);
+      return { html, status: 200, url };
+    }
+
+    if (response.status === 404) {
+      console.log(`  · ${host} — 404 (not published yet)`);
+      sawNotFound = { html: null, status: 404, url };
+      continue;
+    }
+
+    console.warn(`  ✗ ${host} — ${response.status} ${response.statusText}`);
+    failures.push(`${host}: ${response.status}`);
+  }
+
+  if (sawNotFound) return sawNotFound;
+  throw new Error(`All hosts failed — ${failures.join('; ')}`);
 }
 
 // ============================================================
@@ -242,6 +322,8 @@ async function fetchBulletinHTML(year, monthName) {
 async function main() {
   const args = process.argv.slice(2);
   const seedMode = args.includes('--seed');
+  const monthArg = args.find((a) => a.startsWith('--month='));
+  const explicitMonth = monthArg ? monthArg.slice('--month='.length) : null;
 
   // Read existing bulletin.json if any
   let existing = null;
@@ -263,8 +345,11 @@ async function main() {
   // Decide what to fetch:
   //   - First run: fetch CURRENT month first (to seed data quickly)
   //   - Normal: fetch NEXT month (bulletin for next month is published in current month)
-  const target = isFirstRun ? currentMonthTarget() : nextMonthTarget();
-  console.log(`Target: ${target.monthKey} (${target.monthLabel}) — mode: ${isFirstRun ? 'seed' : 'next-month'}`);
+  const target = explicitMonth
+    ? monthTargetFromKey(explicitMonth)
+    : (isFirstRun ? currentMonthTarget() : nextMonthTarget());
+  const mode = explicitMonth ? `explicit ${explicitMonth}` : (isFirstRun ? 'seed' : 'next-month');
+  console.log(`Target: ${target.monthKey} (${target.monthLabel}) — mode: ${mode}`);
 
   // Skip if we already have target
   if (storedCurrentMonth === target.monthKey) {
