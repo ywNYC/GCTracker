@@ -5227,6 +5227,40 @@ const SmartAlerts = ({ userCase, setTab = () => {}, greenCardInfo = { approvalDa
     }
   };
 
+  // Persist alert toggles made AFTER subscribing.
+  // handleSubscribe is the only other place that POSTs and it fires solely from the
+  // subscribe button, so before this every post-subscribe toggle changed local state
+  // and was never sent — the switches were decorative once you'd subscribed.
+  // Debounced so flipping several in a row is a single request, which also keeps well
+  // clear of the per-IP rate limit on /api/subscribe.
+  const skipAlertSync = useRef(true);
+  useEffect(() => {
+    // Not subscribed (or no usable address) — nothing to sync. Re-arm the skip so the
+    // first toggle after a future subscribe doesn't fire a redundant duplicate of the
+    // POST that handleSubscribe just made.
+    if (!isSubscribed || !validateEmail(email)) {
+      skipAlertSync.current = true;
+      return;
+    }
+    if (skipAlertSync.current) {
+      skipAlertSync.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      fetch(SUBSCRIBE_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          userCase,
+          alerts,
+          language: lang,
+        }),
+      }).catch((err) => console.error('Alert preference sync failed:', err));
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [alerts, isSubscribed]);
+
   const handleUnsubscribe = async () => {
     // Fire-and-forget unsubscribe (user stays unsubscribed in UI regardless of API result)
     if (email) {
