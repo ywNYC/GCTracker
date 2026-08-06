@@ -1,0 +1,64 @@
+name: Auto-update Visa Bulletin
+
+# The State Department publishes each bulletin in the 2nd or 3rd week of the prior
+# month, so this checks daily on the 8th–21st. 14:00 UTC = 09:00 ET.
+on:
+  schedule:
+    - cron: '0 14 8-21 * *'
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Seed the current month instead of fetching next month'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scrape-bulletin
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 20+ required: the scraper uses the built-in global fetch and has no deps.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Scrape bulletin
+        id: scrape
+        run: |
+          if [ "${{ inputs.seed }}" = "true" ]; then
+            node scripts/scrape-bulletin.mjs --seed
+          else
+            node scripts/scrape-bulletin.mjs
+          fi
+
+      # The scraper writes public/bulletin.json — Vite serves public/ at the site root,
+      # so this is the file that becomes /bulletin.json after a Pages build.
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- public/bulletin.json; then
+            echo "No change to public/bulletin.json — nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/bulletin.json
+          git commit -m "chore: auto-update visa bulletin"
+          git push
+          echo "Pushed updated bulletin — Cloudflare Pages will redeploy."
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Visa bulletin scrape" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Outcome: ${{ steps.scrape.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Exit codes: 0 = ok (data written or already current), 1 = transient (network / all hosts failed, retries tomorrow), 2 = parser broke (needs a human)." >> "$GITHUB_STEP_SUMMARY"
