@@ -946,7 +946,10 @@ const BULLETIN_ARCHIVE = {
   '2026-04': { label: { en: 'April 2026', zh: '2026年4月', tw: '2026年4月' }, data: bulletinApril2026, previous: bulletinMarch2026 },
   '2026-03': { label: { en: 'March 2026', zh: '2026年3月', tw: '2026年3月' }, data: bulletinMarch2026, previous: null /* no Feb data yet */ },
 };
-const DEFAULT_VIEWING_MONTH = '2026-05';
+// Seeded with the hardcoded months above so the picker still works if /history.json
+// is unavailable; both are replaced at runtime by the real 26-month archive.
+// `let` because the newest available month is only known after history.json loads.
+let DEFAULT_VIEWING_MONTH = '2026-05';
 
 // Average monthly movement (days) — approximate, from Nov 2025 - Apr 2026 trend
 // ==============================================================
@@ -11355,6 +11358,90 @@ export default function App() {
     setBulletinTick((t) => t + 1); // force re-render
   }, [viewingMonth]);
 
+  // Load the real month-by-month archive from /history.json (produced by
+  // scripts/backfill-history.mjs). Before this, BULLETIN_ARCHIVE held three
+  // hardcoded snapshots, so the month picker could only reach back to March 2026
+  // and every "historical" trend was back-projected from a static rate table.
+  // Rebuilt newest-first so the picker lists recent months at the top.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/history.json', { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('history-fetch-not-ok'))))
+      .then((hist) => {
+        if (cancelled || !hist || !Array.isArray(hist.months)) return;
+        const cats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+        const asc = hist.months
+          .filter((m) => m && m.month && m.finalAction && cats.every((c) => m.finalAction[c]))
+          .sort((a, b) => a.month.localeCompare(b.month));
+        if (!asc.length) return;
+
+        const EN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'];
+        const snapshotOf = (m) => ({ finalAction: m.finalAction, filing: m.filing || {} });
+        const entryFor = (m, prev) => {
+          const [yr, mo] = m.month.split('-');
+          const moNum = parseInt(mo, 10);
+          return {
+            label: {
+              en: `${EN_MONTHS[moNum - 1]} ${yr}`,
+              zh: `${yr}年${moNum}月`,
+              tw: `${yr}年${moNum}月`,
+            },
+            data: snapshotOf(m),
+            previous: prev ? snapshotOf(prev) : null,
+          };
+        };
+
+        // Replace wholesale: drop the hardcoded seed months so the picker doesn't
+        // end up with a mix of real and stale entries in a jumbled order.
+        Object.keys(BULLETIN_ARCHIVE).forEach((k) => delete BULLETIN_ARCHIVE[k]);
+        for (let i = asc.length - 1; i >= 0; i--) {
+          BULLETIN_ARCHIVE[asc[i].month] = entryFor(asc[i], i > 0 ? asc[i - 1] : null);
+        }
+
+        // Recompute the "recent" forecast anchor from real observed movement.
+        // The hardcoded RATES_DB.recent values are 5-year averages captured during a
+        // stagnant stretch — F4-China sat at 94 days/year while the last five months
+        // actually averaged ~1,400 days/year. That stale anchor dragged every near-term
+        // forecast far below what the bulletins were plainly doing.
+        // Only `recent` is overridden; the 10y/21y anchors stay as the sanity bounds.
+        const RECENT_WINDOW = 12;
+        const win = asc.slice(-Math.min(RECENT_WINDOW + 1, asc.length));
+        if (win.length >= 4) {
+          const toTime = (v) => (v && v !== 'C' ? Date.parse(`${v}T00:00:00Z`) : null);
+          const monthsSpan = win.length - 1;
+          Object.keys(RATES_DB).forEach((key) => {
+            const dash = key.indexOf('-');
+            const cat = key.slice(0, dash);
+            const country = key.slice(dash + 1);
+            const first = toTime(win[0].finalAction?.[cat]?.[country]);
+            const last = toTime(win[win.length - 1].finalAction?.[cat]?.[country]);
+            // 'C' (current) and 'U' (unavailable → null) carry no usable cutoff date,
+            // and a retrogression would invert the anchor — leave the static value.
+            if (first === null || last === null) return;
+            const days = (last - first) / 86400000;
+            if (days < 0) return;
+            RATES_DB[key] = { ...RATES_DB[key], recent: Math.round((days / monthsSpan) * 12) };
+          });
+        }
+
+        const latest = asc[asc.length - 1].month;
+        DEFAULT_VIEWING_MONTH = latest;
+        // Always jump to the newest month. This effect runs once on mount, before the
+        // user can have picked anything, and the seeded default ('2026-05') exists in
+        // the real archive too — so a "keep it if it's valid" check would leave the app
+        // sitting on May while DEFAULT_VIEWING_MONTH says August, which reads as the
+        // Time Machine being active on a cold load.
+        setViewingMonth(latest);
+        setBulletinTick((t) => t + 1);
+      })
+      .catch(() => {
+        // Keep the hardcoded three-month archive — the app still works, just with
+        // a shorter picker and no real history.
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   // Auto-update bulletin data: fetch from /bulletin.json on mount; mutate the hardcoded
   // bulletinCurrent / bulletinPrevious objects in place if fresh data is available.
   // /bulletin.json is auto-generated by GitHub Actions monthly from travel.state.gov.
@@ -12334,6 +12421,10 @@ export default function App() {
                                minWidth: '200px',
                                boxShadow: '0 4px 24px rgba(17,20,24,0.12)',
                                padding: '4px 0',
+                               // The archive grew from 3 hardcoded months to the full
+                               // real history, so this has to scroll.
+                               maxHeight: '320px',
+                               overflowY: 'auto',
                              }}>
                           <div className="gc-eyebrow" style={{ padding: '6px 12px 4px', borderBottom: '1px solid var(--gc-rule-soft)', marginBottom: '4px' }}>
                             {lang === 'en' ? 'Archive' : lang === 'tw' ? '歷史存檔' : '历史存档'}
