@@ -34,6 +34,7 @@ export async function onRequestGet(context) {
   const format = url.searchParams.get('format') || 'json';
   const langFilter = url.searchParams.get('lang');
   const categoryFilter = url.searchParams.get('category');
+  const confirmedFilter = url.searchParams.get('confirmed');
 
   try {
     // List all keys (KV supports cursor-based pagination; for MVP scale we assume < 1000)
@@ -42,6 +43,10 @@ export async function onRequestGet(context) {
     do {
       const list = await env.SUBSCRIBERS.list({ cursor });
       for (const keyInfo of list.keys) {
+        // Rate-limit counters share this namespace under an `rl:` prefix and hold a
+        // bare number, not a subscriber record. Skip them by key rather than relying
+        // on JSON.parse happening to throw.
+        if (keyInfo.name.startsWith('rl:')) continue;
         const raw = await env.SUBSCRIBERS.get(keyInfo.name);
         if (!raw) continue;
         try {
@@ -49,6 +54,10 @@ export async function onRequestGet(context) {
           // Apply filters
           if (langFilter && record.language !== langFilter) continue;
           if (categoryFilter && record.userCase?.category !== categoryFilter) continue;
+          // ?confirmed=true → only double-opt-in-completed subscribers (what you'd
+          // actually mail); ?confirmed=false → only those who never clicked through.
+          if (confirmedFilter === 'true' && record.confirmed !== true) continue;
+          if (confirmedFilter === 'false' && record.confirmed === true) continue;
           subscribers.push(record);
         } catch {}
       }

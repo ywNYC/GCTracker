@@ -16,14 +16,46 @@
 //     Email failure does NOT fail the subscription (email is best-effort).
 //   - DELETE: remove subscriber from KV.
 
-import { renderWelcomeEmail } from './_emailTemplates.js';
+import { renderWelcomeEmail, renderConfirmEmail } from './_emailTemplates.js';
+
+// Locked to this site's own origin. The frontend calls /api/subscribe same-origin, so
+// this changes nothing for real users, but it stops the endpoint being driven from
+// someone else's page. SITE_URL isn't available at module scope, hence the literal.
+const ALLOWED_ORIGIN = 'https://gc.jmjvc.us';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Access-Control-Max-Age': '86400',
+  'Vary': 'Origin',
 };
+
+// ---- Rate limiting ----
+// Per-IP cap on subscribe attempts. Without it a script can burn the daily Resend
+// quota and the KV write allowance in seconds. Counters live in the same KV namespace
+// under an `rl:` prefix with a TTL, so they expire on their own and never need sweeping.
+// KV is eventually consistent, so a determined attacker can exceed this slightly under
+// heavy concurrency — it's a spend cap, not a security boundary.
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_S = 3600;
+
+async function checkRateLimit(env, ip) {
+  if (!ip || ip === 'unknown') return { ok: true };
+  const key = `rl:${ip}`;
+  let count = 0;
+  try {
+    const raw = await env.SUBSCRIBERS.get(key);
+    count = raw ? parseInt(raw, 10) || 0 : 0;
+  } catch {
+    return { ok: true }; // never let the limiter itself break subscribing
+  }
+  if (count >= RATE_LIMIT_MAX) return { ok: false, count };
+  try {
+    await env.SUBSCRIBERS.put(key, String(count + 1), { expirationTtl: RATE_LIMIT_WINDOW_S });
+  } catch {}
+  return { ok: true, count: count + 1 };
+}
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -54,6 +86,18 @@ async function signEmail(email, secret) {
   return b64.slice(0, 16);
 }
 
+// Separate purpose string so a confirm token can never be replayed as an unsubscribe
+// token (or the reverse) — they are derived from the same secret.
+export async function buildConfirmToken(email, env) {
+  return signEmail(`confirm:${email}`, env.UNSUBSCRIBE_SECRET);
+}
+
+async function buildConfirmUrl(email, env) {
+  const siteUrl = (env.SITE_URL || 'https://gc.jmjvc.us').replace(/\/+$/, '');
+  const token = await buildConfirmToken(email, env);
+  return `${siteUrl}/api/confirm?email=${encodeURIComponent(email)}&token=${token}`;
+}
+
 async function buildUnsubscribeUrl(email, env) {
   const siteUrl = env.SITE_URL || 'https://gc.jmjvc.us';
   const token = await signEmail(email, env.UNSUBSCRIBE_SECRET);
@@ -62,7 +106,8 @@ async function buildUnsubscribeUrl(email, env) {
 
 // ---- Resend ----
 
-async function sendWelcomeEmail({ env, email, userCase, alerts, language }) {
+// Sent by /api/confirm once the recipient has proved they own the address.
+export async function sendWelcomeEmail({ env, email, userCase, alerts, language }) {
   if (!env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY not set, skipping welcome email');
     return { skipped: true };
@@ -114,6 +159,32 @@ async function sendWelcomeEmail({ env, email, userCase, alerts, language }) {
   return { ok: true, id: data.id };
 }
 
+async function sendConfirmEmail({ env, email, language }) {
+  if (!env.RESEND_API_KEY || !env.RESEND_FROM) {
+    console.warn('Resend not configured, skipping confirmation email');
+    return { skipped: true };
+  }
+  const siteUrl = (env.SITE_URL || 'https://gc.jmjvc.us').replace(/\/+$/, '');
+  const confirmUrl = await buildConfirmUrl(email, env);
+  const { subject, html, text } = renderConfirmEmail({ email, language, siteUrl, confirmUrl });
+
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from: env.RESEND_FROM, to: [email], subject, html, text }),
+  });
+
+  if (!resp.ok) {
+    const errBody = await resp.text();
+    console.error('Resend confirm send failed:', resp.status, errBody);
+    return { ok: false, status: resp.status, error: errBody };
+  }
+  return { ok: true, id: (await resp.json()).id };
+}
+
 // ---- Handlers ----
 
 export async function onRequestOptions() {
@@ -143,18 +214,34 @@ export async function onRequestPost(context) {
 
   const emailKey = email.trim().toLowerCase();
 
+  const rate = await checkRateLimit(env, request.headers.get('cf-connecting-ip'));
+  if (!rate.ok) {
+    return json({ success: false, error: 'Too many attempts, try again later' }, 429);
+  }
+
   // Preserve original subscribedAt timestamp if updating an existing record
   let subscribedAt = new Date().toISOString();
   const existingRaw = await env.SUBSCRIBERS.get(emailKey);
   const isUpdate = existingRaw !== null;
+  let wasConfirmed = false;
+  let confirmedAt = null;
   if (isUpdate) {
     try {
       const existing = JSON.parse(existingRaw);
       if (existing.subscribedAt) subscribedAt = existing.subscribedAt;
+      wasConfirmed = existing.confirmed === true;
+      confirmedAt = existing.confirmedAt || null;
     } catch {}
   }
 
   const record = {
+    // Double opt-in: a record only counts as a subscriber once the recipient clicks
+    // the link in the confirmation email. Until then nothing is sent to them beyond
+    // that one email, so a third party cannot sign someone else up — which is what
+    // protects this domain's sending reputation (and the Resend account) from
+    // spam complaints over mail the recipient never asked for.
+    confirmed: wasConfirmed,
+    confirmedAt,
     email: emailKey,
     name: (typeof name === 'string' ? name.trim().slice(0, 50) : ''),
     userCase: userCase || null,
@@ -174,28 +261,34 @@ export async function onRequestPost(context) {
     return json({ success: false, error: 'Storage failed' }, 500);
   }
 
-  // Send welcome email — only on first subscribe, not on updates.
-  // Failures are logged but do NOT fail the API call (subscription itself succeeded).
+  // Already-confirmed subscriber changing their preferences: nothing to re-confirm,
+  // and deliberately no email — otherwise every preference tweak spams them.
+  if (wasConfirmed) {
+    return json({ success: true, isUpdate: true, confirmed: true, message: 'Subscription updated' });
+  }
+
+  // Not yet confirmed (new address, or a repeat request for one that never confirmed):
+  // send the confirmation link. Repeat requests re-send it rather than erroring, since
+  // the usual reason someone subscribes twice is that the first mail went missing.
+  // Failures are logged but do not fail the call — the record is already stored.
   let emailResult = null;
-  if (!isUpdate) {
-    try {
-      emailResult = await sendWelcomeEmail({
-        env,
-        email: emailKey,
-        userCase: record.userCase,
-        alerts: record.alerts,
-        language: record.language,
-      });
-    } catch (err) {
-      console.error('Welcome email error:', err);
-      emailResult = { ok: false, error: String(err) };
-    }
+  try {
+    emailResult = await sendConfirmEmail({
+      env,
+      email: emailKey,
+      language: record.language,
+    });
+  } catch (err) {
+    console.error('Confirmation email error:', err);
+    emailResult = { ok: false, error: String(err) };
   }
 
   return json({
     success: true,
     isUpdate,
-    message: isUpdate ? 'Subscription updated' : 'Subscribed',
+    confirmed: false,
+    pending: true,
+    message: 'Confirmation email sent — check your inbox to activate the subscription',
     emailSent: emailResult?.ok || false,
   });
 }

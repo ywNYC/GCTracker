@@ -363,3 +363,101 @@ export const renderUnsubscribePage = ({ email, success, language }) => {
 </body>
 </html>`;
 };
+
+// ---- Confirmation Email (double opt-in) ----
+// Sent on the FIRST subscribe request. Nothing is treated as an active subscription
+// until the recipient clicks through, so a third party cannot sign someone else up
+// and cannot make this domain send unsolicited mail on their behalf.
+// Deliberately self-contained: it must render even if getCopy() changes shape.
+
+export const renderConfirmEmail = ({ email, language, siteUrl, confirmUrl }) => {
+  const lang = language === 'en' ? 'en' : language === 'tw' ? 'tw' : 'zh';
+
+  const c = {
+    en: {
+      subject: 'Confirm your Green Card Tracker subscription',
+      preheader: 'One click and you are set — we will watch the bulletin for you.',
+      eyebrow: '— Confirm Subscription —',
+      title: 'Almost there',
+      body: 'Someone (hopefully you) asked to receive visa bulletin updates at this address. Click below to confirm and start receiving them.',
+      cta: 'Confirm subscription',
+      ignore: 'If this was not you, simply ignore this email. Nothing was subscribed and you will not hear from us again.',
+      fallback: 'Button not working? Paste this link into your browser:',
+      brand: 'Green Card Tracker',
+    },
+    zh: {
+      subject: '确认订阅绿卡排期追踪',
+      preheader: '点一下就好——之后排期更新我们替你盯着。',
+      eyebrow: '— 确认订阅 —',
+      title: '还差一步',
+      body: '有人（希望是你本人）用这个邮箱申请订阅签证公告排期更新。点击下面的按钮确认，之后就会开始收到更新。',
+      cta: '确认订阅',
+      ignore: '如果这不是你本人操作，直接忽略这封邮件即可。订阅不会生效，我们也不会再打扰你。',
+      fallback: '按钮点不动？把这个链接粘到浏览器里：',
+      brand: '绿卡晴雨表',
+    },
+    tw: {
+      subject: '確認訂閱綠卡排期追蹤',
+      preheader: '點一下就好——之後排期更新我們替你盯著。',
+      eyebrow: '— 確認訂閱 —',
+      title: '還差一步',
+      body: '有人（希望是你本人）用這個信箱申請訂閱簽證公告排期更新。點擊下面的按鈕確認，之後就會開始收到更新。',
+      cta: '確認訂閱',
+      ignore: '如果這不是你本人操作，直接忽略這封郵件即可。訂閱不會生效，我們也不會再打擾你。',
+      fallback: '按鈕點不動？把這個連結貼到瀏覽器裡：',
+      brand: '綠卡晴雨表',
+    },
+  }[lang];
+
+  const safeUrl = escapeHtml(confirmUrl);
+
+  const html = `<!DOCTYPE html>
+<html lang="${lang === 'en' ? 'en' : 'zh'}">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f1ea;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(c.preheader)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ea;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e4dfd3;border-radius:10px;">
+        <tr><td style="padding:32px 32px 8px;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#0e4d2e;">
+          ${escapeHtml(c.eyebrow)}
+        </td></tr>
+        <tr><td style="padding:4px 32px 0;text-align:center;font-family:Georgia,'Times New Roman',serif;font-size:26px;color:#111418;">
+          ${escapeHtml(c.title)}
+        </td></tr>
+        <tr><td style="padding:16px 32px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.7;color:#414852;">
+          ${escapeHtml(c.body)}
+        </td></tr>
+        <tr><td align="center" style="padding:26px 32px 6px;">
+          <a href="${safeUrl}" style="display:inline-block;background:#0e4d2e;color:#ffffff;text-decoration:none;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;font-weight:600;padding:13px 30px;border-radius:6px;">${escapeHtml(c.cta)}</a>
+        </td></tr>
+        <tr><td style="padding:18px 32px 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:11px;line-height:1.6;color:#8a9099;">
+          ${escapeHtml(c.fallback)}<br>
+          <span style="word-break:break-all;color:#0e4d2e;">${safeUrl}</span>
+        </td></tr>
+        <tr><td style="padding:18px 32px 30px;border-top:1px solid #efeae0;margin-top:12px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:11px;line-height:1.6;color:#8a9099;">
+          ${escapeHtml(c.ignore)}
+        </td></tr>
+      </table>
+      <div style="padding:14px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#8a9099;">
+        ${escapeHtml(c.brand)} · <a href="${escapeHtml(siteUrl)}" style="color:#8a9099;">${escapeHtml(siteUrl)}</a>
+      </div>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const text = [
+    c.title,
+    '',
+    c.body,
+    '',
+    `${c.cta}: ${confirmUrl}`,
+    '',
+    c.ignore,
+    '',
+    `${c.brand} · ${siteUrl}`,
+  ].join('\n');
+
+  return { subject: c.subject, html, text };
+};
