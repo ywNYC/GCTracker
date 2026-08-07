@@ -489,7 +489,7 @@ const buildCaseUrl = (siteUrl, userCase) => {
   return `${base}/?${p.toString()}`;
 };
 
-export const renderMonthlyUpdateEmail = ({ email, userCase, update, bulletinMonthLabel, language, siteUrl, unsubscribeUrl }) => {
+export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, bulletinMonthLabel, language, siteUrl, unsubscribeUrl }) => {
   const lang = language === 'en' ? 'en' : 'zh';
   const caseUrl = buildCaseUrl(siteUrl, userCase);
 
@@ -559,9 +559,18 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, bulletinMont
 
   // Deliberately one short line: the chart names already appear in the row labels
   // directly above, so repeating them here only pushed the note into a wrapped block.
-  const chartNote = lang === 'en'
+  // When the scraped USCIS designation covers this bulletin month, the note upgrades
+  // from the generic explainer to the definitive answer for this subscriber's category.
+  let chartNote = lang === 'en'
     ? 'Chart A decides approval · Chart B decides filing'
     : '表 A 决定能否获批，表 B 决定能否递件';
+  const chartKindForCase = userCase?.category?.startsWith('EB') ? uscisChart?.employment : uscisChart?.family;
+  if (chartKindForCase === 'filing' || chartKindForCase === 'finalAction') {
+    const chartName = chartKindForCase === 'filing' ? (lang === 'en' ? 'Chart B' : '表 B') : (lang === 'en' ? 'Chart A' : '表 A');
+    chartNote = lang === 'en'
+      ? `USCIS: file I-485 this month using ${chartName}`
+      : `本月递交 I-485 用${chartName}（USCIS 判定）`;
+  }
 
   const text = [
     headline,

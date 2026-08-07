@@ -98,7 +98,9 @@ async function buildConfirmUrl(email, env) {
   return `${siteUrl}/api/confirm?email=${encodeURIComponent(email)}&token=${token}`;
 }
 
-async function buildUnsubscribeUrl(email, env) {
+// Exported for admin/send-monthly.js — the monthly update mail carries the same
+// signed unsubscribe link as the welcome mail.
+export async function buildUnsubscribeUrl(email, env) {
   const siteUrl = env.SITE_URL || 'https://gc.jmjvc.us';
   const token = await signEmail(email, env.UNSUBSCRIBE_SECRET);
   return `${siteUrl}/api/unsubscribe?email=${encodeURIComponent(email)}&token=${token}`;
