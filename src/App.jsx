@@ -244,6 +244,13 @@ const translations = {
     probAdvance: 'Probability of further advancement',
     probRetrogress: 'Probability of retrogression',
     probMonths: 'Estimated months until current',
+    paceBasisLabel: 'Estimate basis',
+    paceBasisConservative: 'Last 12 months',
+    paceBasisRecent: 'This month',
+    paceRangeLabel: 'Full range',
+    paceExplainConservative: 'Based on the average pace actually delivered over the last 12 bulletins — the deliberately cautious end.',
+    paceExplainRecent: 'Based on this month\'s movement alone. Responsive, but one fast month is a weak basis for a multi-year estimate.',
+    paceRangeNote: 'Both ends are measured from real bulletins. The gap between them is how unsettled this category is — not model error.',
     avgMovement: 'Average monthly movement',
     forecastMethodology: 'Methodology',
     forecastMethodologyDesc: 'This forecast is a statistical estimate based on the average movement of your category and country over recent months. It is not a guarantee. Movement can change due to demand surges, fiscal year resets (every October 1st), or policy changes. In FY2026, the travel ban and processing pause have accelerated ROW advancement — this may reverse.',
@@ -502,6 +509,13 @@ const translations = {
     probAdvance: '继续前进的概率',
     probRetrogress: '倒退的概率',
     probMonths: '预计多久能无排期',
+    paceBasisLabel: '估算口径',
+    paceBasisConservative: '近 12 个月',
+    paceBasisRecent: '本月',
+    paceRangeLabel: '完整区间',
+    paceExplainConservative: '按过去 12 期公告实际平均推进速度估算——刻意取保守的一端。',
+    paceExplainRecent: '只按本月这一次的推进速度估算。反应快，但用单月速度去承诺好几年，依据是很薄的。',
+    paceRangeNote: '两端都来自真实公告。它们之间的差距反映的是这个类别本身有多不稳定，不是模型算错了。',
     avgMovement: '平均每月推进',
     forecastMethodology: '预测方法',
     forecastMethodologyDesc: '此预测是根据你类别和国家近几个月的平均推进速度做出的统计估算,不保证准确。需求激增、新财年重置 (每年 10 月 1 日)、政策变化都会影响实际进度。2026 财年,旅行禁令和处理暂停导致 ROW 加速前进,未来可能反转。',
@@ -757,6 +771,13 @@ const translations = {
     probAdvance: '繼續前進的機率',
     probRetrogress: '倒退的機率',
     probMonths: '預計多久能無排期',
+    paceBasisLabel: '估算口徑',
+    paceBasisConservative: '近 12 個月',
+    paceBasisRecent: '本月',
+    paceRangeLabel: '完整區間',
+    paceExplainConservative: '按過去 12 期公告實際平均推進速度估算——刻意取保守的一端。',
+    paceExplainRecent: '只按本月這一次的推進速度估算。反應快，但用單月速度去承諾好幾年，依據是很薄的。',
+    paceRangeNote: '兩端都來自真實公告。它們之間的差距反映的是這個類別本身有多不穩定，不是模型算錯了。',
     avgMovement: '平均每月推進',
     forecastMethodology: '預測方法',
     forecastMethodologyDesc: '此預測是根據你類別和國家近幾個月的平均推進速度做出的統計估算,不保證準確。需求激增、新財年重置 (每年 10 月 1 日)、政策變化都會影響實際進度。2026 財年,旅行禁令和處理暫停導致 ROW 加速前進,未來可能反轉。',
@@ -782,6 +803,17 @@ const useLang = () => useContext(LanguageContext);
 // Note: Taiwan-born applicants are charged to the "Other" (ROW) pool.
 // ============================================================
 const BULLETIN_CURRENT_MONTH = { en: 'May 2026', zh: '2026年5月', tw: '2026年5月' };
+
+// The month currently on screen, as 'YYYY-MM'. Kept in sync with viewingMonth by the
+// same effect that swaps bulletinCurrent/bulletinPrevious. Every calendar anchor in the
+// forecast chart derives from this — they used to be four separate `new Date(2026, 4, …)`
+// literals, which silently pinned the whole projection to May 2026 no matter what
+// bulletin was actually loaded.
+const BULLETIN_CURRENT_KEY = { value: '2026-05' };
+const bulletinAnchorDate = (day = 1) => {
+  const [y, m] = BULLETIN_CURRENT_KEY.value.split('-').map(Number);
+  return new Date(y, m - 1, day);
+};
 
 // USCIS announced for May 2026: EB uses Final Action Dates (Chart A),
 // Family categories continue to use Dates for Filing (Chart B)
@@ -1098,6 +1130,30 @@ const LONG_TERM_RATES = Object.fromEntries(
 );
 const getLongTermRate = (cat, country) => getRates(cat, country).long;
 
+// Observed month-over-month pace (days/month) for one category+country, averaged across
+// the trailing window of REAL bulletins in BULLETIN_ARCHIVE.
+//
+// One estimator, used by both the chart's projection curve and the axis autofit. They
+// used to disagree: autofit fed estimateMonthsToReachPD a single month's movement while
+// the drawn curve used a windowed average, so the crossover pill and the line it was
+// supposed to label could differ by years. A single month is far too noisy to anchor a
+// multi-year projection anyway — F4-China sat at 0 days for 6 of the last 12 months and
+// then jumped 243 in one.
+const observedPaceFromArchive = (cat, country, windowMonths = 12) => {
+  const keys = Object.keys(BULLETIN_ARCHIVE).sort();
+  if (keys.length < 2) return null;
+  const win = keys.slice(-(windowMonths + 1));
+  const valueAt = (k) => BULLETIN_ARCHIVE[k]?.data?.finalAction?.[cat]?.[country];
+  const first = valueAt(win[0]);
+  const last = valueAt(win[win.length - 1]);
+  // 'C' and 'U' carry no usable cutoff date; a retrogression would invert the anchor.
+  if (!first || !last || first === 'C' || last === 'C' || first === 'U' || last === 'U') return null;
+  const days = (new Date(`${last}T00:00:00`) - new Date(`${first}T00:00:00`)) / 86400000;
+  const span = win.length - 1;
+  if (span <= 0 || days < 0) return null;
+  return days / span;
+};
+
 // ==============================================================
 // AI HYBRID PREDICTION MODEL
 // Blends 4 time horizons:
@@ -1287,8 +1343,10 @@ const computeMovement = (current, previous) => {
   return { type: 'none', days: 0 };
 };
 
-// Forecast: probability + months-until-current (HYBRID model)
-const computeForecast = (userCase) => {
+// Forecast: probability + months-until-current (HYBRID model).
+// `paceBasis` picks which observed pace anchors the estimate: 'conservative' (trailing
+// 12-month average, the default) or 'recent' (this month's movement). The UI exposes it.
+const computeForecast = (userCase, paceBasis = 'conservative') => {
   const country = resolveCountry(userCase.country);
   const cat = userCase.category;
   // IMPORTANT: Use finalAction (Table A) as the primary source — same as TrendChart.
@@ -1307,16 +1365,23 @@ const computeForecast = (userCase) => {
   const thisMonthDays = thisMonthMovement.type === 'advanced' ? thisMonthMovement.days
     : thisMonthMovement.type === 'retrogressed' ? -thisMonthMovement.days : 0;
 
-  // Derive recentDaysPerMonth from LIVE bulletin data (same source TrendChart reads).
-  // This is the single "observed" rate both tab and chart must agree on.
-  // Fall back to long-term /12 only when this month has zero movement (uninformative).
+  // Two observed paces, both measured off real bulletins, neither invented:
+  //   · "recent"       — this month's own movement (responsive, but very noisy)
+  //   · "conservative" — the trailing 12-month average from BULLETIN_ARCHIVE
+  // They can differ by years, so this returns BOTH and the UI shows a range. Default is
+  // the conservative end: a single fast month is the weakest possible basis for a
+  // multi-year promise, and over-promising here is the costly direction to be wrong in.
   const longTermRate = getLongTermRate(cat, country);  // days/year
   const longTermDpm = longTermRate / 12;
-  const recentDaysPerMonth = thisMonthDays > 0
-    ? thisMonthDays
-    : longTermDpm;
+  const singleMonthPace = thisMonthDays > 0 ? thisMonthDays : longTermDpm;
+  const archivePace = observedPaceFromArchive(cat, country);
 
-  // The display "avgMovement" is now the same recentDaysPerMonth both views use
+  // Ordered by value, not by name — a month slower than the 12-month average flips them.
+  const paceFast = archivePace !== null ? Math.max(singleMonthPace, archivePace) : singleMonthPace;
+  const paceSlow = archivePace !== null ? Math.min(singleMonthPace, archivePace) : singleMonthPace;
+  const recentDaysPerMonth = paceBasis === 'recent' ? paceFast : paceSlow;
+
+  // The display "avgMovement" tracks whichever basis is selected
   const avgMovement = Math.round(recentDaysPerMonth);
 
   if (gapDays >= 0) {
@@ -1325,16 +1390,13 @@ const computeForecast = (userCase) => {
 
   const distanceDays = Math.abs(gapDays);
 
-  // HYBRID model via estimateMonthsToReachPD — identical to what TrendChart's
-  // crossover red-line computation uses. Same inputs → same output.
-  const monthsToCurrent = estimateMonthsToReachPD(
-    currentCutoff,
-    userCase.priorityDate,
-    recentDaysPerMonth,
-    longTermRate,
-    cat,
-    country
-  );
+  const monthsAtPace = (pace) => (pace > 0
+    ? estimateMonthsToReachPD(currentCutoff, userCase.priorityDate, pace, longTermRate, cat, country)
+    : null);
+
+  const monthsFast = monthsAtPace(paceFast);
+  const monthsSlow = monthsAtPace(paceSlow);
+  const monthsToCurrent = paceBasis === 'recent' ? monthsFast : monthsSlow;
 
   // Probability of becoming Current NEXT MONTH — now derived from the hybrid
   // one-month advance projection (month=1 from computeHybridAdvance) rather than
@@ -1367,9 +1429,18 @@ const computeForecast = (userCase) => {
 
   return {
     alreadyCurrent: false, eligible: false, distanceDays, avgMovement, thisMonthDays,
-    monthsToCurrent: monthsToCurrent ? Math.ceil(monthsToCurrent) : null,
+    // Raw months, rounded only at display — the email renders the same figures, and
+    // rounding here instead made the two surfaces disagree by a month on the same case.
+    monthsToCurrent: monthsToCurrent ?? null,
     probCurrentNext, probAdvance, probRetrogress, confidence,
     longTermRate, // expose for UI display
+    // Range + the inputs behind it, so the UI can show both ends and say where they came from
+    paceBasis,
+    paceFast: Math.round(paceFast),
+    paceSlow: Math.round(paceSlow),
+    monthsFast: monthsFast ?? null,
+    monthsSlow: monthsSlow ?? null,
+    hasRange: Math.round(paceFast) !== Math.round(paceSlow),
   };
 };
 
@@ -4607,7 +4678,24 @@ const MonthlyUpdate = ({ userCase }) => {
 // ============================================================
 const Forecast = ({ userCase }) => {
   const { t, lang } = useLang();
-  const forecast = useMemo(() => computeForecast(userCase), [userCase]);
+  // Defaults to the cautious end. The user can switch, but they have to choose to.
+  const [paceBasis, setPaceBasis] = useState('conservative');
+  const forecast = useMemo(() => computeForecast(userCase, paceBasis), [userCase, paceBasis]);
+  // Switch to years past two years. The conservative basis routinely lands past the old
+  // "> 60 months" ceiling, and "60+" tells the reader almost nothing.
+  // Threshold matches formatMonthsCompact() in functions/api/_emailTemplates.js — the
+  // monthly email renders the same figures, so the switch to years has to happen at the
+  // same point or the two disagree on cases landing between 18 and 24 months.
+  const durationParts = (m) => {
+    if (m === null || m === undefined) return { value: '—', unit: '' };
+    return m / 12 >= 1.5
+      ? { value: (m / 12).toFixed(1), unit: lang === 'en' ? 'years' : '年' }
+      : { value: String(Math.round(m)), unit: t.months };
+  };
+  const fmtDuration = (m) => {
+    const p = durationParts(m);
+    return p.unit ? `${p.value} ${p.unit}` : p.value;
+  };
   const confLabel = { low: t.confLow, medium: t.confMed, high: t.confHigh }[forecast.confidence];
   const confTone = {
     low: 'bg-red-50 text-red-700 ring-red-200',
@@ -4674,15 +4762,52 @@ const Forecast = ({ userCase }) => {
               <div className="text-[10px] font-bold uppercase tracking-wider text-violet-700 mb-1">{t.probMonths}</div>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-black text-violet-900">
-                  {forecast.monthsToCurrent > 60 ? '60+' : forecast.monthsToCurrent}
+                  {durationParts(forecast.monthsToCurrent).value}
                 </span>
                 <span className="text-sm font-semibold text-violet-700">
-                  {forecast.monthsToCurrent > 60 ? t.moreThanYear : t.months}
+                  {durationParts(forecast.monthsToCurrent).unit}
                 </span>
               </div>
               <div className="mt-2 text-[11px] text-violet-700">
                 {t.avgMovement}: <span className="font-bold">+{forecast.avgMovement} {t.days}/{lang === 'en' ? 'mo' : t.months}</span>
               </div>
+
+              {forecast.hasRange && (
+                <>
+                  {/* The basis switch. Conservative is preselected; picking the optimistic
+                      end is a deliberate act, and the copy under it says what that costs. */}
+                  <div className="mt-3 pt-3 border-t border-violet-200">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-violet-700 mb-1.5">{t.paceBasisLabel}</div>
+                    <div className="inline-flex rounded-lg overflow-hidden ring-1 ring-violet-300">
+                      {[
+                        { key: 'conservative', label: t.paceBasisConservative, pace: forecast.paceSlow, months: forecast.monthsSlow },
+                        { key: 'recent', label: t.paceBasisRecent, pace: forecast.paceFast, months: forecast.monthsFast },
+                      ].map((opt) => (
+                        <button
+                          key={opt.key}
+                          onClick={() => setPaceBasis(opt.key)}
+                          aria-pressed={paceBasis === opt.key}
+                          className={`px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
+                            paceBasis === opt.key
+                              ? 'bg-violet-700 text-white'
+                              : 'bg-white text-violet-700 hover:bg-violet-50'
+                          }`}
+                        >
+                          {opt.label}
+                          <span className="ml-1 font-mono opacity-80">+{opt.pace}{lang === 'en' ? 'd' : '天'}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2 text-[11px] leading-relaxed text-violet-800">
+                      {paceBasis === 'recent' ? t.paceExplainRecent : t.paceExplainConservative}
+                    </div>
+                    <div className="mt-1.5 text-[11px] leading-relaxed text-violet-600">
+                      {t.paceRangeLabel}: <span className="font-bold">{fmtDuration(forecast.monthsFast)} – {fmtDuration(forecast.monthsSlow)}</span>
+                    </div>
+                    <div className="mt-1 text-[10px] leading-relaxed text-violet-500">{t.paceRangeNote}</div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -5744,12 +5869,9 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
       setAutoFitted(false);
       return;
     }
-    // Same Hybrid model the rest of the app uses
+    // Same Hybrid model — and the same observed pace — the chart's own curve uses.
     const longTermRate = getLongTermRate(cat, country);
-    const prevCutoff = bulletinPrevious.finalAction[cat]?.[country];
-    const mv = computeMovement(currentCutoff, prevCutoff);
-    const thisMonthDays = mv.type === 'advanced' ? mv.days : mv.type === 'retrogressed' ? -mv.days : 0;
-    const recentDpm = thisMonthDays > 0 ? thisMonthDays : (longTermRate / 12);
+    const recentDpm = observedPaceFromArchive(cat, country) ?? (longTermRate / 12);
 
     const estMonths = estimateMonthsToReachPD(
       currentCutoff, userCase.priorityDate, recentDpm, longTermRate, cat, country
@@ -5900,15 +6022,23 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
     return null;
   };
 
-  // Generate historical data covering `pastMonths` months ending at May 2026.
-  // For recent 12 months: uses bulletin-based simulation (original logic)
-  // For older months: uses interpolation from HISTORICAL_DATA anchor points (REAL DATA)
+  // Generate historical data covering `pastMonths` months ending at the loaded bulletin.
+  // Every month inside BULLETIN_ARCHIVE (26 real bulletins from history.json) is read
+  // straight out of it; only months older than the archive fall back to interpolation
+  // between the real HISTORICAL_DATA anchor points.
+  //
+  // This used to anchor on the hardcoded `bulletinMay2026` seed and back-extrapolate the
+  // "recent 12 months" with an invented rate table (F4-China: 8 days/month). That made
+  // the chart's observed pace exactly that invented constant, and pinned its starting
+  // cutoff three bulletins in the past — the two errors compounded and pushed F4-China's
+  // crossover out to 2037 while the real data implied a fraction of that.
   const generateHistoricalData = () => {
     const months = [];
-    const now = new Date(2026, 4, 1); // May 2026
+    const now = bulletinAnchorDate(1);
 
-    // Real data from bulletin (Taiwan/Mexico/Philippines all use "Other" pool)
-    const fa = bulletinMay2026.finalAction;
+    // Fallback anchor for months the archive doesn't cover — bulletinCurrent tracks the
+    // month actually on screen, unlike the frozen May seed this used to read.
+    const fa = bulletinCurrent.finalAction;
     const currentData = {
       'EB1-China': fa.EB1.China, 'EB1-Other': fa.EB1.Other, 'EB1-India': fa.EB1.India,
       'EB1-Mexico': fa.EB1.Other, 'EB1-Philippines': fa.EB1.Other,
@@ -5926,50 +6056,32 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
       'F4-Mexico': fa.F4.Other, 'F4-Philippines': fa.F4.Other,
     };
 
-    // Historical movement rate (days/month) for each category+country
-    const rate = {
-      'EB1-China': 20, 'EB1-Other': 0, 'EB1-India': 20, 'EB1-Mexico': 0, 'EB1-Philippines': 0,
-      'EB2-China': 15, 'EB2-Other': 0, 'EB2-India': 10, 'EB2-Mexico': 0, 'EB2-Philippines': 0,
-      'EB3-China': 18, 'EB3-Other': 15, 'EB3-India': 3, 'EB3-Mexico': 15, 'EB3-Philippines': 15,
-      'F1-China': 15, 'F1-Other': 15, 'F1-India': 15, 'F1-Mexico': 8, 'F1-Philippines': 10,
-      'F2A-China': 20, 'F2A-Other': 20, 'F2A-India': 20, 'F2A-Mexico': 18, 'F2A-Philippines': 20,
-      'F3-China': 10, 'F3-Other': 10, 'F3-India': 10, 'F3-Mexico': 5, 'F3-Philippines': 7,
-      'F4-China': 8, 'F4-Other': 8, 'F4-India': 4, 'F4-Mexico': 3, 'F4-Philippines': 5,
-    };
+    // Mexico and Philippines are charged to the "Other" pool in this app's model
+    // (see resolveCountry), so their series read from the Other column.
+    const archiveCountry = (ctry) => (ctry === 'Mexico' || ctry === 'Philippines' ? 'Other' : ctry);
 
-    // Subtract N days from a date string (stay 'C' if already current)
-    const subtractDays = (dateStr, days) => {
-      if (dateStr === 'C' || !dateStr) return dateStr;
-      const d = new Date(dateStr);
-      d.setDate(d.getDate() - days);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    };
-
-    // Build pastMonths months; i=0 is latest (May 2026), i=pastMonths-1 is earliest
-    // For months within the recent 12, use rate-based simulation from current data
-    // For older months, use HISTORICAL_DATA interpolation (real anchor data)
+    // Build pastMonths months; i=0 is latest, i=pastMonths-1 is earliest.
+    // Real bulletin first, interpolated anchors for anything older than the archive.
     for (let i = pastMonths - 1; i >= 0; i--) {
-      const monthsBack = i; // 0 for latest, pastMonths-1 for earliest
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const targetYear = date.getFullYear();
       const targetMonth = date.getMonth() + 1;
+      const archiveKey = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+      const archived = BULLETIN_ARCHIVE[archiveKey]?.data?.finalAction || null;
 
       const monthData = {};
       Object.keys(currentData).forEach(key => {
-        if (i <= 11) {
-          // Recent 12 months: use rate-based back-extrapolation from May 2026
-          monthData[key] = subtractDays(currentData[key], monthsBack * (rate[key] || 10));
-        } else {
-          // Older data: try to interpolate from HISTORICAL_DATA anchor points
-          const [cat, ctry] = key.split('-');
-          const interpolated = interpolateCutoff(cat, ctry, targetYear, targetMonth);
-          if (interpolated !== null) {
-            monthData[key] = interpolated;
-          } else {
-            // Fallback: rate-based extrapolation
-            monthData[key] = subtractDays(currentData[key], monthsBack * (rate[key] || 10));
-          }
+        const [cat, ctry] = key.split('-');
+        const fromArchive = archived?.[cat]?.[archiveCountry(ctry)];
+        if (fromArchive) {
+          monthData[key] = fromArchive;
+          return;
         }
+        // Older than the archive — interpolate between real anchor points.
+        const interpolated = interpolateCutoff(cat, ctry, targetYear, targetMonth);
+        // Last resort (no anchor coverage either): hold the current value flat rather
+        // than inventing movement, so a data gap can never masquerade as a trend.
+        monthData[key] = interpolated !== null ? interpolated : currentData[key];
       });
 
       months.push({
@@ -6097,7 +6209,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
       const monthsElapsed = historicalData.length - 1;
       const totalProgress = latestDate.getTime() - actualEarliestDate.getTime();
       const avgProgressPerMonth = totalProgress / monthsElapsed;
-      const bulletinMonth = new Date(2026, 4, 15).getTime();
+      const bulletinMonth = bulletinAnchorDate(15).getTime();
       const maxForecastDate = bulletinMonth + forecastMonths * 30.44 * 24 * 60 * 60 * 1000;
       const expectedFuture = Math.min(
         latestDate.getTime() + avgProgressPerMonth * forecastMonths,
@@ -6364,10 +6476,13 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const MS_PER_MONTH = 30.44 * MS_PER_DAY;
     
-    // RECENT TREND: advancement per month over past 12 months
+    // RECENT TREND: shared estimator, so this curve and the axis autofit agree.
+    // Falls back to the span of whatever history is on screen when the archive can't
+    // answer (e.g. a window reaching back past the 26 real bulletins).
     const monthsElapsed = historicalData.length - 1;
     const totalRecentProgress = latestDate.getTime() - actualEarliestDate.getTime();
-    const recentDaysPerMonth = (totalRecentProgress / MS_PER_DAY) / monthsElapsed;
+    const recentDaysPerMonth = observedPaceFromArchive(cat, country)
+      ?? ((totalRecentProgress / MS_PER_DAY) / monthsElapsed);
     
     // LONG-TERM RATE: historical average days per year (from 21-year AI model)
     const longTermDaysPerYear = getLongTermRate(cat, country);
@@ -7079,7 +7194,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
             const crossoverX = xScale(crossoverSlot);
             
             // Calculate the estimated calendar date
-            const bulletinMonth = new Date(2026, 4, 15); // May 15, 2026 = slot 11
+            const bulletinMonth = bulletinAnchorDate(15);
             const crossoverCalDate = new Date(bulletinMonth);
             const wholeMonths = Math.floor(monthsToReach);
             const fractionalDays = (monthsToReach - wholeMonths) * 30;
@@ -8189,8 +8304,8 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
           const monthsToReach = (lo + hi) / 2;
           if (monthsToReach <= 0 || monthsToReach > forecastMonths) return null;
           
-          // Calendar date: bulletin month (26/5) + monthsToReach months
-          const bulletinMonth = new Date(2026, 4, 15);
+          // Calendar date: current bulletin month + monthsToReach months
+          const bulletinMonth = bulletinAnchorDate(15);
           const crossoverCalDate = new Date(bulletinMonth);
           const wholeMonths = Math.floor(monthsToReach);
           const fractionalDays = (monthsToReach - wholeMonths) * 30;
@@ -8499,8 +8614,8 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
         {/* Tooltip for forecast hover.
             Suppressed when crossover detail popup is open. */}
         {hoveredForecast !== null && !showCrossoverInfo && (() => {
-          // The bulletin's latest month is May 2026. Forecast months extend from there.
-          const bulletinMonth = new Date(2026, 4, 1); // May 2026
+          // Forecast months extend from whichever bulletin month is currently loaded.
+          const bulletinMonth = bulletinAnchorDate(1);
           const future = new Date(bulletinMonth.getFullYear(), bulletinMonth.getMonth() + hoveredForecast.monthOffset, 1);
           const futureLabel = lang === 'en' 
             ? future.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
@@ -11389,6 +11504,7 @@ export default function App() {
     BULLETIN_CURRENT_MONTH.en = snapshot.label.en;
     BULLETIN_CURRENT_MONTH.zh = snapshot.label.zh;
     BULLETIN_CURRENT_MONTH.tw = snapshot.label.tw;
+    BULLETIN_CURRENT_KEY.value = viewingMonth;
     setBulletinTick((t) => t + 1); // force re-render
   }, [viewingMonth]);
 
