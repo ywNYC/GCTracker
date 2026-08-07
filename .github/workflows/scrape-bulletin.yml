@@ -1,10 +1,19 @@
 name: Auto-update Visa Bulletin
 
-# The State Department publishes each bulletin in the 2nd or 3rd week of the prior
-# month, so this checks daily on the 8th–21st. 14:00 UTC = 09:00 ET.
+# Actual publication dates, from the Wayback Machine's earliest successful capture of
+# each bulletin page (day of the PRIOR month):
+#   Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19 · Apr→17 · May→22 · Jul→18
+# Observed range is days 12-22, so days 10-23 covers it with margin on both sides. Note
+# the original '8-21' window would have missed the May bulletin, published on day 22.
+#
+# Do NOT use the bulletin's own "CA/VO: <date>" line to time this. That is an internal
+# Visa Office sign-off date, roughly the 1st-5th, and reading it as the publication date
+# produces a window that misses every release.
+#
+# Twice daily so a bulletin is picked up within ~12h. 13:00/20:00 UTC = 09:00/16:00 ET.
 on:
   schedule:
-    - cron: '0 14 8-21 * *'
+    - cron: '0 13,20 10-23 * *'
   workflow_dispatch:
     inputs:
       seed:
