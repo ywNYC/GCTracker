@@ -11041,7 +11041,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     zh: {
       title: '绿卡晴雨表',
       subtitle: '先告诉我你的情况',
-      haveCase: '我有案子',
+      haveCase: '我已在排期中',
       haveCaseDesc: '填写我的类别、国家、优先日',
       exploring: '我在探索',
       exploringDesc: '还不确定自己属于哪个类别 — 帮我找找',
@@ -11060,7 +11060,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     tw: {
       title: '綠卡晴雨表',
       subtitle: '先告訴我你的情況',
-      haveCase: '我有案子',
+      haveCase: '我已在排期中',
       haveCaseDesc: '填寫我的類別、國家、優先日',
       exploring: '我在探索',
       exploringDesc: '還不確定自己屬於哪個類別 — 幫我找找',
@@ -12439,6 +12439,11 @@ export default function App() {
           box-sizing: border-box; display: block;
           font-family: inherit;
           color-scheme: light;
+          /* Containing block for the absolutely-positioned picker indicator below.
+             Without this it anchors to the nearest positioned ancestor (the modal),
+             and the calendar icon escapes the input's right edge. */
+          position: relative;
+          padding-right: 34px;
         }
         .visa-root input[type="date"]::-webkit-calendar-picker-indicator {
           position: absolute; right: 10px; opacity: 0.5; cursor: pointer;
