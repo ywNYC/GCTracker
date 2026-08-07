@@ -364,6 +364,357 @@ export const renderUnsubscribePage = ({ email, success, language }) => {
 </html>`;
 };
 
+// ---- Monthly Bulletin Update Email ----
+// Sent when a new Visa Bulletin is scraped and a confirmed subscriber's own
+// category/country moved (advanced, retrogressed, or became current). Personalized
+// per-case: shows this month's Final Action + Filing Date movement for the subscriber's
+// exact case, and (when still not current) a hybrid-model ETA to their priority date.
+// `update` is the shape returned by computeCaseUpdate() in scripts/lib/gcMath.mjs.
+
+// Cutoff dates render as raw YYYY-MM-DD in monospace — short, alignment-stable,
+// and consistent with how the priority date is shown. Only C/U get words.
+const formatDateForLang = (s, lang) => {
+  if (!s || s === 'U') return lang === 'en' ? 'N/A' : '无';
+  if (s === 'C') return lang === 'en' ? 'Current' : '无排期';
+  return s;
+};
+
+const formatMonthsForLang = (months, lang) => {
+  if (months === null || months === undefined) return lang === 'en' ? 'beyond our forecast horizon' : '超出预测范围';
+  if (months <= 0) return lang === 'en' ? 'already current' : '已经排到';
+  const years = months / 12;
+  if (lang === 'en') {
+    return years >= 1.5
+      ? `about ${years.toFixed(1)} years (${Math.round(months)} months)`
+      : `about ${Math.round(months)} months`;
+  }
+  return years >= 1.5
+    ? `约 ${years.toFixed(1)} 年（${Math.round(months)} 个月）`
+    : `约 ${Math.round(months)} 个月`;
+};
+
+// Bare form for the two ends of a range, where a repeated "about" reads as noise.
+const formatMonthsCompact = (months, lang) => {
+  if (months === null || months === undefined) return lang === 'en' ? '10+ yrs' : '10 年以上';
+  if (months <= 0) return lang === 'en' ? 'now' : '已排到';
+  const years = months / 12;
+  if (years >= 1.5) return lang === 'en' ? `${years.toFixed(1)} yrs` : `${years.toFixed(1)} 年`;
+  return lang === 'en' ? `${Math.round(months)} mo` : `${Math.round(months)} 个月`;
+};
+
+const movementCopy = (movement, lang) => {
+  const t = {
+    zh: { advanced: '前进', retrogressed: '倒退', current: '变为无排期（Current）', none: '无变化' },
+    en: { advanced: 'advanced', retrogressed: 'retrogressed', current: 'became Current', none: 'no change' },
+  }[lang];
+  if (movement.type === 'advanced') return lang === 'en' ? `advanced ${movement.days} days` : `前进 ${movement.days} 天`;
+  if (movement.type === 'retrogressed') return lang === 'en' ? `retrogressed ${movement.days ?? ''} days`.trim() : `倒退 ${movement.days ?? ''} 天`.trim();
+  if (movement.type === 'current') return t.current;
+  return t.none;
+};
+
+// Monthly-movement column chart, drawn with table cells and background colors.
+// Deliberately not SVG or a hosted PNG: Gmail strips inline <svg>, Outlook's Word
+// renderer never supported it, and remote images are blocked by default in several
+// clients — a background-color <div> inside a <td> is the one thing that renders
+// everywhere. No hover layer exists because email has no JS, so every fact the
+// tooltip would carry is either direct-labeled or stated in the caption below.
+//
+// Colors are the CVD-validated pair (#0d7cb5 / #c1571f, ΔE 20.8 under protanopia);
+// a red/green pair fails at ΔE 2.0. Bar direction and the signed label carry the
+// same distinction, so color is never the sole encoder.
+const ADVANCE_COLOR = '#0d7cb5';
+const RETROGRESS_COLOR = '#c1571f';
+const ZERO_COLOR = '#d4d2c8';
+
+const renderMovementChart = (series, lang) => {
+  if (!Array.isArray(series) || series.length < 2) return '';
+
+  const CHART_PX = 44;
+  const maxAbs = Math.max(...series.map((s) => Math.abs(s.days)), 1);
+  const peakIdx = series.reduce((best, s, i) => (Math.abs(s.days) > Math.abs(series[best].days) ? i : best), 0);
+
+  // Year included: the window spans a year boundary, so a bare "9月 … 8月" reads as
+  // though both ticks sit in the same year.
+  const shortMonth = (m) => {
+    const [y, mo] = m.split('-');
+    return lang === 'en' ? `${mo}/${y.slice(2)}` : `${y.slice(2)}年${parseInt(mo, 10)}月`;
+  };
+
+  // Only the peak is direct-labeled — a number over every column is noise.
+  const labelRow = series.map((s, i) => {
+    const txt = i === peakIdx ? `${s.days > 0 ? '+' : ''}${Math.round(s.days)}` : '';
+    return `<td align="center" style="padding:0 1px; font-family:'Courier New',monospace; font-size:9px; color:#6b6a64; white-space:nowrap;">${txt}</td>`;
+  }).join('');
+
+  const barRow = series.map((s) => {
+    const zero = Math.round(s.days) === 0;
+    const h = zero ? 2 : Math.max(3, Math.round((Math.abs(s.days) / maxAbs) * CHART_PX));
+    const color = zero ? ZERO_COLOR : (s.days > 0 ? ADVANCE_COLOR : RETROGRESS_COLOR);
+    return `<td valign="bottom" height="${CHART_PX}" style="padding:0 1px; height:${CHART_PX}px;"><div style="height:${h}px; line-height:${h}px; font-size:0; background:${color};">&nbsp;</div></td>`;
+  }).join('');
+
+  const tickRow = series.map((s, i) => {
+    const show = i === 0 || i === series.length - 1;
+    return `<td align="center" style="padding:4px 1px 0; border-top:1px solid #d4d2c8; font-family:'Courier New',monospace; font-size:9px; color:#8a8980; white-space:nowrap;">${show ? shortMonth(s.month) : ''}</td>`;
+  }).join('');
+
+  const stalled = series.filter((s) => Math.round(s.days) === 0).length;
+  const caption = lang === 'en'
+    ? `Monthly advance over the last ${series.length} months — ${stalled} of them moved 0 days.`
+    : `过去 ${series.length} 个月每月推进天数——其中 ${stalled} 个月是 0 天。`;
+
+  return `
+    <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? 'Pace, month by month' : '逐月推进'}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">
+      <tr>${labelRow}</tr>
+      <tr>${barRow}</tr>
+      <tr>${tickRow}</tr>
+    </table>
+    <div style="font-size:11px; line-height:1.6; color:#8a8980; margin-top:8px;">${escapeHtml(caption)}</div>`;
+};
+
+// App.jsx reads the case off the query string (c/ct/pd/in/ps) and — importantly —
+// treats a URL case as "already onboarded", so this link lands the subscriber on their
+// own numbers instead of the first-run category picker.
+const buildCaseUrl = (siteUrl, userCase) => {
+  const base = String(siteUrl || '').replace(/\/+$/, '');
+  if (!userCase?.category || !userCase?.country || !userCase?.priorityDate) return base;
+  const p = new URLSearchParams();
+  p.set('c', userCase.category);
+  p.set('ct', userCase.country);
+  p.set('pd', userCase.priorityDate);
+  if (userCase.inUS === false) p.set('in', '0');
+  if (userCase.petitionerStatus) p.set('ps', userCase.petitionerStatus);
+  return `${base}/?${p.toString()}`;
+};
+
+export const renderMonthlyUpdateEmail = ({ email, userCase, update, bulletinMonthLabel, language, siteUrl, unsubscribeUrl }) => {
+  const lang = language === 'en' ? 'en' : 'zh';
+  const caseUrl = buildCaseUrl(siteUrl, userCase);
+
+  const category = formatCategory(userCase?.category);
+  const country = formatCountry(userCase?.country);
+  const priorityDate = escapeHtml(userCase?.priorityDate) || '—';
+
+  const fa = update.finalAction;
+  const fil = update.filing;
+  const isNowCurrent = fa.status?.status === 'current' || fa.status?.status === 'eligible' || fa.status?.status === 'overdue';
+
+  const headline = isNowCurrent
+    ? (lang === 'en' ? 'Your priority date is current' : '你的优先日已经排到了')
+    : fa.movement.type === 'advanced'
+      ? (lang === 'en'
+          ? `Your category advanced ${fa.movement.days} days this month`
+          : `本月你的类别前进了 ${fa.movement.days} 天`)
+      : fa.movement.type === 'retrogressed'
+        ? (lang === 'en' ? 'Your category retrogressed this month' : '本月你的类别出现倒退')
+        : (lang === 'en' ? 'No movement in your category this month' : '本月你的类别没有变化');
+
+  const subject = lang === 'en'
+    ? `Visa Bulletin ${bulletinMonthLabel}: ${headline}`
+    : `Visa Bulletin ${bulletinMonthLabel} 更新：${headline}`;
+
+  // A range, not a point estimate. The two ends are both computed straight from real
+  // movement — "this month's pace" and "the trailing 12-month average pace" — because
+  // for slow categories a single fast month makes a point estimate wildly optimistic.
+  const fc = !isNowCurrent && update.forecast ? update.forecast : null;
+  const hasRange = fc && fc.windowMean !== null && Math.round(fc.fastRate) !== Math.round(fc.slowRate);
+
+  const rangeHeadline = fc
+    ? (hasRange
+        ? `${formatMonthsCompact(fc.fastMonths, lang)} – ${formatMonthsCompact(fc.slowMonths, lang)}`
+        : formatMonthsCompact(fc.fastMonths, lang))
+    : '';
+
+  const rangeDetail = !fc ? '' : hasRange
+    ? (lang === 'en'
+        ? `The fast end assumes this month's pace holds (${Math.round(fc.fastRate)} days/month). The slow end uses the average pace actually delivered over the last ${fc.windowSize} months (${Math.round(fc.slowRate)} days/month).`
+        : `快的一端假设本月这个速度能保持（${Math.round(fc.fastRate)} 天/月），慢的一端用的是过去 ${fc.windowSize} 个月实际平均速度（${Math.round(fc.slowRate)} 天/月）。`)
+    : (lang === 'en'
+        ? `Based on a pace of ${Math.round(fc.fastRate)} days/month.`
+        : `按每月推进 ${Math.round(fc.fastRate)} 天估算。`);
+
+  const etaLine = rangeDetail;
+  const chartHtml = renderMovementChart(fc?.series, lang);
+
+  // "表 A / 表 B" mirrors the bulletin's own section lettering (A. FINAL ACTION DATES,
+  // B. DATES FOR FILING) and is what Chinese-language immigration discussion uses.
+  // The English chart names stay in place per the repo convention of keeping domain
+  // terms in the original.
+  const rows = [
+    {
+      label: lang === 'en' ? 'Chart A · Final Action Dates' : '表 A · Final Action Dates',
+      prev: formatDateForLang(fa.previous, lang),
+      cur: formatDateForLang(fa.current, lang),
+      move: movementCopy(fa.movement, lang),
+    },
+    {
+      label: lang === 'en' ? 'Chart B · Dates for Filing' : '表 B · Dates for Filing',
+      prev: formatDateForLang(fil.previous, lang),
+      cur: formatDateForLang(fil.current, lang),
+      move: movementCopy(fil.movement, lang),
+    },
+  ];
+
+  // Deliberately one short line: the chart names already appear in the row labels
+  // directly above, so repeating them here only pushed the note into a wrapped block.
+  const chartNote = lang === 'en'
+    ? 'Chart A decides approval · Chart B decides filing'
+    : '表 A 决定能否获批，表 B 决定能否递件';
+
+  const text = [
+    headline,
+    '',
+    lang === 'en' ? 'YOUR CASE' : '你的案子',
+    `${lang === 'en' ? 'Category' : '类别'}: ${category}`,
+    `${lang === 'en' ? 'Country' : '出生国'}: ${country}`,
+    `${lang === 'en' ? 'Priority Date' : '优先日'}: ${priorityDate}`,
+    '',
+    lang === 'en' ? 'THIS MONTH' : '本月变化',
+    ...rows.map((r) => `${r.label}: ${r.prev} -> ${r.cur} (${r.move})`),
+    '',
+    chartNote,
+    '',
+    rangeHeadline ? `${lang === 'en' ? 'ESTIMATED WAIT' : '预计还要等'}: ${rangeHeadline}` : '',
+    etaLine,
+    '',
+    `${lang === 'en' ? 'Open the app' : '打开应用'}: ${siteUrl}`,
+    `${lang === 'en' ? 'Unsubscribe' : '取消订阅'}: ${unsubscribeUrl}`,
+  ].filter((l) => l !== '' || true).join('\n');
+
+  // Each table gets a stacked two-line block instead of four squeezed columns:
+  // line 1 = table name (left) + movement (right), line 2 = old → new in monospace.
+  // Dates never wrap this way, regardless of client width.
+  const rowsHtml = rows.map((r) => `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #e4e1d6;">
+      <tr>
+        <td colspan="2" style="padding:10px 0 2px; font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.1em; color:#6b6a64; text-transform:uppercase;">${escapeHtml(r.label)}</td>
+      </tr>
+      <tr>
+        <td style="padding:0 0 10px; font-family:'Courier New',monospace; font-size:13px; color:#1a1a1a; white-space:nowrap;">${
+          r.prev === r.cur
+            ? `<b>${r.cur}</b>`
+            : `<span style="color:#8a8980; text-decoration:line-through;">${r.prev}</span><span style="color:#8a8980;">&nbsp;→&nbsp;</span><b>${r.cur}</b>`
+        }</td>
+        <td align="right" style="padding:0 0 10px 16px; font-size:12px; color:#0e4d2e; white-space:nowrap;">${escapeHtml(r.move)}</td>
+      </tr>
+    </table>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>${escapeHtml(subject)}</title>
+<style>
+  body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table { border-collapse: collapse; }
+  a { text-decoration: none; }
+  @media only screen and (max-width: 600px) {
+    .container { width: 100% !important; }
+    .px { padding-left: 24px !important; padding-right: 24px !important; }
+    .headline { font-size: 22px !important; }
+  }
+</style>
+</head>
+<body style="margin:0; padding:0; background:#f4f3ee; font-family: Georgia, 'Times New Roman', serif; color:#1a1a1a;">
+
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">${escapeHtml(headline)}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f3ee;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+
+      <table role="presentation" class="container" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px; max-width:560px; background:#fdfcf8; border:1px solid #d4d2c8;">
+
+        <tr>
+          <td class="px" style="padding:32px 40px 20px; border-bottom:1px solid #1a1a1a;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="font-family:Georgia,serif; font-size:22px; font-weight:500; letter-spacing:-0.01em; color:#1a1a1a;">${lang === 'en' ? 'Green Card Tracker' : '绿卡晴雨表'}</td>
+                <td align="right" style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.1em; color:#6b6a64; text-transform:uppercase;">${escapeHtml(bulletinMonthLabel)}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="px" style="padding:28px 40px 8px;">
+            <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#8b3a3a; text-transform:uppercase; margin-bottom:8px;">${lang === 'en' ? '— Bulletin Update —' : '— 排期更新 —'}</div>
+            <div class="headline" style="font-family:Georgia,serif; font-size:26px; line-height:1.3; font-weight:400; letter-spacing:-0.01em; margin-bottom:6px; color:#1a1a1a;">${escapeHtml(headline)}</div>
+          </td>
+        </tr>
+
+        <tr>
+          <td class="px" style="padding:12px 40px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f3ee; border-left:2px solid #1a1a1a;">
+              <tr>
+                <td style="padding:16px 18px;">
+                  <div style="font-family:'Courier New',monospace; font-size:9px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? 'Your Case' : '你的案子'}</div>
+                  <div style="font-family:'Courier New',monospace; font-size:16px; font-weight:700; color:#1a1a1a; letter-spacing:0.02em;">${escapeHtml(category)} · ${escapeHtml(country)}</div>
+                  <div style="font-size:12px; color:#6b6a64; margin:3px 0 14px;">${lang === 'en' ? 'Priority Date' : '优先日'}&nbsp;&nbsp;<span style="font-family:'Courier New',monospace; font-size:13px; color:#1a1a1a;">${priorityDate}</span></div>
+                  ${rowsHtml}
+                  <div style="border-top:1px solid #e4e1d6; padding-top:9px; font-size:11px; line-height:1.5; color:#8a8980;">${escapeHtml(chartNote)}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        ${etaLine ? `
+        <tr>
+          <td class="px" style="padding:20px 40px 8px;">
+            <div style="border-top:1px solid #d4d2c8; padding-top:16px;">
+              <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:8px;">${lang === 'en' ? 'Estimated Wait' : '预计还要等'}</div>
+              <div style="font-family:Georgia,serif; font-size:24px; line-height:1.2; color:#1a1a1a; margin-bottom:8px;">${escapeHtml(rangeHeadline)}</div>
+              <div style="font-size:12px; line-height:1.7; color:#2a2a2a;">${escapeHtml(etaLine)}</div>
+              <div style="font-size:11px; line-height:1.6; color:#8a8980; margin-top:8px;">${lang === 'en'
+                ? 'A model estimate from historical pace, not a guarantee — the bulletin can speed up, slow down, or retrogress.'
+                : '基于历史速度的模型估算，不是承诺——排期可能加速、放缓，也可能倒退。'}</div>
+            </div>
+          </td>
+        </tr>` : ''}
+
+        ${chartHtml ? `
+        <tr>
+          <td class="px" style="padding:16px 40px 8px;">
+            <div style="border-top:1px solid #d4d2c8; padding-top:16px;">${chartHtml}</div>
+          </td>
+        </tr>` : ''}
+
+        <tr>
+          <td align="center" class="px" style="padding:24px 40px;">
+            <a href="${escapeHtml(caseUrl)}" style="display:inline-block; background:#1a1a1a; color:#fdfcf8; padding:11px 28px; text-decoration:none; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${lang === 'en' ? 'Open Green Card Tracker →' : '打开绿卡晴雨表 →'}</a>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" class="px" style="padding:16px 40px 24px; border-top:1px solid #d4d2c8;">
+            <div style="font-size:10px; color:#8a8980; line-height:1.7;">
+              <a href="${escapeHtml(unsubscribeUrl)}" style="color:#6b6a64;">${lang === 'en' ? 'Unsubscribe' : '取消订阅'}</a>
+              &nbsp;·&nbsp;
+              <a href="${escapeHtml(caseUrl)}" style="color:#6b6a64;">${lang === 'en' ? 'Edit case / preferences' : '修改优先日或设置'}</a>
+              &nbsp;·&nbsp;
+              ${lang === 'en' ? 'Data: travel.state.gov' : '数据来源：travel.state.gov'}
+            </div>
+            <div style="font-family:'Courier New',monospace; font-size:9px; letter-spacing:0.15em; color:#b0afa6; text-transform:uppercase; margin-top:14px;">Green Card Tracker · JMJ · 2026</div>
+          </td>
+        </tr>
+
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>`;
+
+  return { subject, html, text };
+};
+
 // ---- Confirmation Email (double opt-in) ----
 // Sent on the FIRST subscribe request. Nothing is treated as an active subscription
 // until the recipient clicks through, so a third party cannot sign someone else up
