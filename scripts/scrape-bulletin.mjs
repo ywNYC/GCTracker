@@ -160,6 +160,133 @@ function findHeading(html, markerRegex, startOffset = 0) {
   return startOffset + match.index;
 }
 
+// ============================================================
+// EXTRAS: DV tables, lettered notice sections, F2A note, metadata
+// These are additive, best-effort fields. Failure to parse any of them warns and
+// moves on — the four cutoff tables remain the only hard contract (exit code 2).
+// ============================================================
+
+const DV_REGION_KEYS = [
+  ['AFRICA', 'africa'],
+  ['ASIA', 'asia'],
+  ['EUROPE', 'europe'],
+  ['NORTH AMERICA', 'northAmerica'],
+  ['OCEANIA', 'oceania'],
+  ['SOUTH AMERICA', 'southAmerica'],
+];
+
+// DV tables are 3 columns: Region | rank cutoff | per-country exceptions.
+// Cutoffs are lottery RANK NUMBERS (e.g. "60,000"), not dates — do not feed parseDate.
+function parseDVTable(tableHtml) {
+  const rows = [...tableHtml.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+  const regions = {};
+  for (const row of rows) {
+    const cells = [...row[1].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)]
+      .map((c) => stripHtml(c[1]));
+    if (cells.length < 2) continue;
+    const label = cells[0].toUpperCase();
+    const regionKey = DV_REGION_KEYS.find(([marker]) => label.includes(marker))?.[1];
+    if (!regionKey) continue; // header row or junk
+
+    const rawCutoff = (cells[1] || '').trim();
+    let cutoff = null;
+    if (/^CURRENT$/i.test(rawCutoff) || rawCutoff.toUpperCase() === 'C') cutoff = 'C';
+    else if (/^[\d,]+$/.test(rawCutoff)) cutoff = parseInt(rawCutoff.replace(/,/g, ''), 10);
+
+    // "Except: Algeria 51,250 Egypt 36,000" → { Algeria: 51250, Egypt: 36000 }
+    const exceptions = {};
+    for (const m of (cells[2] || '').matchAll(/([A-Z][A-Za-z]+(?: [A-Z][A-Za-z]+)*)[:\s]+([\d,]+)/g)) {
+      if (m[1].toLowerCase() === 'except') continue;
+      exceptions[m[1]] = parseInt(m[2].replace(/,/g, ''), 10);
+    }
+
+    regions[regionKey] = { cutoff, ...(Object.keys(exceptions).length ? { exceptions } : {}) };
+  }
+  return Object.keys(regions).length >= 4 ? regions : null;
+}
+
+function parseBulletinExtras(html) {
+  const extras = { dv: null, dvNext: null, notices: [], f2aExempt: null, meta: null };
+  const text = stripHtml(html);
+
+  // ---- DV: current month + next month's advance notice ----
+  const dvCurIdx = findHeading(html, /DIVERSITY\s+IMMIGRANT\s*\(DV\)\s+CATEGORY\s+FOR\s+THE\s+MONTH\s+OF\s+(\w+)/i);
+  if (dvCurIdx !== -1) {
+    const t = findNextTable(html, dvCurIdx);
+    if (t) extras.dv = parseDVTable(t.html);
+  }
+  const dvNextMatch = html.slice(0).match(/CATEGORY\s+RANK\s+CUT-?OFFS\s+WHICH\s+WILL\s+APPLY\s+IN\s+(\w+)/i);
+  if (dvNextMatch) {
+    const idx = html.search(/CATEGORY\s+RANK\s+CUT-?OFFS\s+WHICH\s+WILL\s+APPLY\s+IN\s+\w+/i);
+    const t = findNextTable(html, idx);
+    const regions = t ? parseDVTable(t.html) : null;
+    if (regions) {
+      extras.dvNext = { monthName: dvNextMatch[1], regions };
+    }
+  }
+
+  // ---- Lettered notice sections (D. onward) ----
+  // Topics vary month to month (this month: availability warning, EB-1 India, EB-2
+  // retrogression risk, SIVs) so parsing is structural: ALL-CAPS headings "X. TITLE"
+  // with strictly increasing letters, body = text until the next heading. Ends at the
+  // publication line. "U.S." can't false-match — the letter must be followed by ". "
+  // then more caps.
+  const noticeZone = (() => {
+    const start = text.search(/CATEGORY\s+RANK\s+CUT-?OFFS\s+WHICH\s+WILL\s+APPLY/i);
+    const end = text.search(/Department of State Publication/i);
+    if (start === -1) return null;
+    return text.slice(start, end === -1 ? undefined : end);
+  })();
+  if (noticeZone) {
+    const headingRe = /\b([D-Z])\.\s+([A-Z][A-Z0-9 ,\-'’()./&:;]{8,})/g;
+    const found = [];
+    let lastLetter = 'C';
+    for (const m of noticeZone.matchAll(headingRe)) {
+      if (m[1] <= lastLetter) continue; // letters strictly increase; skip echoes
+      let title = m[2];
+      let bodyStart = m.index + m[0].length;
+      // The caps run stops at the first lowercase letter, which cuts the body's first
+      // word in half ("...VISAS I" + "mmigrant visa...", "(SIV" + "s)"). If we stopped
+      // mid-word, hand the fragment back to the body.
+      if (/[a-z]/.test(noticeZone[bodyStart] || '')) {
+        const lastSpace = title.lastIndexOf(' ');
+        if (lastSpace > 0) {
+          bodyStart -= title.length - lastSpace;
+          title = title.slice(0, lastSpace);
+        }
+      }
+      found.push({ letter: m[1], title: title.trim(), start: m.index, bodyStart });
+      lastLetter = m[1];
+    }
+    extras.notices = found.map((h, i) => ({
+      letter: h.letter,
+      title: h.title.replace(/\s+/g, ' '),
+      text: noticeZone
+        .slice(h.bodyStart, i + 1 < found.length ? found[i + 1].start : undefined)
+        .replace(/\s+/g, ' ')
+        .trim(),
+    }));
+  }
+
+  // ---- F2A per-country-limit exemption date ----
+  const f2a = text.match(/F2A numbers EXEMPT from per-country limit[\s\S]{0,200}?earlier than\s+(\d{1,2}[A-Z]{3}\d{2,4})/i);
+  if (f2a) extras.f2aExempt = parseDate(f2a[1]);
+
+  // ---- Bulletin metadata ----
+  const number = text.match(/\bNumber\s+(\d+)\b/);
+  const volume = text.match(/\bVolume\s+([IVXLCDM]+)\b/);
+  const printed = text.match(/CA\/VO:\s*([A-Za-z]+ \d{1,2}, \d{4})/);
+  if (number || volume || printed) {
+    extras.meta = {
+      ...(volume ? { volume: volume[1] } : {}),
+      ...(number ? { number: parseInt(number[1], 10) } : {}),
+      ...(printed ? { printedDate: printed[1] } : {}),
+    };
+  }
+
+  return extras;
+}
+
 export function parseVisaBulletinHTML(html, targetMonth) {
   // Collapse non-breaking spaces to ordinary ones before any offset-based searching.
   // Every subsequent index (headings, tables) refers to this normalized string, so the
@@ -211,6 +338,16 @@ export function parseVisaBulletinHTML(html, targetMonth) {
     } else {
       console.warn(`  ! table did not parse: ${sec.kind}/${sec.target}`);
     }
+  }
+
+  // Additive best-effort fields — never fail the run over these.
+  try {
+    const extras = parseBulletinExtras(html);
+    Object.assign(result, extras);
+    if (!extras.dv) console.warn('  ! DV table not parsed (soft)');
+    if (!extras.notices.length) console.warn('  ! no notice sections found (soft)');
+  } catch (e) {
+    console.warn(`  ! extras parse failed (soft): ${e.message}`);
   }
 
   return result;
@@ -331,6 +468,9 @@ export async function fetchBulletinHTML(year, monthName) {
 async function main() {
   const args = process.argv.slice(2);
   const seedMode = args.includes('--seed');
+  // --force: refetch even if bulletin.json already has the target month. Used to
+  // enrich an already-scraped month after the parser learns new fields (DV, notices).
+  const forceMode = args.includes('--force');
   const monthArg = args.find((a) => a.startsWith('--month='));
   const explicitMonth = monthArg ? monthArg.slice('--month='.length) : null;
 
@@ -361,7 +501,7 @@ async function main() {
   console.log(`Target: ${target.monthKey} (${target.monthLabel}) — mode: ${mode}`);
 
   // Skip if we already have target
-  if (storedCurrentMonth === target.monthKey) {
+  if (storedCurrentMonth === target.monthKey && !forceMode) {
     console.log(`✓ Already have ${target.monthKey}, nothing to do.`);
     process.exit(0);
   }
@@ -408,7 +548,12 @@ async function main() {
     source: 'github-actions-auto',
     sourceUrl: url,
     current: parsed,
-    previous: existing?.current || null, // Rotate: old current → previous
+    // Rotate old current → previous, EXCEPT when re-scraping the month already held:
+    // rotating then would set previous = current's own month, breaking the
+    // adjacent-month invariant the frontend's trend math depends on.
+    previous: existing?.current?.month === target.monthKey
+      ? (existing?.previous || null)
+      : (existing?.current || null),
   };
   fs.writeFileSync(BULLETIN_JSON_PATH, JSON.stringify(newData, null, 2) + '\n', 'utf8');
   console.log(`✅ Wrote ${BULLETIN_JSON_PATH} — new month: ${target.monthKey}`);

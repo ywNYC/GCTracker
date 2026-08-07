@@ -39,17 +39,24 @@ jobs:
             node scripts/scrape-bulletin.mjs
           fi
 
-      # The scraper writes public/bulletin.json — Vite serves public/ at the site root,
-      # so this is the file that becomes /bulletin.json after a Pages build.
+      # USCIS posts its chart designation ~a week after the DOS bulletin, so this
+      # runs on the same daily cadence. Best-effort: a USCIS outage must not turn
+      # the bulletin scrape red (`|| true`); the parser's own exit 2 still shows
+      # in the log for humans.
+      - name: Scrape USCIS chart designation
+        run: node scripts/scrape-uscis-chart.mjs || true
+
+      # The scrapers write into public/ — Vite serves public/ at the site root,
+      # so these become /bulletin.json and /uscis-charts.json after a Pages build.
       - name: Commit if changed
         run: |
-          if git diff --quiet -- public/bulletin.json; then
-            echo "No change to public/bulletin.json — nothing to commit."
+          if git diff --quiet -- public/bulletin.json public/uscis-charts.json; then
+            echo "No change to scraped data — nothing to commit."
             exit 0
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/bulletin.json
+          git add public/bulletin.json public/uscis-charts.json
           git commit -m "chore: auto-update visa bulletin"
           git push
           echo "Pushed updated bulletin — Cloudflare Pages will redeploy."

@@ -22,7 +22,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "scrape": "node scripts/scrape-bulletin.mjs",
-    "scrape:seed": "node scripts/scrape-bulletin.mjs --seed"
+    "scrape:seed": "node scripts/scrape-bulletin.mjs --seed",
+    "scrape:uscis": "node scripts/scrape-uscis-chart.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.383.0",

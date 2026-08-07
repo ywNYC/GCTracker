@@ -1,4 +1,4 @@
-# 交接 · 2026-08-07
+# 交接 · 2026-08-07（第二次更新）
 
 下一轮会话从这份开始读。项目规则见 `CLAUDE.md`（同目录，会自动加载）。
 
@@ -6,12 +6,16 @@
 
 ## 立刻要知道的三件事
 
-1. **PR #3 开着没合，线上仍是错的。** https://github.com/ywNYC/GCTracker/pull/3
-   分支 `fix/forecast-real-data`。合并前 `gc.jmjvc.us` 的预测页仍显示 2037 年那个错数字。
+1. **GitHub 账号因 billing 被锁，Actions 完全跑不了。** run 31158607139 的错误是
+   「account is locked due to a billing issue」——这才是自动更新从未成功的真正原因
+   （不是 runner 故障）。只有用户能修：GitHub Settings → Billing。解锁后
+   `gh workflow run scrape-bulletin.yml` 验证一次。
 2. **这个仓库是 PUBLIC。** 任何真实邮箱、优先日、密钥都不能进代码。
    `scripts/render-monthly-preview.mjs` 已改为全部从环境变量读，别改回硬编码。
 3. **Resend API key 曾在一次对话记录里出现过。** 若介意，去 Resend 后台吊销重发，
    并同步更新 Cloudflare Pages 的 `RESEND_API_KEY`。
+
+（PR #3 —— 预测页改用真实数据 —— 已于 08-07 合并上线，交叉点 2037→2033。）
 
 ---
 
@@ -46,18 +50,30 @@
 计算逻辑抽在 **`scripts/lib/gcMath.mjs`**（Node 侧），与 `src/App.jsx` 是**两份平行实现**。
 改模型时两边都要改——文件顶部注释里写了这条。
 
-### 还欠的：批量发送脚本
+### 批量发送：已实现为 POST /api/admin/send-monthly
 
-`scripts/send-monthly.js` 不存在。需要：遍历 `SUBSCRIBERS` KV（**跳过 `rl:` 前缀**，
-那是限流计数器）→ 过滤 `confirmed === true` → 逐个算 `computeCaseUpdate` →
-只给类别有变化的人发 → 调 Resend。
+`functions/api/admin/send-monthly.js`（Pages Function，因为 KV 只有它能碰）。
+公告更新后手动触发：
 
-预览脚本可参考跑法：
+```
+curl -X POST https://gc.jmjvc.us/api/admin/send-monthly \
+  -H "Authorization: Bearer $ADMIN_TOKEN"          # ?dryRun=1 先看会发给谁
+```
+
+- 遍历 KV 跳过 `rl:`，只发 `confirmed === true` 且类别有变化的人
+- **幂等**：成功发送后往记录写 `lastNotifiedMonth`，同月重跑不会二次发送（`?force=1` 覆盖）
+- 数据从 `${SITE_URL}/history.json` 拉（和前端同源），并复现 `applyRecentRateOverride`
+- 若 `/uscis-charts.json` 覆盖当月，邮件注释自动换成「本月递 I-485 用表 X（USCIS 判定）」
+- **尚未实发过一次真实批量**——第一次跑先 `?dryRun=1`
+
+计算逻辑唯一实现在 `functions/api/_gcMath.js`（Pages 打包不跨 functions/ 边界），
+`scripts/lib/gcMath.mjs` 只是 re-export。与 `src/App.jsx` 仍是两份平行实现，改模型两边都要动。
+
+预览脚本跑法：
 ```
 PREVIEW_TO=you@example.com RESEND_API_KEY=re_xxx RESEND_FROM="..." \
   node scripts/render-monthly-preview.mjs [--dry-run]
 ```
-`--dry-run` 只写 `/tmp/gc-monthly-preview.html` 不发信。
 
 ---
 
@@ -70,25 +86,25 @@ PREVIEW_TO=you@example.com RESEND_API_KEY=re_xxx RESEND_FROM="..." \
 
 ---
 
-## 抓取扩展（用户已确认要做，还没开始）
+## 抓取扩展：已完成
 
-现在只抓四张排期表。已实地核对 2026-08 公告，**确认可抓**：
+`scrape-bulletin.mjs` 现在额外解析（全部 **additive、软失败**——只 warn 不红灯，
+四张排期表仍是唯一硬契约）：
 
-| 内容 | 位置 | 备注 |
-|---|---|---|
-| DV 当月排期 | B 节，7 地区 × 3 列 | 带国家例外（Algeria/Egypt/Nepal） |
-| DV **下月**预告 | C 节 | 前瞻数据，八月公告里就登了九月截止号 |
-| D/E/F/G 说明段 | 纯文本 | **E/F 是明确的倒退预警**，对通知产品价值极高 |
-| F2A 免限额日期 | 五个单格小表 | 2026-08 是 `22MAR05` |
-| 年度配额数字 | A 节段落 4/5 | FY 上限、各优先级百分比 |
-| 公告元数据 | 页首 | Volume XI、Number 17、CA/VO 日期 |
+- `dv` / `dvNext`：DV 当月 + 下月预告，6 地区 rank cutoff + 国家例外（是抽签排名数字不是日期，别喂 parseDate）
+- `notices`：D 之后的字母节（标题 + 正文），**结构化解析**——字母严格递增、全大写标题，
+  因为各月主题不同不能按内容匹配。E/F 这类倒退预警就在这里
+- `f2aExempt`：F2A 免 per-country 限额日期（2026-08 实值是 `22JUL25` → 2025-07-22）
+- `meta`：Volume / Number / CA-VO 日期
 
-**USCIS「用哪张表」要单独抓一个源。** 公告本身不含判定，只写「去 uscis.gov/visabulletininfo 查」。
-该页 `curl` 返回 200（会跳转到 `.../adjustment-of-status-filing-charts-from-the-visa-bulletin`），
-表述规整，还有「Next Month's」区块。2026-08 的答案是：**家庭类用表 B，就业类用表 A**。
+新增 `--force`：重抓已有月份以补新字段，且**不轮转 previous**（同月重抓时轮转会让
+previous == current，破坏相邻月不变量——已在代码里防住）。2026-08 已用它补全。
 
-> 注意：F4 属家庭类，八月 USCIS 认的是表 B。邮件目前把表 A 放主位——对家庭类而言主次是反的，
-> 等这个抓取做好后可以直接给出当月确定答案。
+**USCIS「用哪张表」也已完成**：`npm run scrape:uscis` → `public/uscis-charts.json`。
+2026-08 实抓结果：家庭类=表 B（filing），就业类=表 A（finalAction）。三个消费方都接上了：
+发信端点（邮件注释给确定答案）、前端（运行时覆盖 `FILING_AUTHORIZED`）、workflow（每日跑，`|| true` 软失败）。
+
+历史月份如需补这些字段：按时间顺序对每个月跑 `--month=YYYY-MM --force`（注意相邻序）。
 
 ---
 
@@ -96,37 +112,18 @@ PREVIEW_TO=you@example.com RESEND_API_KEY=re_xxx RESEND_FROM="..." \
 
 | 环节 | 状态 |
 |---|---|
-| 抓取公告数据 | ✅ 可用（`npm run scrape`，本地验证过 404 优雅退出） |
+| 抓取公告数据（含 DV/notices/meta） | ✅ 可用，2026-08 已带全字段 |
+| USCIS 表格判定抓取 | ✅ 可用（`npm run scrape:uscis`），前端+邮件已接 |
 | 网站显示 2026-08 | ✅ 已上线 |
-| 26 个月历史 + 月份选择器 | ✅ 已上线 |
+| 预测页用真实数据 + 区间口径 | ✅ 已上线（PR #3） |
 | 订阅收集 + 双重确认 | ✅ 已上线 |
-| 预测页用真实数据 | ⏳ **PR #3 待合并** |
-| 月度邮件模板 | ⏳ 随 PR #3 待合并 |
-| 批量发送脚本 | ❌ 不存在 |
-| GitHub Actions 自动更新 | ❌ **从未成功跑通过一次** |
-| 订阅区勾选顺序（A） | ❌ 未做 |
+| 订阅区勾选顺序（A） | ✅ 已修（勾选块移到表单前） |
+| 月度邮件模板 | ✅ 在 main |
+| 批量发送端点 | ✅ 代码完成，**从未实发过**（先 dryRun） |
+| GitHub Actions 自动更新 | ❌ **被账号 billing 锁挡死**（见顶部第 1 条） |
 
----
-
-## GitHub Actions：唯一一次运行是失败的
-
-run `31123677747` 失败原因是 `The job was not acquired by Runner of type hosted` ——
-GitHub 没把托管 runner 派下来，脚本压根没执行。是 GitHub 的故障，不是代码问题，
-但**这条链至今没有被端到端证明过**。
-
-cron 是 `0 14 8-21 * *`（每月 8–21 号）。九月公告通常 8–15 号发布，所以正常情况下
-它会自己抓到。想手动验证的话现在跑是**空转**（九月尚未发布，404 → exit 0，不 commit
-不部署），能证明管道通不通。
-
----
-
-## 还欠着的 A：订阅区勾选顺序
-
-勾选块在 `src/App.jsx` 的 `alertItems.map` 附近，在 `{!isSubscribed ? ... : ...}` 三元
-表达式**之外**，要整块移到订阅表单**之前**。未订阅时被长表单推到下方，观感像是
-「订阅完才出现」。功能性问题已在 `5f196d9` 修复，这里只剩观感。
-
-> 注意：PR #3 动过 `src/App.jsx`，行号已偏移，动手前先 grep 定位。
+cron 是 `0 14 8-21 * *`（每月 8–21 号）。billing 解锁后九月公告（通常 8–15 号发布）
+会被自动抓到；随后需要有人（或未来的自动化）调 send-monthly 端点发信。
 
 ---
 

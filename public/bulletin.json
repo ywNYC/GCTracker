@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "2026-08-06T14:18:18.213Z",
+  "lastUpdated": "2026-08-07T11:09:29.625Z",
   "source": "github-actions-auto",
   "sourceUrl": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-august-2026.html",
   "current": {
     "month": "2026-08",
-    "scrapedAt": "2026-08-06T14:18:18.211Z",
+    "scrapedAt": "2026-08-07T11:09:29.613Z",
     "finalAction": {
       "EB1": {
         "Other": "C",
@@ -120,6 +120,96 @@
         "Mexico": "2001-04-30",
         "Philippines": "2008-03-22"
       }
+    },
+    "dv": {
+      "africa": {
+        "cutoff": 60000,
+        "exceptions": {
+          "Algeria": 51250,
+          "Egypt": 36000
+        }
+      },
+      "asia": {
+        "cutoff": 40000,
+        "exceptions": {
+          "Nepal": 13500
+        }
+      },
+      "europe": {
+        "cutoff": 29000
+      },
+      "northAmerica": {
+        "cutoff": "C"
+      },
+      "oceania": {
+        "cutoff": 2050
+      },
+      "southAmerica": {
+        "cutoff": 4000
+      }
+    },
+    "dvNext": {
+      "monthName": "SEPTEMBER",
+      "regions": {
+        "africa": {
+          "cutoff": 101250,
+          "exceptions": {
+            "Algeria": 85000,
+            "Egypt": 50000
+          }
+        },
+        "asia": {
+          "cutoff": 40000,
+          "exceptions": {
+            "Nepal": 13500
+          }
+        },
+        "europe": {
+          "cutoff": 47500
+        },
+        "northAmerica": {
+          "cutoff": "C"
+        },
+        "oceania": {
+          "cutoff": 3000
+        },
+        "southAmerica": {
+          "cutoff": 4750
+        }
+      }
+    },
+    "notices": [
+      {
+        "letter": "D",
+        "title": "AVAILABILITY OF FAMILY-SPONSORED AND EMPLOYMENT-BASED VISAS",
+        "text": "Immigrant visa issuance rates for aliens from certain countries have decreased in light of various actions the administration has taken to protect national security and public safety, and to otherwise advance the interests of the United States (e.g. Presidential Proclamation 10949 , Presidential Proclamation 10998 , Immigrant Visa Processing Updates ). Consequently, to make visas available in accordance with sections 201-203 of the INA to sufficient prospective immigrants from other countries to use immigrant visa numbers that are available in FY 2026, dates for filing and final action dates have been advanced across various immigrant visa categories throughout recent months. Note that as additional immigrant visa demand materializes, or administration actions are amended, retrogression may be necessary in the upcoming months to keep issuances within annual limits. Visa categories may become “Unavailable” prior to the end of the fiscal year if annual limits, category limits, or pro-rated per-country limits are reached. This situation is being continually monitored, and any necessary adjustments will be made accordingly."
+      },
+      {
+        "letter": "E",
+        "title": "VISA AVAILABILITY IN THE EMPLOYMENT-BASED FIRST PREFERENCE (EB-1) FINAL ACTION DATE FOR INDIA",
+        "text": "High demand and number use by aliens chargeable to India in the EB-1 visa category may necessitate making the category unavailable in the coming weeks if India’s pro-rated limit in the EB-1 category is reached before the fiscal year ends. This situation will be continually monitored, and any necessary adjustments will be made accordingly."
+      },
+      {
+        "letter": "F",
+        "title": "VISA AVAILABILITY IN THE EMPLOYMENT-BASED SECOND PREFERENCE (EB-2) CATEGORY",
+        "text": "Sufficient demand and increased number use in the EB-2 visa category may make it necessary to retrogress the final action date or make the category unavailable in the coming months to hold number use within the maximum allowed under the FY 2026 annual limit. This situation will be continually monitored, and any necessary adjustments will be made accordingly."
+      },
+      {
+        "letter": "G",
+        "title": "U.S. GOVERNMENT EMPLOYEE SPECIAL IMMIGRANT VISAS",
+        "text": "(SIVs) The National Defense Authorization Act (NDAA) for Fiscal Year 2024, signed into law on December 22, 2023, may affect certain current and former employees of the U.S. Government abroad, as well as certain surviving spouses and children of deceased employees of the U.S. government abroad, applying for SIVs or adjustment of status, as described in section 101(a)(27)(D) of the INA. This does not affect certain Iraqis and Afghans applying for SQ and SI SIVs. Applicants should contact the consular section at which they filed their Form DS‑1884 for further information on the impact of that law on their case."
+      },
+      {
+        "letter": "H",
+        "title": "FOR THE LATEST INFORMATION ON VISA PROCESSING AT U.S. EMBASSIES AND CONSULATES, PLEASE VISIT THE BUREAU OF CONSULAR AFFAIRS WEBSITE AT TRAVEL.STATE.GOV",
+        "text": ""
+      }
+    ],
+    "f2aExempt": "2025-07-22",
+    "meta": {
+      "volume": "XI",
+      "number": 17,
+      "printedDate": "July 15, 2026"
     }
   },
   "previous": {

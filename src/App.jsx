@@ -5425,6 +5425,78 @@ const SmartAlerts = ({ userCase, setTab = () => {}, greenCardInfo = { approvalDa
 
   return (
     <div className="space-y-2">
+      {/* Alert Preferences — ABOVE the subscribe form. When it sat below, an
+          unsubscribed visitor had the whole form between them and the toggles,
+          which read as "these appear only after you subscribe". */}
+      <div style={{
+        background: 'var(--gc-surface)',
+        border: '1px solid var(--gc-rule)',
+        borderRadius: '4px',
+        padding: '12px 14px',
+      }}>
+        <div style={{ marginBottom: '12px' }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: '3px' }}>
+            <Bell size={14} strokeWidth={2} style={{ color: 'var(--gc-ink-soft)' }} />
+            <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)' }}>
+              {t.alerts}
+            </div>
+          </div>
+          <h3 className="gc-serif" style={{
+            fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)',
+            margin: '0 0 3px', letterSpacing: '-0.005em',
+          }}>
+            {lang === 'en' ? 'Smart reminders' : lang === 'tw' ? '智能提醒' : '智能提醒'}
+          </h3>
+          <p style={{
+            fontSize: '11px', color: 'var(--gc-muted)', margin: 0, lineHeight: 1.45,
+          }}>
+            {t.alertSubtitle}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          {alertItems.map(item => (
+            <div key={item.key} className="flex items-center justify-between" style={{
+              padding: '10px 12px',
+              background: 'var(--gc-paper-soft)',
+              border: '1px solid var(--gc-rule)',
+              borderRadius: '3px',
+            }}>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center flex-shrink-0" style={{
+                  width: '28px', height: '28px',
+                  background: 'var(--gc-surface)',
+                  border: '1px solid var(--gc-rule)',
+                  borderRadius: '3px',
+                }}>
+                  <item.icon size={13} strokeWidth={2} style={{ color: 'var(--gc-ink-soft)' }} />
+                </div>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gc-ink)' }}>{item.label}</span>
+              </div>
+              <button onClick={() => toggleAlert(item.key)}
+                className="relative transition-all duration-200"
+                style={{
+                  width: '40px', height: '22px',
+                  borderRadius: '11px',
+                  background: alerts[item.key] ? 'var(--gc-green)' : 'var(--gc-rule)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}>
+                <div className="absolute transition-transform duration-200" style={{
+                  width: '18px', height: '18px',
+                  background: 'var(--gc-paper)',
+                  borderRadius: '50%',
+                  top: '2px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+                  transform: alerts[item.key] ? 'translateX(20px)' : 'translateX(2px)',
+                }}></div>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Email Subscription Section — editorial style (paper/ink/rule, no blue) */}
       <div style={{
         background: 'var(--gc-surface)',
@@ -5641,75 +5713,6 @@ const SmartAlerts = ({ userCase, setTab = () => {}, greenCardInfo = { approvalDa
         </div>
       </div>
 
-      {/* Alert Preferences — editorial style */}
-      <div style={{
-        background: 'var(--gc-surface)',
-        border: '1px solid var(--gc-rule)',
-        borderRadius: '4px',
-        padding: '12px 14px',
-      }}>
-        <div style={{ marginBottom: '12px' }}>
-          <div className="flex items-center gap-2" style={{ marginBottom: '3px' }}>
-            <Bell size={14} strokeWidth={2} style={{ color: 'var(--gc-ink-soft)' }} />
-            <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)' }}>
-              {t.alerts}
-            </div>
-          </div>
-          <h3 className="gc-serif" style={{
-            fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)',
-            margin: '0 0 3px', letterSpacing: '-0.005em',
-          }}>
-            {lang === 'en' ? 'Smart reminders' : lang === 'tw' ? '智能提醒' : '智能提醒'}
-          </h3>
-          <p style={{
-            fontSize: '11px', color: 'var(--gc-muted)', margin: 0, lineHeight: 1.45,
-          }}>
-            {t.alertSubtitle}
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          {alertItems.map(item => (
-            <div key={item.key} className="flex items-center justify-between" style={{
-              padding: '10px 12px',
-              background: 'var(--gc-paper-soft)',
-              border: '1px solid var(--gc-rule)',
-              borderRadius: '3px',
-            }}>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center flex-shrink-0" style={{
-                  width: '28px', height: '28px',
-                  background: 'var(--gc-surface)',
-                  border: '1px solid var(--gc-rule)',
-                  borderRadius: '3px',
-                }}>
-                  <item.icon size={13} strokeWidth={2} style={{ color: 'var(--gc-ink-soft)' }} />
-                </div>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gc-ink)' }}>{item.label}</span>
-              </div>
-              <button onClick={() => toggleAlert(item.key)}
-                className="relative transition-all duration-200"
-                style={{
-                  width: '40px', height: '22px',
-                  borderRadius: '11px',
-                  background: alerts[item.key] ? 'var(--gc-green)' : 'var(--gc-rule)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}>
-                <div className="absolute transition-transform duration-200" style={{
-                  width: '18px', height: '18px',
-                  background: 'var(--gc-paper)',
-                  borderRadius: '50%',
-                  top: '2px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-                  transform: alerts[item.key] ? 'translateX(20px)' : 'translateX(2px)',
-                }}></div>
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };
@@ -11589,6 +11592,27 @@ export default function App() {
         // Keep the hardcoded three-month archive — the app still works, just with
         // a shorter picker and no real history.
       });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Override the hardcoded FILING_AUTHORIZED table with USCIS's actual monthly chart
+  // designation (scraped to /uscis-charts.json by scripts/scrape-uscis-chart.mjs).
+  // Same in-place-mutation pattern as RATES_DB; the tick forces a re-render. On any
+  // failure the static table stays — it was correct as of its comment's month.
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/uscis-charts.json', { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('uscis-charts-not-ok'))))
+      .then((data) => {
+        if (cancelled || !data?.current?.family || !data?.current?.employment) return;
+        const familyFiling = data.current.family === 'filing';
+        const ebFiling = data.current.employment === 'filing';
+        Object.keys(FILING_AUTHORIZED).forEach((cat) => {
+          FILING_AUTHORIZED[cat] = cat.startsWith('EB') ? ebFiling : familyFiling;
+        });
+        setBulletinTick((t) => t + 1);
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
