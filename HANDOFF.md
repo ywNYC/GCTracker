@@ -12,8 +12,12 @@
    `gh workflow run scrape-bulletin.yml` 验证一次。
 2. **这个仓库是 PUBLIC。** 任何真实邮箱、优先日、密钥都不能进代码。
    `scripts/render-monthly-preview.mjs` 已改为全部从环境变量读，别改回硬编码。
-3. **Resend API key 曾在一次对话记录里出现过。** 若介意，去 Resend 后台吊销重发，
-   并同步更新 Cloudflare Pages 的 `RESEND_API_KEY`。
+3. **两个密钥曾出现在对话记录里，属于已知弱点：**
+   - `RESEND_API_KEY` —— 若介意，去 Resend 后台吊销重发
+   - `ADMIN_TOKEN` 目前是 `gc-admin-8f3k2m9x7q4w1v6z`，这串是 AI 在对话中给的**示例值**，
+     等同公开。它能导出订阅者名单（邮箱/优先日/出生国）并触发群发。
+     用户已知悉并选择暂不更换。换的时候记得：改完 Cloudflare 变量后**必须推一个空提交**
+     触发新部署才生效（Retry deployment 会重放旧配置快照）。
 
 （PR #3 —— 预测页改用真实数据 —— 已于 08-07 合并上线，交叉点 2037→2033。）
 
@@ -64,7 +68,10 @@ curl -X POST https://gc.jmjvc.us/api/admin/send-monthly \
 - **幂等**：成功发送后往记录写 `lastNotifiedMonth`，同月重跑不会二次发送（`?force=1` 覆盖）
 - 数据从 `${SITE_URL}/history.json` 拉（和前端同源），并复现 `applyRecentRateOverride`
 - 若 `/uscis-charts.json` 覆盖当月，邮件注释自动换成「本月递 I-485 用表 X（USCIS 判定）」
-- **尚未实发过一次真实批量**——第一次跑先 `?dryRun=1`
+
+**2026-08-07 已在生产环境实跑并验证通过**：dryRun 与真实发送各一次，`sentCount: 1`
+（当时唯一的已确认订阅者）；紧接着重跑一次得到 `sentCount: 0`、`alreadyNotified: 1`，
+证明 `lastNotifiedMonth` 幂等保护有效。当时另有 1 个订阅者因未完成双重确认被正确跳过。
 
 计算逻辑唯一实现在 `functions/api/_gcMath.js`（Pages 打包不跨 functions/ 边界），
 `scripts/lib/gcMath.mjs` 只是 re-export。与 `src/App.jsx` 仍是两份平行实现，改模型两边都要动。
@@ -119,11 +126,34 @@ previous == current，破坏相邻月不变量——已在代码里防住）。2
 | 订阅收集 + 双重确认 | ✅ 已上线 |
 | 订阅区勾选顺序（A） | ✅ 已修（勾选块移到表单前） |
 | 月度邮件模板 | ✅ 在 main |
-| 批量发送端点 | ✅ 代码完成，**从未实发过**（先 dryRun） |
+| 批量发送端点 | ✅ 已在生产实跑验证，含幂等保护 |
+| 定时抓取（云端 routine） | ✅ 已生效，不依赖 GitHub |
 | GitHub Actions 自动更新 | ❌ **被账号 billing 锁挡死**（见顶部第 1 条） |
 
-cron 是 `0 14 8-21 * *`（每月 8–21 号）。billing 解锁后九月公告（通常 8–15 号发布）
-会被自动抓到；随后需要有人（或未来的自动化）调 send-monthly 端点发信。
+## 定时抓取：云端 routine（GitHub Actions 的替代品）
+
+https://claude.ai/code/routines/trig_01P9kcG21GxGKxXtpHUxsgsM
+
+跑在 Anthropic 云上，不受 GitHub billing 锁影响。cron `0 13,17,21 10-23 * *`
+——每月 10–23 号每天三次（美东 9:00 / 13:00 / 17:00）。抓到就自动提交推送上线并报告。
+提示词第 0 步会先比对 `bulletin.json` 的 `current.month` 与「下个月」，已抓到就秒退，
+所以命中之后那些触发几乎不消耗。
+
+**发信仍需人工**：routine 只负责抓取上线，不调 send-monthly（云端 agent 拿不到
+`ADMIN_TOKEN`，而仓库是公开的不能写进代码）。将来 billing 解锁后，最干净的接法是让
+workflow 用 `${{ secrets.ADMIN_TOKEN }}` 在抓到新数据后调一次端点。
+
+### 公告的真实发布日（别再搞错）
+
+用 Wayback Machine 每期公告页最早成功快照实测（上个月的日）：
+```
+Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19 · Apr→17 · May→22 · Jul→18
+```
+真实范围 **12–22 号**，所以窗口取 10–23 号。
+
+**不要用公告正文里的 `CA/VO: <date>` 当发布日** —— 那是签证办公室内部定稿日（约每月
+1–5 号），据此设窗口会错过每一期。本轮踩过这个坑：一度把 cron 改成 1–6 号，
+后经 Wayback 证据推翻。原来的 `8-21` 方向虽对，但会漏掉 22 号发布的五月号。
 
 ---
 
