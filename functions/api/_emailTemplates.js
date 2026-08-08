@@ -466,12 +466,18 @@ const countryFlagHtml = (country) => {
   const vStripes = (colors, ws) => colors.map((c, i) =>
     `<div style="display:inline-block; width:${ws[i]}px; height:${H}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
   const flags = {
-    // 五星俱全：大星 + 2×2 小星阵。小星 6px 的 ★ 渲染近似圆点——真旗在这个尺寸下
-    // 小星本来也只是四个点，观感正确。
+    // 五星红旗：大星居左，四颗小星呈纵向弧线环拱其右侧（中间两颗外凸、上下
+    // 两颗内收——即真旗上小星所在的圆弧）。6px 小星渲染为圆点，与真旗缩略一致；
+    // 邮件里无法做每颗星的指向旋转，圆点无方向性，不失真。
     China: box(
-      `<div style="width:${W}px; height:${H}px; background:#DE2910; text-align:left;">`
-      + `<div style="display:inline-block; vertical-align:top; padding:1px 0 0 2px; font-size:13px; line-height:16px; color:#FFDE00;">&#9733;</div>`
-      + `<div style="display:inline-block; vertical-align:top; padding-top:2px; font-size:6px; line-height:7px; color:#FFDE00;">&#9733;&#9733;<br>&#9733;&#9733;</div>`
+      `<div style="width:${W}px; height:${H}px; background:#DE2910; text-align:left; font-size:0; line-height:0;">`
+      + `<div style="display:inline-block; vertical-align:top; width:12px; text-align:center; padding-top:2px; font-size:12px; line-height:15px; color:#FFDE00;">&#9733;</div>`
+      + `<div style="display:inline-block; vertical-align:top; width:14px; padding-top:1px;">`
+      + `<div style="font-size:5px; line-height:4px; color:#FFDE00; padding-left:0;">&#9733;</div>`
+      + `<div style="font-size:5px; line-height:4px; color:#FFDE00; padding-left:3px;">&#9733;</div>`
+      + `<div style="font-size:5px; line-height:5px; color:#FFDE00; padding-left:3px;">&#9733;</div>`
+      + `<div style="font-size:5px; line-height:5px; color:#FFDE00; padding-left:0;">&#9733;</div>`
+      + `</div>`
       + `</div>`),
     India: box(hStripes(['#FF9933', '#ffffff', '#138808'], [7, 6, 7])),
     Mexico: box(vStripes(['#006847', '#ffffff', '#CE1126'], [10, 10, 10])),
