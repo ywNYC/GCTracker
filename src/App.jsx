@@ -2205,8 +2205,8 @@ const ProgressTimeline = ({ priorityDate, cutoff, chartLabel, sharedScale, showP
               <Clock size={12} />
               <span>
                 {lang === 'en'
-                  ? `${daysRemaining} days to go (~${monthsRemaining} mo)`
-                  : `还差 ${daysRemaining} 天（约${monthsRemaining}个月）`}
+                  ? `${daysRemaining.toLocaleString('en-US')} days to go (~${monthsRemaining} mo)`
+                  : `还差 ${daysRemaining.toLocaleString('en-US')} 天（约${monthsRemaining}个月）`}
               </span>
             </div>
           )}
@@ -5690,7 +5690,7 @@ const CompareByCountry = ({ userCase }) => {
                   return (
                     <span className="flex items-center gap-0.5 text-amber-700 font-semibold flex-shrink-0 text-[11px]">
                       <Clock size={11} strokeWidth={2.5} />
-                      {lang === 'en' ? `${daysA}d (~${monthsA}m)` : `还差${daysA}天(${monthsA}月)`}
+                      {lang === 'en' ? `${daysA.toLocaleString('en-US')}d (~${monthsA}m)` : `还差${daysA.toLocaleString('en-US')}天(${monthsA}月)`}
                     </span>
                   );
                 })()}
@@ -5747,7 +5747,7 @@ const CompareByCountry = ({ userCase }) => {
                   return (
                     <span className="flex items-center gap-0.5 text-amber-700 font-semibold flex-shrink-0 text-[11px]">
                       <Clock size={11} strokeWidth={2.5} />
-                      {lang === 'en' ? `${daysB}d (~${monthsB}m)` : `还差${daysB}天(${monthsB}月)`}
+                      {lang === 'en' ? `${daysB.toLocaleString('en-US')}d (~${monthsB}m)` : `还差${daysB.toLocaleString('en-US')}天(${monthsB}月)`}
                     </span>
                   );
                 })()}
@@ -11974,7 +11974,15 @@ export default function App() {
     try { window.localStorage.setItem('gc_lang', lang); }
     catch (e) { /* noop */ }
   }, [lang]);
-  const [tab, setTab] = useState('overview');
+  // ?tab= deep link (e.g. ?tab=alerts to land on the subscription page from an email).
+  // Read-only: switching tabs afterwards doesn't write back to the URL.
+  const [tab, setTab] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get('tab');
+      if (['overview', 'trends', 'update', 'compare', 'index', 'alerts'].includes(p)) return p;
+    } catch (e) { /* noop */ }
+    return 'overview';
+  });
   // Track the tab the user came from, for the "← back" button in The Index
   const [previousTab, setPreviousTab] = useState('overview');
 
@@ -13620,8 +13628,10 @@ export default function App() {
               {/* Reset all data — destructive, two-stage confirmation.
                   First click: button turns amber, shows "确认?" + "取消".
                   Second click within 5s: wipes all gc_* localStorage, reloads app.
-                  After 5s idle, reverts to neutral. */}
-              <span style={{ opacity: 0.4 }}>·</span>
+                  After 5s idle, reverts to neutral.
+                  Forced onto its own line, pushed away from the theme picker: a
+                  wipe-everything action should not sit 8px from a cosmetic toggle. */}
+              <span style={{ flexBasis: '100%', height: 0 }} aria-hidden="true" />
               {confirmReset === null ? (
                 <button
                   onClick={() => {
