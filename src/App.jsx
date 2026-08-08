@@ -9453,16 +9453,18 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
 // ============================================================
 const ForecastHub = ({ userCase, i485ServiceCenter = 'average', completedI485Steps = [], stepActualDates = {} }) => {
   const { t, lang } = useLang();
-  const [view, setView] = useState('chart'); // 'chart' | 'next'
+  const [view, setView] = useState('next'); // 'chart' | 'next'（chart 暂下架）
 
   const subTabs = [
-    {
-      id: 'chart',
-      icon: BarChart3,
-      en: { label: 'Long-term chart', desc: 'Historical movement + forecast to eligibility' },
-      zh: { label: '长期走势', desc: '历史排期 + 预测到符合条件的时间' },
-      tw: { label: '長期走勢', desc: '歷史排期 + 預測到符合條件的時間' },
-    },
+    // 「长期走势」暂时下架：它与总结卡/下月预测的口径不一致（hybrid 模型 vs 直线外推），
+    // 统一口径前先只保留下月预测。TrendChart 组件代码保留，恢复时把这段解开即可。
+    // {
+    //   id: 'chart',
+    //   icon: BarChart3,
+    //   en: { label: 'Long-term chart', desc: 'Historical movement + forecast to eligibility' },
+    //   zh: { label: '长期走势', desc: '历史排期 + 预测到符合条件的时间' },
+    //   tw: { label: '長期走勢', desc: '歷史排期 + 預測到符合條件的時間' },
+    // },
     {
       id: 'next',
       icon: Sparkles,
@@ -9493,8 +9495,8 @@ const ForecastHub = ({ userCase, i485ServiceCenter = 'average', completedI485Ste
         </p>
       </div>
 
-      {/* Sub-tab toggle */}
-      <div style={{ padding: '0 12px' }}>
+      {/* Sub-tab toggle — hidden entirely while only one view is available */}
+      <div style={{ padding: '0 12px', display: subTabs.length > 1 ? 'block' : 'none' }}>
         <div style={{
           display: 'flex', gap: 0, margin: '12px 0',
           border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden'
