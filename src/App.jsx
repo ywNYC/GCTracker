@@ -5205,21 +5205,19 @@ const Forecast = ({ userCase }) => {
     high: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   }[forecast.confidence];
 
-  const ProbBar = ({ label, value, color }) => {
+  // Token-colored meter: fill carries the outcome's color, track is a light step of
+  // the same surface. Gradients were Tailwind blues/greens outside the theme system.
+  const ProbBar = ({ label, value, tone }) => {
     const pct = Math.round(value * 100);
-    const gradientMap = {
-      'text-emerald-600': 'bg-gradient-to-r from-emerald-400 to-emerald-500',
-      'text-blue-600': 'bg-gradient-to-r from-blue-400 to-blue-500',
-      'text-red-600': 'bg-gradient-to-r from-red-400 to-red-500',
-    };
+    const fill = { good: 'var(--gc-green)', neutral: 'var(--gc-blue)', bad: 'var(--gc-red)' }[tone] || 'var(--gc-muted)';
     return (
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-slate-700">{label}</span>
-          <span className={`text-sm font-bold ${color}`}>{pct}%</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--gc-ink-soft)' }}>{label}</span>
+          <span className="text-sm font-bold gc-mono" style={{ color: fill }}>{pct}%</span>
         </div>
-        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${gradientMap[color]}`} style={{ width: `${pct}%` }}></div>
+        <div style={{ height: '8px', background: 'var(--gc-rule-soft)', borderRadius: '4px', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: fill, borderRadius: '4px', transition: 'width 200ms' }}></div>
         </div>
       </div>
     );
@@ -5260,17 +5258,27 @@ const Forecast = ({ userCase }) => {
           </div>
         ) : (
           <>
-            <div className="p-4 mb-4 bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200 rounded-xl">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-violet-700 mb-1">{t.probMonths}</div>
+            {/* This sub-tab is called 下月预测 — so NEXT MONTH's probabilities lead.
+                The long-term ETA used to sit on top in a violet hero card, which made
+                the page answer a question nobody asked it. */}
+            <div className="space-y-3 mb-4">
+              <ProbBar label={t.probBecomeCurrent} value={forecast.probCurrentNext} tone="good" />
+              <ProbBar label={t.probAdvance} value={forecast.probAdvance} tone="neutral" />
+              <ProbBar label={t.probRetrogress} value={forecast.probRetrogress} tone="bad" />
+            </div>
+
+            {/* Long-term ETA, demoted to a reference card and tokenized (was violet). */}
+            <div style={{ background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius)', padding: '14px' }}>
+              <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '4px' }}>{t.probMonths}</div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-violet-900">
+                <span className="text-3xl font-black" style={{ color: 'var(--gc-ink)' }}>
                   {durationParts(forecast.monthsToCurrent).value}
                 </span>
-                <span className="text-sm font-semibold text-violet-700">
+                <span className="text-sm font-semibold" style={{ color: 'var(--gc-ink-soft)' }}>
                   {durationParts(forecast.monthsToCurrent).unit}
                 </span>
               </div>
-              <div className="mt-2 text-[11px] text-violet-700">
+              <div className="mt-2 text-[11px]" style={{ color: 'var(--gc-ink-soft)' }}>
                 {t.avgMovement}: <span className="font-bold">+{forecast.avgMovement} {t.days}/{lang === 'en' ? 'mo' : t.months}</span>
               </div>
 
@@ -5278,44 +5286,50 @@ const Forecast = ({ userCase }) => {
                 <>
                   {/* The basis switch. Conservative is preselected; picking the optimistic
                       end is a deliberate act, and the copy under it says what that costs. */}
-                  <div className="mt-3 pt-3 border-t border-violet-200">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-violet-700 mb-1.5">{t.paceBasisLabel}</div>
-                    <div className="inline-flex rounded-lg overflow-hidden ring-1 ring-violet-300">
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--gc-rule-soft)' }}>
+                    <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '6px' }}>{t.paceBasisLabel}</div>
+                    <div className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
                       {[
                         { key: 'conservative', label: t.paceBasisConservative, pace: forecast.paceSlow, months: forecast.monthsSlow },
                         { key: 'recent', label: t.paceBasisRecent, pace: forecast.paceFast, months: forecast.monthsFast },
-                      ].map((opt) => (
+                      ].map((opt, i) => (
                         <button
                           key={opt.key}
                           onClick={() => setPaceBasis(opt.key)}
                           aria-pressed={paceBasis === opt.key}
-                          className={`px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
-                            paceBasis === opt.key
-                              ? 'bg-violet-700 text-white'
-                              : 'bg-white text-violet-700 hover:bg-violet-50'
-                          }`}
+                          className="px-2.5 py-1.5 text-[11px] font-semibold transition-colors"
+                          style={{
+                            border: 'none', cursor: 'pointer',
+                            borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                            background: paceBasis === opt.key ? 'var(--gc-ink)' : 'var(--gc-surface)',
+                            color: paceBasis === opt.key ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
+                          }}
                         >
                           {opt.label}
-                          <span className="ml-1 font-mono opacity-80">+{opt.pace}{lang === 'en' ? 'd' : '天'}</span>
+                          <span className="ml-1 gc-mono" style={{ opacity: 0.8 }}>+{opt.pace}{lang === 'en' ? 'd' : '天'}</span>
                         </button>
                       ))}
                     </div>
-                    <div className="mt-2 text-[11px] leading-relaxed text-violet-800">
+                    <div className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--gc-ink-soft)' }}>
                       {paceBasis === 'recent' ? t.paceExplainRecent : t.paceExplainConservative}
                     </div>
-                    <div className="mt-1.5 text-[11px] leading-relaxed text-violet-600">
+                    <div className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--gc-ink-soft)' }}>
                       {t.paceRangeLabel}: <span className="font-bold">{fmtDuration(forecast.monthsFast)} – {fmtDuration(forecast.monthsSlow)}</span>
                     </div>
-                    <div className="mt-1 text-[10px] leading-relaxed text-violet-500">{t.paceRangeNote}</div>
+                    <div className="mt-1 text-[10px] leading-relaxed" style={{ color: 'var(--gc-muted)' }}>{t.paceRangeNote}</div>
                   </div>
                 </>
               )}
-            </div>
 
-            <div className="space-y-3">
-              <ProbBar label={t.probBecomeCurrent} value={forecast.probCurrentNext} color="text-emerald-600" />
-              <ProbBar label={t.probAdvance} value={forecast.probAdvance} color="text-blue-600" />
-              <ProbBar label={t.probRetrogress} value={forecast.probRetrogress} color="text-red-600" />
+              {/* Why this number differs from the long-term chart and the summary card —
+                  three estimators with different assumptions, stated once, here. */}
+              <div className="mt-3 pt-2 text-[10px] leading-relaxed" style={{ borderTop: '1px solid var(--gc-rule-soft)', color: 'var(--gc-muted)' }}>
+                {lang === 'en'
+                  ? 'This figure blends the current month with the 21-year long-term average. The Long-term chart and the Overview summary extrapolate observed pace directly, so their numbers differ — different assumptions, same data.'
+                  : lang === 'tw'
+                    ? '口徑說明：此處為混合模型（當月速度＋21 年長期均值）。「長期走勢」圖與總結頁按觀測均速直線外推，數字會不同——是假設不同，不是資料錯了。'
+                    : '口径说明：此处为混合模型（当月速度＋21 年长期均值）。「长期走势」图与总结页按观测均速直线外推，数字会不同——是假设不同，不是数据错了。'}
+              </div>
             </div>
           </>
         )}
@@ -7705,7 +7719,10 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
             const fractionalDays = (monthsToReach - wholeMonths) * 30;
             crossoverCalDate.setMonth(crossoverCalDate.getMonth() + wholeMonths);
             crossoverCalDate.setDate(crossoverCalDate.getDate() + Math.round(fractionalDays));
-            const crossoverLabel = `${String(crossoverCalDate.getFullYear()).slice(-2)}/${crossoverCalDate.getMonth() + 1}`;
+            // Readable "41年10月" / "Oct '41", not the cryptic "41/10" two-digit slash form.
+            const crossoverLabel = lang === 'en'
+              ? `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][crossoverCalDate.getMonth()]} '${String(crossoverCalDate.getFullYear()).slice(-2)}`
+              : `${String(crossoverCalDate.getFullYear()).slice(-2)}年${crossoverCalDate.getMonth() + 1}月`;
 
             // APPROVAL DATE ESTIMATE — mirrors Overview's I-485 card approval logic EXACTLY
             // so both views show the same range. The Overview calc is:
@@ -7757,12 +7774,23 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
               latestApproval = actual;
             }
 
-            // For the small chart pill, show a RANGE directly: "27/3 – 27/5"
-            // (previously was single-point = latest end; user feedback: too conservative
-            //  and people understand ranges just fine).
-            const earliestLabel = `${String(earliestApproval.getFullYear()).slice(-2)}/${earliestApproval.getMonth() + 1}`;
-            const latestLabel   = `${String(latestApproval.getFullYear()).slice(-2)}/${latestApproval.getMonth() + 1}`;
-            const approvalLabel = earliestLabel === latestLabel ? earliestLabel : `${earliestLabel}–${latestLabel}`;
+            // For the small chart pill, show a RANGE directly ("27年3–5月"), readable
+            // year-month words instead of the cryptic YY/M slash form. Same-year ranges
+            // collapse the year so the text still fits the 144px pill.
+            const enMon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const fmtYM = (d) => lang === 'en'
+              ? `${enMon[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`
+              : `${String(d.getFullYear()).slice(-2)}年${d.getMonth() + 1}月`;
+            const approvalLabel = (() => {
+              const a = earliestApproval, b = latestApproval;
+              if (a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()) return fmtYM(a);
+              if (a.getFullYear() === b.getFullYear()) {
+                return lang === 'en'
+                  ? `${enMon[a.getMonth()]}–${enMon[b.getMonth()]} '${String(a.getFullYear()).slice(-2)}`
+                  : `${String(a.getFullYear()).slice(-2)}年${a.getMonth() + 1}–${b.getMonth() + 1}月`;
+              }
+              return `${fmtYM(a)}–${fmtYM(b)}`;
+            })();
             // If the user has already completed the approval step in Overview,
             // celebrate that instead of showing a forecast.
             const alreadyApproved = completedI485Steps.includes('approval');
@@ -12514,6 +12542,36 @@ export default function App() {
            card stretched to the full 1280px viewport. Restore the container caps. */
         .visa-root .max-w-3xl { max-width: 48rem; }
         .visa-root .max-w-4xl { max-width: 56rem; }
+
+        /* Legacy Tailwind palette → theme tokens. 动态/对比/下月预测 predate the token
+           system (white cards, slate text, indigo/purple accents) and ignored the four
+           themes entirely. Scoped overrides fold every remaining call site into the
+           token system at once — redseal/monocle now restyle these pages too. */
+        .visa-root .bg-white { background-color: var(--gc-surface) !important; }
+        .visa-root .bg-slate-50 { background-color: var(--gc-paper-soft) !important; }
+        .visa-root .bg-slate-100 { background-color: var(--gc-rule-soft) !important; }
+        .visa-root .border-slate-100, .visa-root .border-slate-200 { border-color: var(--gc-rule) !important; }
+        .visa-root .text-slate-800, .visa-root .text-slate-900 { color: var(--gc-ink) !important; }
+        .visa-root .text-slate-600, .visa-root .text-slate-700 { color: var(--gc-ink-soft) !important; }
+        .visa-root .text-slate-400, .visa-root .text-slate-500 { color: var(--gc-muted) !important; }
+        .visa-root .rounded-xl, .visa-root .rounded-2xl { border-radius: var(--gc-radius) !important; }
+        .visa-root .shadow-sm { box-shadow: none !important; }
+        .visa-root .bg-emerald-50 { background-color: var(--gc-green-soft) !important; }
+        .visa-root .border-emerald-200 { border-color: var(--gc-green-border) !important; }
+        .visa-root .text-emerald-600, .visa-root .text-emerald-700 { color: var(--gc-green) !important; }
+        .visa-root .text-emerald-900 { color: var(--gc-green-ink) !important; }
+        .visa-root .bg-red-50 { background-color: var(--gc-red-soft) !important; }
+        .visa-root .border-red-200 { border-color: var(--gc-red-border) !important; }
+        .visa-root .text-red-600, .visa-root .text-red-700 { color: var(--gc-red) !important; }
+        .visa-root .text-red-900 { color: var(--gc-red-ink) !important; }
+        .visa-root .bg-amber-50 { background-color: var(--gc-amber-soft) !important; }
+        .visa-root .border-amber-200 { border-color: var(--gc-amber-border) !important; }
+        .visa-root .text-amber-600, .visa-root .text-amber-700 { color: var(--gc-amber) !important; }
+        .visa-root .bg-blue-50, .visa-root .bg-indigo-50, .visa-root .bg-purple-50 { background-color: var(--gc-blue-soft) !important; }
+        .visa-root .border-blue-200, .visa-root .border-indigo-200, .visa-root .border-purple-200 { border-color: var(--gc-blue-border) !important; }
+        .visa-root .text-blue-600, .visa-root .text-blue-700, .visa-root .text-blue-800, .visa-root .text-blue-900,
+        .visa-root .text-indigo-600, .visa-root .text-indigo-700,
+        .visa-root .text-purple-600, .visa-root .text-purple-700 { color: var(--gc-blue) !important; }
 
         /* ========================================================
            THEME SYSTEM
