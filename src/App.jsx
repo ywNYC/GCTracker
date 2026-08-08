@@ -12501,6 +12501,11 @@ export default function App() {
         svg { max-width: 100%; height: auto; }
         .visa-root * { max-width: 100%; box-sizing: border-box; }
         .visa-root input, .visa-root select, .visa-root button { max-width: 100%; }
+        /* The blanket .visa-root * max-width:100% outranks Tailwind's .max-w-3xl
+           (0,0,1,1 vs 0,0,1,0), which silently un-capped the desktop layout — every
+           card stretched to the full 1280px viewport. Restore the container caps. */
+        .visa-root .max-w-3xl { max-width: 48rem; }
+        .visa-root .max-w-4xl { max-width: 56rem; }
 
         /* ========================================================
            THEME SYSTEM
@@ -12992,8 +12997,8 @@ export default function App() {
 
           {/* Header — editorial masthead */}
           <header style={{ width: '100%', maxWidth: '100vw', boxSizing: 'border-box', background: 'var(--gc-surface)' }}>
-            <div className="max-w-4xl mx-auto flex items-center gap-2"
-                 style={{ padding: '9px 12px', boxSizing: 'border-box', width: '100%', maxWidth: '100%' }}>
+            <div className="max-w-3xl mx-auto flex items-center gap-2"
+                 style={{ padding: '9px 12px', boxSizing: 'border-box', width: '100%' }}>
 
               {/* Wordmark: Green Card miniature + serif title.
                   Static design — no animation. Captures the "in-flight" moment:
@@ -13347,7 +13352,7 @@ export default function App() {
           {/* Time Machine banner — only shown when viewing a non-default month */}
           {isTimeMachineActive && (
             <div style={{ width: '100%', background: 'var(--gc-amber-soft)', borderTop: '1px solid var(--gc-amber-border)', borderBottom: '1px solid var(--gc-amber-border)' }}>
-              <div className="max-w-4xl mx-auto flex items-center gap-2" style={{ padding: '6px 12px' }}>
+              <div className="max-w-3xl mx-auto flex items-center gap-2" style={{ padding: '6px 12px' }}>
                 <Clock size={11} style={{ color: 'var(--gc-amber)' }} strokeWidth={2.2} />
                 <p style={{ fontSize: '11px', color: 'var(--gc-amber-ink)', flex: 1, minWidth: 0, lineHeight: 1.3 }}>
                   {lang === 'en'
@@ -13377,7 +13382,7 @@ export default function App() {
 
           {/* Navigation — single-row document tabs with hairline active indicator */}
           <nav style={{ width: '100%', maxWidth: '100vw', boxSizing: 'border-box', background: 'var(--gc-surface)' }}>
-            <div className="max-w-4xl mx-auto" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+            <div className="max-w-3xl mx-auto" style={{ width: '100%', boxSizing: 'border-box' }}>
               <div className="flex" style={{ width: '100%' }}>
                 {tabs.map(tb => {
                   const Icon = tb.icon;
@@ -13426,12 +13431,14 @@ export default function App() {
         </div>
         {/* End fixed header wrapper */}
 
-        <main className="max-w-4xl mx-auto"
+        {/* max-w-3xl (768px), and no inline maxWidth — an inline maxWidth:'100%' was
+            overriding the Tailwind cap entirely, so desktop rendered every card at full
+            viewport width (60+ CJK chars per line at 1280px). */}
+        <main className="max-w-3xl mx-auto"
               style={{
                 padding: '12px',
                 boxSizing: 'border-box',
                 width: '100%',
-                maxWidth: '100%'
               }}>
           {(() => {
             // Overview now uses the same CompactCaseBar as other tabs (no more full sidebar).
