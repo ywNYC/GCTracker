@@ -2974,60 +2974,70 @@ const BulletinMovementChart = ({ cat, country }) => {
   const total = points.reduce((s, p) => s + (p.days || 0), 0);
   const maxUp = Math.max(...points.map((p) => Math.max(p.days || 0, 0)), 0);
   const maxDown = Math.max(...points.map((p) => Math.max(-(p.days || 0), 0)), 0);
-  const scaleMax = Math.max(total, maxUp, 1);
 
   const UP_PX = 84;
-  // Bars get value labels on their caps, so the tallest bar stops short of the top:
-  // 20px of headroom fits two staggered 9px label rows (adjacent labeled bars offset
-  // vertically so 3-digit numbers don't collide on ~13px-wide 24-month columns).
-  const LABEL_ROOM = 20;
-  const perDay = (UP_PX - LABEL_ROOM) / scaleMax;
+  // 12-month columns are wide enough for single-line labels; only the 24-month view
+  // needs the two-row stagger, so only it pays the extra headroom.
+  const LABEL_ROOM = windowMonths === 24 ? 20 : 12;
+  const plotH = UP_PX - LABEL_ROOM;
+  // Bars scale to the biggest single month — NOT to the cumulative total. Sharing one
+  // scale with the total squashed every bar into the bottom sixth of the chart. The
+  // cumulative story now rides the overlay line, which has its own normalization.
+  const perDay = plotH / Math.max(maxUp, maxDown, 1);
   const downPx = maxDown > 0 ? Math.ceil(maxDown * perDay) + LABEL_ROOM : 0;
 
-  // Stagger assignment: walk the columns; a labeled column whose immediate left
+  // Stagger assignment (24-month view only): a labeled column whose immediate left
   // neighbor is labeled on the same side of the baseline takes the raised row.
   const labelRow = points.map(() => 0);
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1].days, b = points[i].days;
-    if (a && b && Math.sign(a) === Math.sign(b) && labelRow[i - 1] === 0) labelRow[i] = 1;
+  if (windowMonths === 24) {
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1].days, b = points[i].days;
+      if (a && b && Math.sign(a) === Math.sign(b) && labelRow[i - 1] === 0) labelRow[i] = 1;
+    }
   }
 
+  // Cumulative step line: running net total per month, normalized to the plot height
+  // (its own scale — the legend says so). Flat runs = stalls; drops = retrogression.
+  const cums = [];
+  {
+    let run = 0;
+    for (const p of points) { run += p.days || 0; cums.push(run); }
+  }
+  const cumMax = Math.max(...cums, 0);
+  const cumMin = Math.min(...cums, 0);
+  const cumSpan = Math.max(cumMax - cumMin, 1);
+  const showLine = cumMax > 0;
+  // Step path across N equal columns in a 0–100 × 0–UP_PX viewBox (non-uniform scale).
+  const n = points.length;
+  const yOf = (v) => 2 + (1 - (v - cumMin) / cumSpan) * (plotH - 4) + LABEL_ROOM;
+  // Start at the zero level, then per month: rise to that month's running total,
+  // run flat across the column. Flat runs are stalls, drops are retrogression.
+  const linePath = (() => {
+    let d = `M 0 ${yOf(cums[0] - (points[0].days || 0)).toFixed(1)}`;
+    for (let i = 0; i < n; i++) {
+      d += ` V ${yOf(cums[i]).toFixed(1)} H ${(((i + 1) / n) * 100).toFixed(2)}`;
+    }
+    return d;
+  })();
+  const areaPath = `${linePath} V ${yOf(cumMin < 0 ? cumMin : 0).toFixed(1)} H 0 Z`;
+
   const selIdx = sel === null ? points.length - 1 : sel;
-  const selPt = selIdx === -1 ? null : points[selIdx];
+  const selPt = points[selIdx];
 
   const fmtMonth = (m) => {
     const [y, mo] = m.split('-');
     return lang === 'en' ? `${mo}/${y.slice(2)}` : `${y.slice(2)}年${parseInt(mo, 10)}月`;
   };
-  const readout = selIdx === -1
-    ? (lang === 'en'
-        ? `Net ${total >= 0 ? '+' : ''}${total} days over ${points.length} months`
-        : `${points.length} 个月累计${total >= 0 ? '前进' : '倒退'} ${Math.abs(total)} 天`)
-    : selPt.days === null
-      ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no cutoff (C/U)` : `${fmtMonth(selPt.month)} · 无截止日（C/U）`)
-      : selPt.days === 0
-        ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no movement` : `${fmtMonth(selPt.month)} · 没有变化`)
-        : (lang === 'en'
-            ? `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? 'advanced' : 'retrogressed'} ${Math.abs(selPt.days)} days`
-            : `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? '前进' : '倒退'} ${Math.abs(selPt.days)} 天`);
-
-  // Cumulative column: solid green at true scale; hairline separators overlaid at the
-  // running-total breakpoints so it reads as this window's months stacked up. Separators
-  // are drawn only when segments are ≥3px apart — thinner would smear into noise.
-  const cumH = Math.max(total * perDay, 2);
-  const separators = [];
-  if (total > 0) {
-    let run = 0;
-    for (let i = 0; i < points.length - 1; i++) {
-      run += Math.max(points[i].days || 0, 0);
-      const y = run * perDay;
-      if (y >= 3 && cumH - y >= 3 && (separators.length === 0 || y - separators[separators.length - 1] >= 3)) {
-        separators.push(y);
-      }
-    }
-  }
+  const readout = selPt.days === null
+    ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no cutoff (C/U)` : `${fmtMonth(selPt.month)} · 无截止日（C/U）`)
+    : selPt.days === 0
+      ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no movement` : `${fmtMonth(selPt.month)} · 没有变化`)
+      : (lang === 'en'
+          ? `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? 'advanced' : 'retrogressed'} ${Math.abs(selPt.days)} days`
+          : `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? '前进' : '倒退'} ${Math.abs(selPt.days)} 天`);
 
   const hasNegative = maxDown > 0;
+  const manual = sel !== null;
 
   return (
     <div style={{ padding: '10px 12px 9px', borderTop: '1px solid var(--gc-rule-soft)' }}>
@@ -3054,103 +3064,99 @@ const BulletinMovementChart = ({ cat, country }) => {
         </div>
       </div>
 
-      {/* Plot: monthly columns · divider · cumulative column */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px' }}>
-        {points.map((p, i) => {
-          const isSel = i === selIdx;
-          // Emphasis, not a background block: a tapped month keeps full ink while the
-          // rest recede. A full-height highlight behind the column reads as data.
-          const manual = sel !== null;
-          const barOpacity = manual ? (isSel ? 1 : 0.35) : 0.9;
-          const upH = p.days > 0 ? Math.max(p.days * perDay, 2) : 0;
-          const dnH = p.days < 0 ? Math.max(-p.days * perDay, 2) : 0;
-          return (
-            <button key={p.month} type="button"
-              onClick={() => setSel(i === selIdx && sel !== null ? null : i)}
-              aria-label={readout}
-              style={{
-                flex: '1 1 0', minWidth: 0, padding: 0, border: 'none', cursor: 'pointer',
-                background: 'transparent',
-              }}>
-              <div style={{ height: `${UP_PX}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
-                {p.days > 0 && (
-                  <>
-                    <span className="gc-mono" style={{
-                      fontSize: '8px', lineHeight: '9px', fontWeight: 600,
-                      color: 'var(--gc-ink-soft)', whiteSpace: 'nowrap',
-                      transform: labelRow[i] ? 'translateY(-9px)' : 'none',
-                      opacity: barOpacity, marginBottom: '1px',
-                    }}>{p.days}</span>
-                    <div style={{
-                      width: '100%', maxWidth: '18px', height: `${upH}px`,
-                      background: 'var(--gc-blue)', borderRadius: '2px 2px 0 0',
-                      opacity: barOpacity,
-                    }} />
-                  </>
-                )}
-                {p.days === 0 && (
-                  <div style={{ width: '100%', maxWidth: '18px', height: '2px', background: 'var(--gc-subtle)', opacity: manual && !isSel ? 0.4 : 1 }} />
-                )}
-                {p.days === null && (
-                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid var(--gc-subtle)', marginBottom: '-1px' }} />
-                )}
-              </div>
-              {hasNegative && (
-                <div style={{ height: `${downPx}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
-                  {p.days < 0 && (
+      {/* Plot: monthly columns with the cumulative step line washed behind them.
+          A 34px gutter on the right keeps the line's endpoint label out of the last
+          column — without it, "+609" lands on top of the last bar's own number
+          whenever the biggest month is also the latest one. */}
+      <div style={{ position: 'relative', paddingRight: showLine ? '34px' : 0 }}>
+        {showLine && (
+          <svg viewBox={`0 0 100 ${UP_PX}`} preserveAspectRatio="none" aria-hidden="true"
+               style={{ position: 'absolute', left: 0, top: 0, width: 'calc(100% - 34px)', height: `${UP_PX}px`, pointerEvents: 'none' }}>
+            <path d={areaPath} fill="var(--gc-green)" opacity="0.08" />
+            <path d={linePath} fill="none" stroke="var(--gc-green)" strokeWidth="1.5"
+                  vectorEffect="non-scaling-stroke" opacity="0.75" />
+          </svg>
+        )}
+        {/* Endpoint label in the gutter, vertically centered on the line's end.
+            HTML, not SVG text, so the non-uniform viewBox can't distort glyphs. */}
+        {showLine && (
+          <span className="gc-mono" style={{
+            position: 'absolute', right: 0, top: `${Math.min(Math.max(yOf(cums[n - 1]) - 5, LABEL_ROOM - 4), UP_PX - 12)}px`,
+            fontSize: '9.5px', fontWeight: 700, color: 'var(--gc-green-ink)',
+            pointerEvents: 'none',
+          }}>
+            {total >= 0 ? '+' : '−'}{Math.abs(total)}
+          </span>
+        )}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px' }}>
+          {points.map((p, i) => {
+            const isSel = i === selIdx;
+            const barOpacity = manual ? (isSel ? 1 : 0.35) : 0.9;
+            const upH = p.days > 0 ? Math.max(p.days * perDay, 2) : 0;
+            const dnH = p.days < 0 ? Math.max(-p.days * perDay, 2) : 0;
+            return (
+              <button key={p.month} type="button"
+                onClick={() => setSel(i === selIdx && sel !== null ? null : i)}
+                aria-label={readout}
+                style={{
+                  flex: '1 1 0', minWidth: 0, padding: 0, border: 'none', cursor: 'pointer',
+                  background: 'transparent',
+                }}>
+                <div style={{ height: `${UP_PX}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+                  {p.days > 0 && (
                     <>
-                      <div style={{
-                        width: '100%', maxWidth: '18px', height: `${dnH}px`,
-                        background: 'var(--gc-red)', borderRadius: '0 0 2px 2px',
-                        opacity: barOpacity,
-                      }} />
                       <span className="gc-mono" style={{
                         fontSize: '8px', lineHeight: '9px', fontWeight: 600,
-                        color: 'var(--gc-red-ink)', whiteSpace: 'nowrap',
-                        transform: labelRow[i] ? 'translateY(9px)' : 'none',
-                        opacity: barOpacity, marginTop: '1px',
-                      }}>−{Math.abs(p.days)}</span>
+                        color: 'var(--gc-ink-soft)', whiteSpace: 'nowrap',
+                        transform: labelRow[i] ? 'translateY(-9px)' : 'none',
+                        opacity: barOpacity, marginBottom: '1px',
+                      }}>{p.days}</span>
+                      <div style={{
+                        width: '100%', maxWidth: '18px', height: `${upH}px`,
+                        background: 'var(--gc-blue)', borderRadius: '2px 2px 0 0',
+                        opacity: barOpacity,
+                      }} />
                     </>
                   )}
+                  {p.days === 0 && (
+                    <div style={{ width: '100%', maxWidth: '12px', height: '2px', background: 'var(--gc-subtle)', opacity: manual && !isSel ? 0.4 : 1 }} />
+                  )}
+                  {p.days === null && (
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid var(--gc-subtle)', marginBottom: '-1px' }} />
+                  )}
                 </div>
-              )}
-            </button>
-          );
-        })}
-
-        {/* Divider between the monthly series and the cumulative total */}
-        <div style={{ alignSelf: 'stretch', width: '1px', background: 'var(--gc-rule)', margin: '0 4px' }} />
-
-        {/* Cumulative column — direct-labeled on the cap */}
-        <button type="button"
-          onClick={() => setSel(-1 === selIdx && sel !== null ? null : -1)}
-          style={{
-            flex: '0 0 34px', padding: 0, border: 'none', cursor: 'pointer',
-            background: 'transparent',
-            opacity: sel !== null && selIdx !== -1 ? 0.35 : 1,
-          }}>
-          <div style={{ height: `${UP_PX}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
-            <span className="gc-mono" style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '2px', whiteSpace: 'nowrap' }}>
-              {total >= 0 ? '+' : '−'}{Math.abs(total)}
-            </span>
-            <div style={{ position: 'relative', width: '22px', height: `${cumH}px`, background: 'var(--gc-green)', borderRadius: '2px 2px 0 0', overflow: 'hidden' }}>
-              {separators.map((y) => (
-                <div key={y} style={{ position: 'absolute', left: 0, right: 0, bottom: `${y}px`, height: '1px', background: 'var(--gc-surface)', opacity: 0.9 }} />
-              ))}
-            </div>
-          </div>
-          {hasNegative && <div style={{ height: `${downPx}px` }} />}
-        </button>
+                {hasNegative && (
+                  <div style={{ height: `${downPx}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
+                    {p.days < 0 && (
+                      <>
+                        <div style={{
+                          width: '100%', maxWidth: '18px', height: `${dnH}px`,
+                          background: 'var(--gc-red)', borderRadius: '0 0 2px 2px',
+                          opacity: barOpacity,
+                        }} />
+                        <span className="gc-mono" style={{
+                          fontSize: '8px', lineHeight: '9px', fontWeight: 600,
+                          color: 'var(--gc-red-ink)', whiteSpace: 'nowrap',
+                          transform: labelRow[i] ? 'translateY(9px)' : 'none',
+                          opacity: barOpacity, marginTop: '1px',
+                        }}>−{Math.abs(p.days)}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Baseline */}
       <div style={{ height: '1px', background: 'var(--gc-rule)', marginTop: hasNegative ? '0' : '-1px' }} />
 
-      {/* X labels: first · last · 累计 */}
+      {/* X labels: first · last */}
       <div className="flex items-center justify-between gc-mono" style={{ fontSize: '8.5px', color: 'var(--gc-muted-soft)', marginTop: '3px' }}>
         <span>{fmtMonth(points[0].month)}</span>
         <span>{fmtMonth(points[points.length - 1].month)}</span>
-        <span style={{ flex: '0 0 42px', textAlign: 'center' }}>{lang === 'en' ? 'total' : '累计'}</span>
       </div>
 
       {/* Readout for the tapped column (defaults to the latest month) */}
@@ -3158,7 +3164,7 @@ const BulletinMovementChart = ({ cat, country }) => {
         {readout}
       </div>
 
-      {/* Legend — identity spelled out, swatches beside text (text stays in text tokens) */}
+      {/* Legend — the line's scale independence is declared here */}
       <div className="flex items-center gap-3" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginTop: '4px', flexWrap: 'wrap' }}>
         <span className="inline-flex items-center gap-1">
           <span style={{ width: '7px', height: '7px', background: 'var(--gc-blue)', borderRadius: '1px', display: 'inline-block' }} />
@@ -3170,10 +3176,12 @@ const BulletinMovementChart = ({ cat, country }) => {
             {lang === 'en' ? 'Retrogression' : '倒退'}
           </span>
         )}
-        <span className="inline-flex items-center gap-1">
-          <span style={{ width: '7px', height: '7px', background: 'var(--gc-green)', borderRadius: '1px', display: 'inline-block' }} />
-          {lang === 'en' ? `${windowMonths}-month total` : `${windowMonths}个月累计`}
-        </span>
+        {showLine && (
+          <span className="inline-flex items-center gap-1">
+            <span style={{ width: '10px', height: '2px', background: 'var(--gc-green)', display: 'inline-block' }} />
+            {lang === 'en' ? `${windowMonths}-mo cumulative (own scale)` : `${windowMonths}个月累计（独立比例）`}
+          </span>
+        )}
       </div>
     </div>
   );
