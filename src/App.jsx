@@ -1179,6 +1179,20 @@ const monthlyMovementFromArchive = (cat, country, windowMonths = 12) => {
   return out.some((p) => p.days !== null) ? out : null;
 };
 
+// Gap-days → estimated calendar days at the observed 12-month Chart A pace. The old
+// reading — wait one calendar day per day of cutoff gap — had the I-485 card promising
+// "2037" while the summary card and Forecast tab said "2033" on the same screen.
+// Chart A pace is the only observed pace we track; applying it to a Chart B gap is an
+// approximation (the two charts move roughly together). No usable pace → degrade to
+// the old 1:1 reading rather than invent a number.
+const paceDaysToCalendar = (cat, country, gapDays) => {
+  if (!gapDays || gapDays <= 0) return 0;
+  const hist = monthlyMovementFromArchive(cat, country, 12);
+  const total = hist ? hist.reduce((s, p) => s + (p.days || 0), 0) : 0;
+  if (total <= 0) return gapDays;
+  return Math.round((gapDays / (total / 12)) * 30.44);
+};
+
 // ==============================================================
 // AI HYBRID PREDICTION MODEL
 // Blends 4 time horizons:
@@ -1315,7 +1329,9 @@ const formatDate = (s, lang) => {
     if (lang === 'tw') return '無排期';
     return 'Current';
   }
-  if (!s) return lang === 'en' ? 'N/A' : '无';
+  // null = the bulletin's U (see computeStatus). "无" read as missing data; say what
+  // it actually means.
+  if (!s || s === 'U') return lang === 'en' ? 'No visas (U)' : lang === 'tw' ? '本月無名額（U）' : '本月无名额（U）';
   const d = parseDate(s);
   if (lang === 'zh' || lang === 'tw') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -1323,14 +1339,19 @@ const formatDate = (s, lang) => {
 
 const formatDateShort = (s, lang) => {
   if (s === 'C') return lang === 'zh' ? '无排期' : lang === 'tw' ? '無排期' : 'Current';
-  if (!s) return '';
+  if (s === 'U') return 'U';
+  if (!s) return 'U'; // null = the bulletin's U (no visas), not missing data
   const d = parseDate(s);
   if (lang === 'zh' || lang === 'tw') return `${d.getFullYear().toString().slice(-2)}年${d.getMonth() + 1}月`;
   return d.toLocaleDateString('en-US', { year: '2-digit', month: 'short' });
 };
 const computeStatus = (priorityDate, cutoff) => {
   if (cutoff === 'C') return { status: 'current', days: 0 };
-  if (!cutoff) return { status: 'notCurrent', days: null };
+  // null is what the scraper emits for the bulletin's "U" (and bare dashes) — see
+  // parseDate in scrape-bulletin.mjs. The four-chart parse is a hard contract, so a
+  // null cell means the bulletin itself printed no cutoff: no visas this month.
+  // That is NOT the same as "排期未到" — there is no queue position to measure.
+  if (!cutoff || cutoff === 'U') return { status: 'unavailable', days: null };
   const pd = parseDate(priorityDate);
   const co = parseDate(cutoff);
   if (!pd) return { status: 'notCurrent', days: null };
@@ -1361,7 +1382,13 @@ const computeMovement = (current, previous) => {
   if (current === 'C' && previous === 'C') return { type: 'none', days: 0, wasCurrent: true };
   if (current === 'C' && previous !== 'C') return { type: 'current', days: null };
   if (current !== 'C' && previous === 'C') return { type: 'retrogressed', days: null, fromCurrent: true };
-  if (!current || !previous) return { type: 'none', days: 0 };
+  // null/'U' = the bulletin printed no cutoff (U). Distinguish "went unavailable"
+  // (a de-facto retrogression to zero) from "resumed" (numbers came back) — both used
+  // to collapse into "no change", which is the opposite of what happened.
+  const noCut = (v) => !v || v === 'U';
+  if (noCut(current) && noCut(previous)) return { type: 'unavailable', days: null, still: true };
+  if (noCut(current)) return { type: 'unavailable', days: null, became: true };
+  if (noCut(previous)) return { type: 'resumed', days: null };
   const d = daysBetween(parseDate(current), parseDate(previous));
   if (d > 0) return { type: 'advanced', days: d };
   if (d < 0) return { type: 'retrogressed', days: Math.abs(d) };
@@ -1492,6 +1519,10 @@ const StatusBadge = ({ status, daysAgo }) => {
     overdue:    { bg: 'var(--gc-green-soft)',  bd: 'var(--gc-green-border)', fg: 'var(--gc-green-ink)',
                   label: lang === 'en' ? 'No wait needed' : '无需排期', icon: CheckCircle2 },
     notCurrent: { bg: 'var(--gc-amber-soft)',  bd: 'var(--gc-amber-border)', fg: 'var(--gc-amber-ink)', label: t.statusNotCurrent, icon: Clock },
+    // The bulletin printed U — no visas at all this month. Distinct from notCurrent:
+    // there is no cutoff to be behind.
+    unavailable: { bg: 'var(--gc-red-soft)',   bd: 'var(--gc-red-border)',   fg: 'var(--gc-red-ink)',
+                  label: lang === 'en' ? 'No visas (U)' : lang === 'tw' ? '本月無名額' : '本月无名额', icon: Clock },
     suspicious: { bg: 'var(--gc-red-soft)',    bd: 'var(--gc-red-border)',   fg: 'var(--gc-red-ink)',
                   label: lang === 'en' ? 'Check your PD' : '请检查优先日', icon: AlertCircle },
   };
@@ -2565,7 +2596,7 @@ const I485ProgressBar = ({ completedSteps = [], userCase }) => {
 // Movement Indicator
 // ============================================================
 const MovementIndicator = ({ movement, compact }) => {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const size = compact ? 14 : 16;
   const textSize = compact ? 'text-xs' : 'text-sm';
   if (movement.type === 'advanced') return (
@@ -2578,6 +2609,18 @@ const MovementIndicator = ({ movement, compact }) => {
     <div className="flex items-center gap-1 text-red-600">
       <TrendingDown size={size} strokeWidth={2.5} />
       <span className={`${textSize} font-bold`}>{movement.days ? `-${movement.days}` : '↓'}</span>
+    </div>
+  );
+  if (movement.type === 'unavailable') return (
+    <div className="flex items-center gap-1 text-red-600">
+      <TrendingDown size={size} strokeWidth={2.5} />
+      <span className={`${textSize} font-bold`}>{movement.still ? 'U' : '→U'}</span>
+    </div>
+  );
+  if (movement.type === 'resumed') return (
+    <div className="flex items-center gap-1 text-emerald-600">
+      <TrendingUp size={size} strokeWidth={2.5} />
+      <span className={`${textSize} font-bold`}>{lang === 'en' ? 'resumed' : '恢复'}</span>
     </div>
   );
   if (movement.type === 'current') return (
@@ -3459,7 +3502,12 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           //   12-24mo → ink         (approaching)
           //   6-12mo  → amber       (close, start preparing)
           //   < 6mo   → green       (imminent)
-          if (months === null) {
+          if (ps.status === 'unavailable') {
+            // The bulletin printed U — no visas this month, no queue position to show.
+            accentColor = 'var(--gc-amber, var(--gc-ink))';
+            waitingTitle = lang === 'en' ? 'No visas this month (U)' : lang === 'tw' ? '本月無名額（U）' : '本月无名额（U）';
+            waitingSub = lang === 'en' ? 'The bulletin lists no cutoff — numbers may resume in a future month' : lang === 'tw' ? '公告未給出截止日，之後月份可能恢復名額' : '公告未给出截止日，之后月份可能恢复名额';
+          } else if (months === null) {
             accentColor = 'var(--gc-ink)';
             waitingTitle = lang === 'en' ? 'In queue' : lang === 'tw' ? '你已在排期中' : '你已在排期中';
             waitingSub = lang === 'en' ? 'Awaiting cutoff advancement' : lang === 'tw' ? '等待截止日推進' : '等待截止日推进';
@@ -3679,14 +3727,16 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
               const mvB = computeMovement(currentFiling, previousFiling);
               const mvColor = (type) => {
                 if (type === 'advanced') return 'var(--gc-green)';
-                if (type === 'retrogressed') return 'var(--gc-red)';
-                if (type === 'current') return 'var(--gc-green)';
+                if (type === 'retrogressed' || type === 'unavailable') return 'var(--gc-red)';
+                if (type === 'current' || type === 'resumed') return 'var(--gc-green)';
                 return 'var(--gc-muted)';
               };
               const mvText = (m) => {
                 if (m.type === 'advanced') return `+${m.days}${lang === 'en' ? 'd' : '天'}`;
                 if (m.type === 'retrogressed') return `−${m.days}${lang === 'en' ? 'd' : '天'}`;
                 if (m.type === 'current') return 'C';
+                if (m.type === 'unavailable') return m.still ? 'U' : `→U`;
+                if (m.type === 'resumed') return lang === 'en' ? 'resumed' : '恢复名额';
                 return '—';
               };
               return (
@@ -3773,16 +3823,20 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 
         // Determine filing baseline:
         //   if user can file now (current/eligible/overdue) → today
-        //   otherwise → today + days-until-PD-reaches-cutoff (projected)
+        //   otherwise → today + the gap CONVERTED AT OBSERVED PACE (not 1 day per day —
+        //   that naive reading put this card four years apart from the summary card)
         const today = new Date();
         const filingBaseline = (() => {
           if (primaryStatus.status === 'current' || primaryStatus.status === 'eligible' || primaryStatus.status === 'overdue' || primaryCutoff === 'C') {
             return today;
           }
-          const daysAway = primaryStatus.days || 0;
+          const daysAway = paceDaysToCalendar(userCase.category, country, primaryStatus.days || 0);
           return new Date(today.getTime() + daysAway * 24 * 60 * 60 * 1000);
         })();
         const isFilingProjected = !(primaryStatus.status === 'current' || primaryStatus.status === 'eligible' || primaryStatus.status === 'overdue' || primaryCutoff === 'C');
+        // U (stored as null — see computeStatus) means no visas this month: no gap to
+        // convert, no date to promise. Downstream shows 待定 instead of a fake "today".
+        const filingDateUnknown = primaryStatus.status === 'unavailable' || (isFilingProjected && primaryStatus.days === null);
 
         const addDays = (date, days) => {
           const d = new Date(date);
@@ -3830,7 +3884,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                       || finalActionStatus.status === 'overdue';
         const aCurrentDate = aCurrent
           ? today
-          : new Date(today.getTime() + (finalActionStatus.days || 0) * 24 * 60 * 60 * 1000);
+          : new Date(today.getTime() + paceDaysToCalendar(userCase.category, country, finalActionStatus.days || 0) * 24 * 60 * 60 * 1000);
         // After A becomes current, USCIS typically issues approval within ~30–90 days.
         const postACurrentMin = 30;
         const postACurrentMax = 90;
@@ -4000,7 +4054,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 ? (lang === 'en' ? 'Priority date reached' : lang === 'tw' ? '排期到達' : '排期到达')
                 : stepInfos[nextStepIndex].title;
               const dateText = isWaitingForPD
-                ? (lang === 'en' ? `est. ${fmtDate(filingBaseline)}` : `预计 ${fmtDate(filingBaseline)}`)
+                ? (filingDateUnknown
+                    ? (lang === 'en' ? 'TBD — no visas (U)' : lang === 'tw' ? '待定 · 本月無名額（U）' : '待定 · 本月无名额（U）')
+                    : (lang === 'en' ? `est. ${fmtDate(filingBaseline)}` : `预计 ${fmtDate(filingBaseline)}`))
                 : fmtDateRange(stepInfos[nextStepIndex].earliestDate, stepInfos[nextStepIndex].latestDate);
               return (
                 <>
@@ -4770,6 +4826,10 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
             ? (lang === 'en' ? `${label} retrogressed from current` : lang === 'tw' ? `${label}從 C 回落` : `${label}从 C 回落`)
             : (lang === 'en' ? `${label} retrogressed ${m.days} days` : lang === 'tw' ? `${label}倒退 ${m.days} 天` : `${label}倒退 ${m.days} 天`);
           if (m.wasCurrent) return lang === 'en' ? `${label} stayed current (C)` : lang === 'tw' ? `${label}維持無需排隊（C）` : `${label}保持无需排队（C）`;
+          if (m.type === 'unavailable') return m.still
+            ? (lang === 'en' ? `${label} remains unavailable (U)` : lang === 'tw' ? `${label}持續無名額（U）` : `${label}持续无名额（U）`)
+            : (lang === 'en' ? `${label} went unavailable (U — no visas this month)` : lang === 'tw' ? `${label}轉為無名額（U，本月不發名額）` : `${label}转为无名额（U，本月不发名额）`);
+          if (m.type === 'resumed') return lang === 'en' ? `${label} resumed (numbers are back)` : lang === 'tw' ? `${label}恢復名額` : `${label}恢复名额`;
           return lang === 'en' ? `${label} held steady` : lang === 'tw' ? `${label}原地不動` : `${label}没有变化`;
         };
 
@@ -4991,10 +5051,16 @@ const MonthlyUpdate = ({ userCase }) => {
     ? { type: 'none', days: 0 }
     : computeMovement(bulletinCurrent.finalAction[userCase.category][userCountry], bulletinPrevious.finalAction[userCase.category][userCountry]);
 
-  const impactText = { advanced: t.impactAdvanced, retrogressed: t.impactRetrogressed, none: t.impactNoChange, current: t.impactBecameCurrent }[userImpact.type];
+  const impactText = {
+    advanced: t.impactAdvanced, retrogressed: t.impactRetrogressed, none: t.impactNoChange, current: t.impactBecameCurrent,
+    unavailable: lang === 'en' ? 'Your category is unavailable this month (U) — no visas issued.' : lang === 'tw' ? '你的類別本月無名額（U）。' : '你的类别本月无名额（U）。',
+    resumed: lang === 'en' ? 'Your category resumed — numbers are back.' : lang === 'tw' ? '你的類別恢復名額了。' : '你的类别恢复名额了。',
+  }[userImpact.type];
   const impactTone = {
     advanced: 'bg-emerald-50 text-emerald-900 border-emerald-200',
     retrogressed: 'bg-red-50 text-red-900 border-red-200',
+    unavailable: 'bg-red-50 text-red-900 border-red-200',
+    resumed: 'bg-emerald-50 text-emerald-900 border-emerald-200',
     none: 'bg-slate-50 text-slate-700 border-slate-200',
     current: 'bg-emerald-50 text-emerald-900 border-emerald-200',
   }[userImpact.type];
