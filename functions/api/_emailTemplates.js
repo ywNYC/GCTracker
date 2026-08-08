@@ -468,16 +468,16 @@ const countryFlagHtml = (country, k = 1) => {
   const vStripes = (colors, ws) => colors.map((c, i) =>
     `<div style="display:inline-block; width:${ws[i] * k}px; height:${H}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
   const flags = {
-    // 五星红旗：大星居左，四颗小星呈纵向弧线环拱其右侧（0/3/3/0 缩进 = 真旗小星
-    // 所在圆弧：中间两颗外凸、上下两颗内收）。
+    // 五星红旗：大星居左，四颗小星呈纵向弧线环拱其右侧（0/6/6/0 缩进 = 真旗小星
+    // 所在圆弧）。每颗小星独立成行且行高=字号、height 显式声明——Gmail 会重算行高，
+    // 行高小于字号时字形被挤压裁切，曾导致小星丢失；此写法强制五颗齐全。
     China: box(
       `<div style="width:${W}px; height:${H}px; background:#DE2910; text-align:left; font-size:0; line-height:0;">`
-      + `<div style="display:inline-block; vertical-align:top; width:${12 * k}px; text-align:center; padding-top:${2 * k}px; font-size:${12 * k}px; line-height:${15 * k}px; color:#FFDE00;">&#9733;</div>`
-      + `<div style="display:inline-block; vertical-align:top; width:${14 * k}px; padding-top:${1 * k}px;">`
-      + `<div style="font-size:${5 * k}px; line-height:${4 * k}px; color:#FFDE00; padding-left:0;">&#9733;</div>`
-      + `<div style="font-size:${5 * k}px; line-height:${4 * k}px; color:#FFDE00; padding-left:${3 * k}px;">&#9733;</div>`
-      + `<div style="font-size:${5 * k}px; line-height:${5 * k}px; color:#FFDE00; padding-left:${3 * k}px;">&#9733;</div>`
-      + `<div style="font-size:${5 * k}px; line-height:${5 * k}px; color:#FFDE00; padding-left:0;">&#9733;</div>`
+      + `<div style="display:inline-block; vertical-align:top; width:${12 * k}px; text-align:center; padding-top:${2 * k}px; font-size:${12 * k}px; line-height:${13 * k}px; color:#FFDE00;">&#9733;</div>`
+      + `<div style="display:inline-block; vertical-align:top; width:${16 * k}px; padding-top:${1 * k}px;">`
+      + [0, 3, 3, 0].map((pad) =>
+          `<div style="height:${4.5 * k}px; font-size:${4.5 * k}px; line-height:${4.5 * k}px; color:#FFDE00; padding-left:${pad * k}px; overflow:visible;">&#9733;</div>`
+        ).join('')
       + `</div>`
       + `</div>`),
     India: box(hStripes(['#FF9933', '#ffffff', '#138808'], [7, 6, 7])),
