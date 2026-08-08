@@ -164,9 +164,20 @@ Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19
 3. `src/App.jsx` 单文件约 13500 行；主包 ~550 KB 未做代码分割。
 4. **`node_modules/`（6767 个文件）整个被 commit 在这个公开仓库里，且没有 `.gitignore`。**
    用户已知悉，待清理（涉及删除已跟踪文件，动手前先问）。
-5. 邮件侧（functions/api/_gcMath.js 的 computeMovement）对 U 仍按「无变化」处理——
-   App 侧已修（unavailable/resumed），邮件侧未同步。U 订阅者的月度邮件会说「无变化」。
-6. 英文界面长单词（"Philippines"、"retrogressed 107 days"）在窄卡里的换行未实测过。
+5. 英文界面长单词（"Philippines"、"retrogressed 107 days"）在窄卡里的换行未实测过。
+6. U 案子的月度邮件没有图表和 ETA（forecast 为 null 时整块跳过）——语义正确但可以
+   考虑降级显示历史柱图。
+
+## 2026-08-08 第五轮：Pareto 图表（分支 feat/pareto-figure）
+
+- **App BulletinMovementChart**：单月柱独立比例 + SVG 绿色累计阶梯线叠加（独立归一化，
+  图例注明），终点标签在右侧 34px 槽内防叠字；删右侧独立累计柱；12月视图数字单行。
+- **邮件 renderBulletinFigure**：走势图与逐月推进合并为单面板行情图（价格+成交量式），
+  共用 12 个月窗口与月份轴；走势层改绿色（累计语义），端标「起/现 cutoff · +累计」；
+  删独立累计柱；连接语+图例。旧的 renderMovementChart/renderCutoffTrendChart 已删除。
+- **邮件侧 U 语义同步**：_gcMath computeMovement 补 unavailable/resumed；
+  movementCopy/标题（持续/转为无名额）/moveColor/formatDateForLang（无名额（U））齐活。
+  EB1 印度真实公告 notice 卡首次实测渲染通过。
 
 ## 2026-08-08 第四轮：整站审计修复（分支 fix/stale-data-and-ui-audit，6 个 commit）
 

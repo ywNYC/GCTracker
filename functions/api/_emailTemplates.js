@@ -383,7 +383,8 @@ export const renderUnsubscribePage = ({ email, success, language }) => {
 // Cutoff dates render as raw YYYY-MM-DD in monospace — short, alignment-stable,
 // and consistent with how the priority date is shown. Only C/U get words.
 const formatDateForLang = (s, lang) => {
-  if (!s || s === 'U') return lang === 'en' ? 'N/A' : '无';
+  // null IS the bulletin's U (scraper contract) — "无"/"N/A" read as missing data.
+  if (!s || s === 'U') return lang === 'en' ? 'Unavailable (U)' : '无名额（U）';
   if (s === 'C') return lang === 'en' ? 'Current' : '无排期';
   return s;
 };
@@ -419,6 +420,10 @@ const movementCopy = (movement, lang) => {
   if (movement.type === 'advanced') return lang === 'en' ? `advanced ${movement.days} days` : `前进 ${movement.days} 天`;
   if (movement.type === 'retrogressed') return lang === 'en' ? `retrogressed ${movement.days ?? ''} days`.trim() : `倒退 ${movement.days ?? ''} 天`.trim();
   if (movement.type === 'current') return t.current;
+  if (movement.type === 'unavailable') return movement.still
+    ? (lang === 'en' ? 'still unavailable (U)' : '持续无名额（U）')
+    : (lang === 'en' ? 'went unavailable (U)' : '转为无名额（U）');
+  if (movement.type === 'resumed') return lang === 'en' ? 'resumed' : '恢复名额';
   return t.none;
 };
 
@@ -475,119 +480,111 @@ const countryFlagHtml = (country) => {
   return f ? `<!--[if !mso]><!-->&nbsp;${f}<!--<![endif]-->` : '';
 };
 
-// Monthly columns + one separated cumulative column, mirroring the site's in-app
-// chart. Fed the 12-month series (not 24) so every column is wide enough to carry its
-// value on ONE aligned row — no staggering. The monthly side and the total column are
-// scaled INDEPENDENTLY (the total would otherwise flatten every monthly bar to a
-// sliver); the divider, the distinct zone tint, and the per-mark numbers make the two
-// scales explicit. Below the axis, a bracket annotates the window's dominant streak
-// ("6 months in a row at 0 days") so the rhythm is readable at a glance.
-const renderMovementChart = (series, lang) => {
+// One composed figure, price-and-volume style: the cutoff-position step line on top
+// (that line IS the cumulative story — each month's advance stacks into position), the
+// per-month movement columns below, both over the SAME 12 columns and one month axis.
+// They used to be two separate panels with different windows (24 vs 12 months), which
+// hid the fact that they are two views of the same data. Email constraints as ever:
+// tables + background colors only, the "line" is a row of joined column caps.
+const renderBulletinFigure = (cutPoints, series, lang) => {
   if (!Array.isArray(series) || series.length < 2) return '';
 
-  const UP_PX = 64;
   const days = (s) => (typeof s.days === 'number' ? Math.round(s.days) : 0);
+  const n = series.length;
   const total = series.reduce((sum, s) => sum + days(s), 0);
   const maxUp = Math.max(...series.map((s) => Math.max(days(s), 0)), 0);
   const maxDown = Math.max(...series.map((s) => Math.max(-days(s), 0)), 0);
   const hasNeg = maxDown > 0;
+
+  const UP_PX = 60;
   const perDay = UP_PX / Math.max(maxUp, maxDown, 1);
   const DOWN_PX = hasNeg ? Math.max(Math.ceil(maxDown * perDay), 4) : 0;
+  const TREND_PX = 44;
+  const TREND_FILL_GREEN = '#dfeae3'; // light tint of CUMULATIVE_COLOR for the position layer
 
   const shortMonth = (m) => {
     const [y, mo] = m.split('-');
     return lang === 'en' ? `${mo}/${y.slice(2)}` : `${y.slice(2)}年${parseInt(mo, 10)}月`;
   };
-
   const labelStyle = "font-family:'Courier New',monospace; font-size:9px; color:#6b6a64; white-space:nowrap;";
-  const CUM_BG = '#eceadf'; // the total column's zone — a step off the panel, marking its own scale
-  const dividerTd = (extra = '') => `<td width="10" style="width:10px; border-right:1px solid #d4d2c8;${extra}">&nbsp;</td>`;
-  const cumTd = (inner, extra = '') => `<td width="34" align="center" style="width:34px; background:${CUM_BG};${extra}">${inner}</td>`;
 
-  // Row 1 — every non-zero value on one row, centered over its column. Twelve columns
-  // at ~34px each fit three digits with air; no staggering, nothing to misalign.
-  const topLabelRow = series.map((s) => {
-    const d = days(s);
-    return `<td align="center" valign="bottom" style="padding:0 1px 2px; ${labelStyle}">${d > 0 ? d : ''}</td>`;
-  }).join('')
-    + dividerTd()
-    + cumTd(`<span style="font-family:'Courier New',monospace; font-size:9px; font-weight:bold; color:${CUMULATIVE_COLOR}; white-space:nowrap;">${total >= 0 ? '+' : '−'}${Math.abs(total)}</span>`, ' vertical-align:bottom; padding:0 1px 2px;');
-
-  // Total column: the window's months stacked chronologically from the baseline, on its
-  // OWN scale (the full chart height). Divs render top-down, so segments are emitted
-  // newest-first; 1px zone-color gaps separate them; sub-3px months merge forward.
-  const cumSegments = [];
-  const gross = series.reduce((sum, s) => sum + Math.max(days(s), 0), 0);
-  if (total > 0 && gross > 0) {
-    const perDayCum = UP_PX / gross;
-    let carry = 0;
-    for (const s of series) {
-      carry += Math.max(days(s), 0) * perDayCum;
-      if (carry >= 3) { cumSegments.push(Math.round(carry)); carry = 0; }
-    }
-    if (carry > 0) {
-      if (cumSegments.length) cumSegments[cumSegments.length - 1] += Math.round(carry);
-      else cumSegments.push(Math.max(Math.round(carry), 2));
-    }
+  // ---- Position layer (the line): cutoffs aligned to the same months as the bars.
+  // cutPoints may span a longer window; keep the entry per bar month plus the one
+  // just before the window, for the 起 label.
+  let trendRows = '';
+  let trendCaption = '';
+  const byMonth = new Map((Array.isArray(cutPoints) ? cutPoints : []).map((pt) => [pt.month, pt]));
+  const aligned = series.map((sm) => byMonth.get(sm.month) || null);
+  const usable = aligned.filter(Boolean);
+  if (usable.length >= 2) {
+    const toT = (pt) => Date.parse(`${pt.cutoff}T00:00:00Z`);
+    const min = Math.min(...usable.map(toT));
+    const max = Math.max(...usable.map(toT));
+    const span = Math.max(max - min, 1);
+    const capRow = aligned.map((pt) => {
+      if (!pt) return `<td valign="bottom" height="${TREND_PX}" style="padding:0; height:${TREND_PX}px;"></td>`;
+      const h = 5 + Math.round(((toT(pt) - min) / span) * (TREND_PX - 8));
+      return `<td valign="bottom" height="${TREND_PX}" style="padding:0; height:${TREND_PX}px;"><div style="height:${h}px; font-size:0; background:${TREND_FILL_GREEN}; border-top:3px solid ${CUMULATIVE_COLOR};">&nbsp;</div></td>`;
+    }).join('');
+    const first = usable[0], last = usable[usable.length - 1];
+    const endLabelRow = `
+      <tr>
+        <td colspan="${Math.ceil(n / 2)}" align="left" style="padding:0 0 3px; font-family:'Courier New',monospace; font-size:8px; color:#6b6a64; white-space:nowrap;">${lang === 'en' ? 'from' : '起'}&nbsp;${first.cutoff}</td>
+        <td colspan="${Math.floor(n / 2)}" align="right" style="padding:0 0 3px; font-family:'Courier New',monospace; font-size:8px; color:#6b6a64; white-space:nowrap;">${lang === 'en' ? 'now' : '现'}&nbsp;${last.cutoff}&nbsp;·&nbsp;<span style="color:${CUMULATIVE_COLOR}; font-weight:bold;">${total >= 0 ? '+' : '−'}${Math.abs(total)}</span></td>
+      </tr>`;
+    trendRows = `${endLabelRow}
+      <tr>${capRow}</tr>
+      <tr><td colspan="${n}" style="height:10px; font-size:0; border-top:1px solid #e4e1d6;">&nbsp;</td></tr>`;
+    trendCaption = lang === 'en'
+      ? `Top: Final Action Date position (cumulative). Bottom: days moved each month.`
+      : `上为截止日位置（累计走势），下为每月推进天数。`;
   }
-  const cumHtml = cumSegments.length
-    ? `<div style="width:20px; margin:0 auto;">${cumSegments.slice().reverse().map((h, i) =>
-        `<div style="height:${Math.max(h - 1, 2)}px; font-size:0; background:${CUMULATIVE_COLOR};${i > 0 ? ' margin-top:1px;' : ''}">&nbsp;</div>`
-      ).join('')}</div>`
-    : `<div style="width:20px; margin:0 auto; height:2px; font-size:0; background:${ZERO_COLOR};">&nbsp;</div>`;
 
-  // Row 2 — the up side of the baseline, scaled to the biggest single month.
-  const upBarRow = series.map((s) => {
-    const d = days(s);
+  // ---- Movement layer (the bars): value on every non-zero column, one aligned row.
+  const topLabelRow = series.map((sm) => {
+    const d = days(sm);
+    return `<td align="center" valign="bottom" style="padding:0 1px 2px; ${labelStyle}">${d > 0 ? d : ''}</td>`;
+  }).join('');
+
+  const upBarRow = series.map((sm) => {
+    const d = days(sm);
     const inner = d > 0
       ? `<div style="width:20px; margin:0 auto; height:${Math.max(Math.round(d * perDay), 2)}px; font-size:0; background:${ADVANCE_COLOR};">&nbsp;</div>`
       : d === 0
-        // Narrower than a data bar on purpose — a zero is a marker, not a magnitude,
-        // and matching widths made the flat months scan like real columns.
         ? `<div style="width:12px; margin:0 auto; height:2px; font-size:0; background:${ZERO_COLOR};">&nbsp;</div>`
         : '';
     return `<td valign="bottom" height="${UP_PX}" style="padding:0 1px; height:${UP_PX}px;">${inner}</td>`;
-  }).join('')
-    + dividerTd()
-    + cumTd(cumHtml, ` vertical-align:bottom; height:${UP_PX}px; padding:0 1px;`);
+  }).join('');
 
-  // Rows 3+4 — the down side, only when the window contains a retrogression.
   const downBarRow = hasNeg
-    ? series.map((s) => {
-        const d = days(s);
+    ? series.map((sm) => {
+        const d = days(sm);
         const inner = d < 0
           ? `<div style="width:20px; margin:0 auto; height:${Math.max(Math.round(-d * perDay), 2)}px; font-size:0; background:${RETROGRESS_COLOR};">&nbsp;</div>`
           : '';
         return `<td valign="top" height="${DOWN_PX}" style="padding:0 1px; height:${DOWN_PX}px; border-top:1px solid #b8b6ac;">${inner}</td>`;
       }).join('')
-      + dividerTd(' border-top:1px solid #b8b6ac;')
-      + cumTd('&nbsp;', ` height:${DOWN_PX}px; border-top:1px solid #b8b6ac;`)
     : '';
   const downLabelRow = hasNeg
-    ? series.map((s) => {
-        const d = days(s);
+    ? series.map((sm) => {
+        const d = days(sm);
         return `<td align="center" valign="top" style="padding:2px 1px 0; ${labelStyle}">${d < 0 ? `−${Math.abs(d)}` : ''}</td>`;
-      }).join('') + dividerTd() + cumTd('&nbsp;')
+      }).join('')
     : '';
 
-  // Tick row — the baseline doubles as the axis when there is no down side.
   const tickBorder = hasNeg ? '' : ' border-top:1px solid #b8b6ac;';
-  const tickRow = series.map((s, i) => {
-    const show = i === 0 || i === series.length - 1;
+  const tickRow = series.map((sm, i) => {
+    const show = i === 0 || i === n - 1;
     const align = i === 0 ? 'left' : 'right';
-    return `<td align="${show ? align : 'center'}" style="padding:4px 1px 0;${tickBorder} font-family:'Courier New',monospace; font-size:9px; color:#8a8980; white-space:nowrap;">${show ? shortMonth(s.month) : ''}</td>`;
-  }).join('')
-    + dividerTd(tickBorder)
-    + cumTd(`<span style="font-family:'Courier New',monospace; font-size:9px; color:#8a8980; white-space:nowrap;">${lang === 'en' ? 'total' : '累计'}</span>`, `${tickBorder} padding:4px 1px 0;`);
+    return `<td align="${show ? align : 'center'}" style="padding:4px 1px 0;${tickBorder} font-family:'Courier New',monospace; font-size:9px; color:#8a8980; white-space:nowrap;">${show ? shortMonth(sm.month) : ''}</td>`;
+  }).join('');
 
-  // Streak bracket — the dominant run in the window, drawn under exactly the months it
-  // covers (a colspan cell with a top rule). Zero-streaks outrank advance-streaks:
-  // "nothing moved for 6 months" is the fact a reader most needs called out.
+  // Streak bracket — the dominant run, drawn under exactly the months it covers.
   const runs = [];
   let runStart = 0;
   const kind = (d) => (d > 0 ? 'adv' : d < 0 ? 'ret' : 'zero');
-  for (let i = 1; i <= series.length; i++) {
-    if (i === series.length || kind(days(series[i])) !== kind(days(series[runStart]))) {
+  for (let i = 1; i <= n; i++) {
+    if (i === n || kind(days(series[i])) !== kind(days(series[runStart]))) {
       runs.push({ kind: kind(days(series[runStart])), start: runStart, len: i - runStart });
       runStart = i;
     }
@@ -602,92 +599,39 @@ const renderMovementChart = (series, lang) => {
         ? (lang === 'en' ? `${streak.len} straight months of retrogression` : `连续 ${streak.len} 个月倒退`)
         : (lang === 'en' ? `${streak.len} straight months advancing` : `连续 ${streak.len} 个月前进`);
     const before = streak.start > 0 ? `<td colspan="${streak.start}">&nbsp;</td>` : '';
-    const after = series.length - streak.start - streak.len > 0 ? `<td colspan="${series.length - streak.start - streak.len}">&nbsp;</td>` : '';
+    const after = n - streak.start - streak.len > 0 ? `<td colspan="${n - streak.start - streak.len}">&nbsp;</td>` : '';
     streakRow = `
       <tr>
         ${before}
         <td colspan="${streak.len}" align="center" style="padding:3px 2px 0;"><div style="border-top:2px solid #b8b6ac; padding-top:2px; font-family:'Courier New',monospace; font-size:9px; color:#8a8980; white-space:nowrap;">${escapeHtml(text)}</div></td>
         ${after}
-        ${dividerTd()}
-        ${cumTd('&nbsp;')}
       </tr>`;
   }
 
-  const caption = lang === 'en'
-    ? `Monthly movement, last ${series.length} months. The total column has its own scale — read its number.`
-    : `近 ${series.length} 个月逐月变化。累计柱按独立比例绘制，以顶部数字为准。`;
-
-  const legendKey = (color, text) =>
-    `<span style="white-space:nowrap;"><span style="display:inline-block; width:8px; height:8px; background:${color}; vertical-align:middle;">&nbsp;</span><span style="font-size:10px; color:#6b6a64; vertical-align:middle;">&nbsp;${escapeHtml(text)}</span></span>`;
+  const legendKey = (swatch, text) =>
+    `<span style="white-space:nowrap;">${swatch}<span style="font-size:10px; color:#6b6a64; vertical-align:middle;">&nbsp;${escapeHtml(text)}</span></span>`;
+  const sq = (color) => `<span style="display:inline-block; width:8px; height:8px; background:${color}; vertical-align:middle;">&nbsp;</span>`;
+  const lineSw = `<span style="display:inline-block; width:12px; height:3px; background:${CUMULATIVE_COLOR}; vertical-align:middle;">&nbsp;</span>`;
   const legend = `
-    <div style="margin-top:8px; line-height:1.6;">
-      ${legendKey(ADVANCE_COLOR, lang === 'en' ? 'Monthly advance' : '单月前进')}&nbsp;&nbsp;&nbsp;
-      ${hasNeg ? legendKey(RETROGRESS_COLOR, lang === 'en' ? 'Retrogression' : '倒退') + '&nbsp;&nbsp;&nbsp;' : ''}
-      ${legendKey(CUMULATIVE_COLOR, lang === 'en' ? `${series.length}-month total` : `${series.length}个月累计`)}
+    <div style="margin-top:8px; line-height:1.8;">
+      ${trendRows ? legendKey(lineSw, lang === 'en' ? 'Cutoff position (cumulative)' : '截止日位置（累计）') + '&nbsp;&nbsp;&nbsp;' : ''}
+      ${legendKey(sq(ADVANCE_COLOR), lang === 'en' ? 'Monthly advance' : '单月前进')}&nbsp;&nbsp;&nbsp;
+      ${hasNeg ? legendKey(sq(RETROGRESS_COLOR), lang === 'en' ? 'Retrogression' : '倒退') : ''}
     </div>`;
 
+  const caption = trendCaption || (lang === 'en'
+    ? `Monthly movement, last ${n} months.`
+    : `近 ${n} 个月逐月变化。`);
+
   return `
-    <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? 'Pace, month by month' : '逐月推进'}</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">
+    <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? 'Bulletin chart · Chart A' : '排期图表 · 表 A'}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">${trendRows}
       <tr>${topLabelRow}</tr>
       <tr>${upBarRow}</tr>
       ${hasNeg ? `<tr>${downBarRow}</tr><tr>${downLabelRow}</tr>` : ''}
       <tr>${tickRow}</tr>${streakRow}
     </table>
     <div style="font-size:11px; line-height:1.6; color:#8a8980; margin-top:8px;">${escapeHtml(caption)}</div>${legend}`;
-};
-
-// Cutoff trend over the window — the "line chart". A true polyline is impossible in
-// email (no SVG in Gmail, no JS anywhere), so each month is a column whose colored
-// 3px cap sits at the cutoff's normalized height, with a light area fill below.
-// Twenty-five caps in a row read as a stepped line.
-const renderCutoffTrendChart = (points, lang) => {
-  if (!Array.isArray(points) || points.length < 2) return '';
-
-  const CHART_PX = 56;
-  const toT = (p) => Date.parse(`${p.cutoff}T00:00:00Z`);
-  const min = Math.min(...points.map(toT));
-  const max = Math.max(...points.map(toT));
-  const span = Math.max(max - min, 1);
-
-  // Start and end cutoff dates ride above the chart's left/right edges, prefixed
-  // 起/现 so it's clear WHICH values they are — the start cap sits at the bottom left,
-  // far from its own label, and a bare date up there would leave the reader guessing.
-  const endLabelRow = `
-      <tr>
-        <td colspan="${Math.ceil(points.length / 2)}" align="left" style="padding:0 0 3px; font-family:'Courier New',monospace; font-size:8px; color:#6b6a64; white-space:nowrap;">${lang === 'en' ? 'from' : '起'}&nbsp;${points[0].cutoff}</td>
-        <td colspan="${Math.floor(points.length / 2)}" align="right" style="padding:0 0 3px; font-family:'Courier New',monospace; font-size:8px; color:#6b6a64; white-space:nowrap;">${lang === 'en' ? 'now' : '现'}&nbsp;${points[points.length - 1].cutoff}</td>
-      </tr>`;
-
-  // No inter-column padding: the columns fuse into one stepped area so the 3px caps
-  // read as a continuous line, not a row of bars — this chart is the email's polyline.
-  const barRow = points.map((p) => {
-    const h = 5 + Math.round(((toT(p) - min) / span) * (CHART_PX - 8));
-    return `<td valign="bottom" height="${CHART_PX}" style="padding:0; height:${CHART_PX}px;"><div style="height:${h}px; font-size:0; background:${TREND_FILL}; border-top:3px solid ${ADVANCE_COLOR};">&nbsp;</div></td>`;
-  }).join('');
-
-  const shortMonth = (m) => {
-    const [y, mo] = m.split('-');
-    return lang === 'en' ? `${mo}/${y.slice(2)}` : `${y.slice(2)}年${parseInt(mo, 10)}月`;
-  };
-  const tickRow = points.map((p, i) => {
-    const show = i === 0 || i === points.length - 1;
-    return `<td align="center" style="padding:4px 1px 0; border-top:1px solid #d4d2c8; font-family:'Courier New',monospace; font-size:9px; color:#8a8980; white-space:nowrap;">${show ? shortMonth(p.month) : ''}</td>`;
-  }).join('');
-
-  const first = points[0], last = points[points.length - 1];
-  const totalDays = Math.round((toT(last) - toT(first)) / 86400000);
-  const caption = lang === 'en'
-    ? `Final Action Date went from ${first.cutoff} to ${last.cutoff} over ${points.length - 1} months — ${totalDays >= 0 ? '+' : ''}${totalDays} days total.`
-    : `${points.length - 1} 个月里 Final Action Date 从 ${first.cutoff} 走到 ${last.cutoff}，共${totalDays >= 0 ? '前进' : '倒退'} ${Math.abs(totalDays)} 天。`;
-
-  return `
-    <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? 'Cutoff trend' : '排期走势'}</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">${endLabelRow}
-      <tr>${barRow}</tr>
-      <tr>${tickRow}</tr>
-    </table>
-    <div style="font-size:11px; line-height:1.6; color:#8a8980; margin-top:8px;">${escapeHtml(caption)}</div>`;
 };
 
 // App.jsx reads the case off the query string (c/ct/pd/in/ps) and — importantly —
@@ -732,9 +676,21 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
         ? (lang === 'en'
             ? { pre: 'Your category ', accent: 'retrogressed', post: ' this month', color: RETROGRESS_COLOR }
             : { pre: '本月你的类别', accent: '出现倒退', post: '', color: RETROGRESS_COLOR })
-        : (lang === 'en'
-            ? { pre: 'No movement in your category this month', accent: '', post: '', color: '#6b6a64' }
-            : { pre: '本月你的类别没有变化', accent: '', post: '', color: '#6b6a64' });
+        : fa.movement.type === 'unavailable'
+          ? (fa.movement.still
+              ? (lang === 'en'
+                  ? { pre: 'Your category ', accent: 'is still unavailable (U)', post: '', color: RETROGRESS_COLOR }
+                  : { pre: '本月你的类别', accent: '持续无名额（U）', post: '', color: RETROGRESS_COLOR })
+              : (lang === 'en'
+                  ? { pre: 'Your category ', accent: 'went unavailable (U)', post: '', color: RETROGRESS_COLOR }
+                  : { pre: '本月你的类别', accent: '转为无名额（U）', post: '', color: RETROGRESS_COLOR }))
+          : fa.movement.type === 'resumed'
+            ? (lang === 'en'
+                ? { pre: 'Your category ', accent: 'resumed', post: ' — numbers are back', color: GOOD_COLOR }
+                : { pre: '你的类别', accent: '恢复名额了', post: '', color: GOOD_COLOR })
+            : (lang === 'en'
+                ? { pre: 'No movement in your category this month', accent: '', post: '', color: '#6b6a64' }
+                : { pre: '本月你的类别没有变化', accent: '', post: '', color: '#6b6a64' });
   const headline = hp.pre + hp.accent + hp.post;
   const headlineHtml = `${escapeHtml(hp.pre)}<span style="color:${hp.color}; font-weight:600;">${escapeHtml(hp.accent)}</span>${escapeHtml(hp.post)}`;
   const eyebrowColor = hp.accent ? hp.color : '#8b3a3a';
@@ -797,8 +753,7 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   ].filter(Boolean).join(' · ') || headline;
   // 12-month series on purpose: twelve ~34px columns carry one aligned row of value
   // labels; the 24-month rhythm lives in the cutoff trend chart above.
-  const chartHtml = renderMovementChart(fc?.series, lang);
-  const trendHtml = renderCutoffTrendChart(update.cutoffHistory, lang);
+  const figureHtml = renderBulletinFigure(update.cutoffHistory, fc?.series, lang);
 
   // How far the cutoff still has to travel to reach this subscriber's priority date.
   const gapDays = !isNowCurrent && fa.status?.days ? fa.status.days : null;
@@ -831,7 +786,7 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   // terms in the original.
   // Movement text carries the same advance/retrogress colors as the charts, so the
   // whole email speaks one color language (blue = forward, rust = backward).
-  const moveColor = (movement) => movement.type === 'retrogressed' ? RETROGRESS_COLOR
+  const moveColor = (movement) => (movement.type === 'retrogressed' || movement.type === 'unavailable') ? RETROGRESS_COLOR
     : movement.type === 'none' ? '#8a8980' : ADVANCE_COLOR;
   const rows = [
     {
@@ -986,20 +941,11 @@ ${emailHead(subject)}
           </td>
         </tr>` : ''}
 
-        ${trendHtml ? `
-        <tr>
-          <td class="px" style="padding:16px 40px 0;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PANEL_BG}; border:1px solid ${PANEL_BORDER};">
-              <tr><td style="padding:14px 14px 12px;">${trendHtml}</td></tr>
-            </table>
-          </td>
-        </tr>` : ''}
-
-        ${chartHtml ? `
+        ${figureHtml ? `
         <tr>
           <td class="px" style="padding:16px 40px 8px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PANEL_BG}; border:1px solid ${PANEL_BORDER};">
-              <tr><td style="padding:14px 14px 12px;">${chartHtml}</td></tr>
+              <tr><td style="padding:14px 14px 12px;">${figureHtml}</td></tr>
             </table>
           </td>
         </tr>` : ''}
