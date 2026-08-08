@@ -458,23 +458,32 @@ const PANEL_BORDER = '#e4e1d6';
 // inline-block, so the whole flag is wrapped in a non-mso conditional — Outlook simply
 // shows no flag rather than a broken one.
 const countryFlagHtml = (country) => {
-  const W = 21, H = 14;
-  const box = (inner, w = W, h = H, extra = '') =>
-    `<div style="display:inline-block; vertical-align:-2px; width:${w}px; height:${h}px; font-size:0; line-height:0; border:1px solid rgba(26,26,26,0.25); overflow:hidden;${extra}">${inner}</div>`;
+  const W = 30, H = 20;
+  const box = (inner, extra = '') =>
+    `<div style="display:inline-block; vertical-align:-4px; width:${W}px; height:${H}px; font-size:0; line-height:0; border:1px solid rgba(26,26,26,0.25); overflow:hidden;${extra}">${inner}</div>`;
   const hStripes = (colors, hs) => colors.map((c, i) =>
     `<div style="width:${W}px; height:${hs[i]}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
   const vStripes = (colors, ws) => colors.map((c, i) =>
     `<div style="display:inline-block; width:${ws[i]}px; height:${H}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
   const flags = {
-    China: box(`<div style="width:${W}px; height:${H}px; background:#DE2910; text-align:left;"><span style="display:inline-block; margin:0 0 0 2px; font-size:9px; line-height:${H}px; color:#FFDE00;">★</span></div>`),
-    India: box(hStripes(['#FF9933', '#ffffff', '#138808'], [5, 4, 5])),
-    Mexico: box(vStripes(['#006847', '#ffffff', '#CE1126'], [7, 7, 7])),
+    // 五星俱全：大星 + 2×2 小星阵。小星 6px 的 ★ 渲染近似圆点——真旗在这个尺寸下
+    // 小星本来也只是四个点，观感正确。
+    China: box(
+      `<div style="width:${W}px; height:${H}px; background:#DE2910; text-align:left;">`
+      + `<div style="display:inline-block; vertical-align:top; padding:1px 0 0 2px; font-size:13px; line-height:16px; color:#FFDE00;">&#9733;</div>`
+      + `<div style="display:inline-block; vertical-align:top; padding-top:2px; font-size:6px; line-height:7px; color:#FFDE00;">&#9733;&#9733;<br>&#9733;&#9733;</div>`
+      + `</div>`),
+    India: box(hStripes(['#FF9933', '#ffffff', '#138808'], [7, 6, 7])),
+    Mexico: box(vStripes(['#006847', '#ffffff', '#CE1126'], [10, 10, 10])),
     Philippines: box(
-      `<div style="display:inline-block; width:6px; height:${H}px; font-size:0; line-height:0; background:#ffffff;"></div>`
-      + `<div style="display:inline-block; width:${W - 6}px; height:${H}px; font-size:0; line-height:0; vertical-align:top;">${hStripes(['#0038A8', '#CE1126'], [7, 7]).replace(new RegExp(`width:${W}px`, 'g'), `width:${W - 6}px`)}</div>`),
+      `<div style="display:inline-block; width:8px; height:${H}px; font-size:0; line-height:0; background:#ffffff;"></div>`
+      + `<div style="display:inline-block; width:${W - 8}px; height:${H}px; font-size:0; line-height:0; vertical-align:top;">`
+      + `<div style="width:${W - 8}px; height:10px; font-size:0; line-height:0; background:#0038A8;"></div>`
+      + `<div style="width:${W - 8}px; height:10px; font-size:0; line-height:0; background:#CE1126;"></div>`
+      + `</div>`),
     // The site shows its blue globe for the ROW pool; a bordered blue disc is the
     // closest email-safe stand-in.
-    Taiwan: `<div style="display:inline-block; vertical-align:-2px; width:12px; height:12px; font-size:0; line-height:0; background:#3b82f6; border:1px solid #1e40af; border-radius:50%;"></div>`,
+    Taiwan: `<div style="display:inline-block; vertical-align:-3px; width:14px; height:14px; font-size:0; line-height:0; background:#3b82f6; border:1px solid #1e40af; border-radius:50%;"></div>`,
   };
   const f = flags[country];
   return f ? `<!--[if !mso]><!-->&nbsp;${f}<!--<![endif]-->` : '';
@@ -499,7 +508,7 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
   const UP_PX = 60;
   const perDay = UP_PX / Math.max(maxUp, maxDown, 1);
   const DOWN_PX = hasNeg ? Math.max(Math.ceil(maxDown * perDay), 4) : 0;
-  const TREND_PX = 44;
+  const TREND_PX = 40;
   const TREND_FILL_GREEN = '#dfeae3'; // light tint of CUMULATIVE_COLOR for the position layer
 
   const shortMonth = (m) => {
@@ -521,23 +530,36 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
     const min = Math.min(...usable.map(toT));
     const max = Math.max(...usable.map(toT));
     const span = Math.max(max - min, 1);
-    const capRow = aligned.map((pt) => {
+    // In-cell labels riding the stairs: the cutoff reached on the window's biggest
+    // jump, and the running total over the final step — anchored to the line itself
+    // instead of floating in the header row.
+    let jumpIdx = -1, jumpMax = 0;
+    series.forEach((sm, i) => { if (days(sm) > jumpMax && aligned[i]) { jumpMax = days(sm); jumpIdx = i; } });
+    const capLabel = (i) => {
+      const bits = [];
+      if (i === n - 1) bits.push(`<span style="color:${CUMULATIVE_COLOR}; font-weight:bold;">${total >= 0 ? '+' : '−'}${Math.abs(total)}</span>`);
+      else if (i === jumpIdx && aligned[i]) bits.push(aligned[i].cutoff);
+      return bits.length
+        ? `<div style="font-family:'Courier New',monospace; font-size:7.5px; line-height:9px; color:#6b6a64; white-space:nowrap; text-align:${i === n - 1 ? 'right' : 'center'}; padding-bottom:1px;">${bits.join('')}</div>`
+        : '';
+    };
+    const capRow = aligned.map((pt, i) => {
       if (!pt) return `<td valign="bottom" height="${TREND_PX}" style="padding:0; height:${TREND_PX}px;"></td>`;
-      const h = 5 + Math.round(((toT(pt) - min) / span) * (TREND_PX - 8));
-      return `<td valign="bottom" height="${TREND_PX}" style="padding:0; height:${TREND_PX}px;"><div style="height:${h}px; font-size:0; background:${TREND_FILL_GREEN}; border-top:3px solid ${CUMULATIVE_COLOR};">&nbsp;</div></td>`;
+      // 12px floor: the lowest cutoff is not "zero", it just started the window —
+      // a 5px sliver glued to the divider read as a broken line floating in space.
+      const h = 12 + Math.round(((toT(pt) - min) / span) * (TREND_PX - 16));
+      return `<td valign="bottom" height="${TREND_PX}" style="padding:0; height:${TREND_PX}px;">${capLabel(i)}<div style="height:${h}px; font-size:0; background:${TREND_FILL_GREEN}; border-top:3px solid ${CUMULATIVE_COLOR};">&nbsp;</div></td>`;
     }).join('');
     const first = usable[0], last = usable[usable.length - 1];
     const endLabelRow = `
       <tr>
         <td colspan="${Math.ceil(n / 2)}" align="left" style="padding:0 0 3px; font-family:'Courier New',monospace; font-size:8px; color:#6b6a64; white-space:nowrap;">${lang === 'en' ? 'from' : '起'}&nbsp;${first.cutoff}</td>
-        <td colspan="${Math.floor(n / 2)}" align="right" style="padding:0 0 3px; font-family:'Courier New',monospace; font-size:8px; color:#6b6a64; white-space:nowrap;">${lang === 'en' ? 'now' : '现'}&nbsp;${last.cutoff}&nbsp;·&nbsp;<span style="color:${CUMULATIVE_COLOR}; font-weight:bold;">${total >= 0 ? '+' : '−'}${Math.abs(total)}</span></td>
+        <td colspan="${Math.floor(n / 2)}" align="right" style="padding:0 0 3px; font-family:'Courier New',monospace; font-size:8px; color:#6b6a64; white-space:nowrap;">${lang === 'en' ? 'now' : '现'}&nbsp;${last.cutoff}</td>
       </tr>`;
     trendRows = `${endLabelRow}
       <tr>${capRow}</tr>
-      <tr><td colspan="${n}" style="height:10px; font-size:0; border-top:1px solid #e4e1d6;">&nbsp;</td></tr>`;
-    trendCaption = lang === 'en'
-      ? `Top: Final Action Date position (cumulative). Bottom: days moved each month.`
-      : `上为截止日位置（累计走势），下为每月推进天数。`;
+      <tr><td colspan="${n}" style="height:4px; font-size:0; line-height:0;">&nbsp;</td></tr>`;
+    trendCaption = '';
   }
 
   // ---- Movement layer (the bars): value on every non-zero column, one aligned row.
@@ -549,20 +571,20 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
   const upBarRow = series.map((sm) => {
     const d = days(sm);
     const inner = d > 0
-      ? `<div style="width:20px; margin:0 auto; height:${Math.max(Math.round(d * perDay), 2)}px; font-size:0; background:${ADVANCE_COLOR};">&nbsp;</div>`
+      ? `<div style="height:${Math.max(Math.round(d * perDay), 2)}px; font-size:0; background:${ADVANCE_COLOR};">&nbsp;</div>`
       : d === 0
-        ? `<div style="width:12px; margin:0 auto; height:2px; font-size:0; background:${ZERO_COLOR};">&nbsp;</div>`
+        ? `<div style="width:60%; margin:0 auto; height:2px; font-size:0; background:#c5c2b4;">&nbsp;</div>`
         : '';
-    return `<td valign="bottom" height="${UP_PX}" style="padding:0 1px; height:${UP_PX}px;">${inner}</td>`;
+    return `<td valign="bottom" height="${UP_PX}" style="padding:0 4px; height:${UP_PX}px;">${inner}</td>`;
   }).join('');
 
   const downBarRow = hasNeg
     ? series.map((sm) => {
         const d = days(sm);
         const inner = d < 0
-          ? `<div style="width:20px; margin:0 auto; height:${Math.max(Math.round(-d * perDay), 2)}px; font-size:0; background:${RETROGRESS_COLOR};">&nbsp;</div>`
+          ? `<div style="height:${Math.max(Math.round(-d * perDay), 2)}px; font-size:0; background:${RETROGRESS_COLOR};">&nbsp;</div>`
           : '';
-        return `<td valign="top" height="${DOWN_PX}" style="padding:0 1px; height:${DOWN_PX}px; border-top:1px solid #b8b6ac;">${inner}</td>`;
+        return `<td valign="top" height="${DOWN_PX}" style="padding:0 4px; height:${DOWN_PX}px; border-top:1px solid #b8b6ac;">${inner}</td>`;
       }).join('')
     : '';
   const downLabelRow = hasNeg
@@ -603,23 +625,25 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
     streakRow = `
       <tr>
         ${before}
-        <td colspan="${streak.len}" align="center" style="padding:3px 2px 0;"><div style="border-top:2px solid #b8b6ac; padding-top:2px; font-family:'Courier New',monospace; font-size:9px; color:#8a8980; white-space:nowrap;">${escapeHtml(text)}</div></td>
+        <td colspan="${streak.len}" align="center" style="padding:3px 2px 0;"><div style="border-top:1px solid #c5c2b4; padding-top:2px; font-family:'Courier New',monospace; font-size:9px; color:#8a8980; white-space:nowrap;">${escapeHtml(text)}</div></td>
         ${after}
       </tr>`;
   }
 
   const legendKey = (swatch, text) =>
     `<span style="white-space:nowrap;">${swatch}<span style="font-size:10px; color:#6b6a64; vertical-align:middle;">&nbsp;${escapeHtml(text)}</span></span>`;
-  const sq = (color) => `<span style="display:inline-block; width:8px; height:8px; background:${color}; vertical-align:middle;">&nbsp;</span>`;
-  const lineSw = `<span style="display:inline-block; width:12px; height:3px; background:${CUMULATIVE_COLOR}; vertical-align:middle;">&nbsp;</span>`;
+  // font-size:0 on the swatches: the &nbsp; inside otherwise inherits the body size
+  // and inflates an 8px square into a tall bar (seen live in Gmail iOS).
+  const sq = (color) => `<span style="display:inline-block; width:8px; height:8px; font-size:0; line-height:0; background:${color}; vertical-align:middle;">&nbsp;</span>`;
+  const lineSw = `<span style="display:inline-block; width:12px; height:3px; font-size:0; line-height:0; background:${CUMULATIVE_COLOR}; vertical-align:middle;">&nbsp;</span>`;
   const legend = `
     <div style="margin-top:8px; line-height:1.8;">
-      ${trendRows ? legendKey(lineSw, lang === 'en' ? 'Cutoff position (cumulative)' : '截止日位置（累计）') + '&nbsp;&nbsp;&nbsp;' : ''}
-      ${legendKey(sq(ADVANCE_COLOR), lang === 'en' ? 'Monthly advance' : '单月前进')}&nbsp;&nbsp;&nbsp;
+      ${trendRows ? legendKey(lineSw, lang === 'en' ? 'Top · cutoff position (cumulative)' : '上 · 截止日位置（累计）') + '&nbsp;&nbsp;&nbsp;' : ''}
+      ${legendKey(sq(ADVANCE_COLOR), lang === 'en' ? (trendRows ? 'Bottom · monthly advance' : 'Monthly advance') : (trendRows ? '下 · 单月前进' : '单月前进'))}&nbsp;&nbsp;&nbsp;
       ${hasNeg ? legendKey(sq(RETROGRESS_COLOR), lang === 'en' ? 'Retrogression' : '倒退') : ''}
     </div>`;
 
-  const caption = trendCaption || (lang === 'en'
+  const caption = trendRows ? '' : (lang === 'en'
     ? `Monthly movement, last ${n} months.`
     : `近 ${n} 个月逐月变化。`);
 
@@ -631,7 +655,7 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
       ${hasNeg ? `<tr>${downBarRow}</tr><tr>${downLabelRow}</tr>` : ''}
       <tr>${tickRow}</tr>${streakRow}
     </table>
-    <div style="font-size:11px; line-height:1.6; color:#8a8980; margin-top:8px;">${escapeHtml(caption)}</div>${legend}`;
+    ${caption ? `<div style="font-size:11px; line-height:1.6; color:#8a8980; margin-top:8px;">${escapeHtml(caption)}</div>` : ''}${legend}`;
 };
 
 // App.jsx reads the case off the query string (c/ct/pd/in/ps) and — importantly —
@@ -735,12 +759,13 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   };
   const calFast = fc ? monthToCal(fc.fastMonths) : null;
   const calSlow = fc && hasRange ? monthToCal(fc.slowMonths) : null;
-  const calLine = calFast
-    ? (calSlow
-        ? (lang === 'en'
-            ? `On the calendar: around ${calFast} at the optimistic end, around ${calSlow} at the conservative end.`
-            : `换算到日历上：乐观约 ${calFast}，保守约 ${calSlow}。`)
-        : (lang === 'en' ? `On the calendar: around ${calFast}.` : `换算到日历上：约 ${calFast}。`))
+  // Calendar-first: "2027年10月 – 2033年6月" answers the reader's actual question;
+  // the duration form ("14 个月 – 6.9 年") demotes to a secondary line.
+  const rangeHeadlineCal = calFast
+    ? (calSlow ? `${calFast} – ${calSlow}` : (lang === 'en' ? `~${calFast}` : `约 ${calFast}`))
+    : '';
+  const durLine = rangeHeadline && rangeHeadlineCal
+    ? (lang === 'en' ? `That is ${rangeHeadline} from now.` : `即距今约 ${rangeHeadline}。`)
     : '';
 
   // Inbox preview line. The subject already carries the headline, so the preheader
@@ -749,7 +774,9 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   const preheader = [
     `${lang === 'en' ? 'Chart A' : '表A'} ${formatDateForLang(fa.current, lang)}`,
     preheaderGap ? (lang === 'en' ? `${preheaderGap.toLocaleString('en-US')} days to your PD` : `距优先日 ${preheaderGap.toLocaleString('en-US')} 天`) : '',
-    calFast ? (lang === 'en' ? `optimistic ~${calFast}` : `乐观约 ${calFast}`) : '',
+    calFast && calSlow
+      ? (lang === 'en' ? `optimistic ~${calFast} · conservative ~${calSlow}` : `乐观约 ${calFast} · 保守约 ${calSlow}`)
+      : calFast ? (lang === 'en' ? `optimistic ~${calFast}` : `乐观约 ${calFast}`) : '',
   ].filter(Boolean).join(' · ') || headline;
   // 12-month series on purpose: twelve ~34px columns carry one aligned row of value
   // labels; the 24-month rhythm lives in the cutoff trend chart above.
@@ -760,7 +787,7 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   const gapLine = gapDays
     ? (lang === 'en'
         ? `The current cutoff is ${gapDays.toLocaleString('en-US')} days short of your priority date.`
-        : `当前 cutoff 距你的优先日还差 ${gapDays.toLocaleString('en-US')} 天。`)
+        : `当前截止日距你的优先日还差 ${gapDays.toLocaleString('en-US')} 天。`)
     : '';
 
   // Bulletin notices that mention this subscriber's exact category token (e.g. "EB-2",
@@ -833,9 +860,9 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
     '',
     chartNote,
     '',
-    rangeHeadline ? `${lang === 'en' ? 'ESTIMATED WAIT' : '预计还要等'}: ${rangeHeadline}` : '',
+    rangeHeadline ? `${lang === 'en' ? 'ESTIMATED WAIT' : '预计还要等'}: ${rangeHeadlineCal || rangeHeadline}` : '',
+    durLine,
     etaLine,
-    calLine,
     gapLine,
     (() => {
       // Same 12-month net the chart's cumulative column shows, for text-only clients.
@@ -928,9 +955,9 @@ ${emailHead(subject)}
               <tr>
                 <td style="padding:16px 18px;">
                   <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#4e6b58; text-transform:uppercase; margin-bottom:8px;">${lang === 'en' ? 'Estimated Wait' : '预计还要等'}</div>
-                  <div style="font-family:Georgia,serif; font-size:24px; line-height:1.2; color:#1a1a1a; margin-bottom:8px;">${escapeHtml(rangeHeadline)}</div>
+                  <div style="font-family:Georgia,serif; font-size:24px; line-height:1.2; color:#1a1a1a; margin-bottom:8px;">${escapeHtml(rangeHeadlineCal || rangeHeadline)}</div>
+                  ${durLine ? `<div style="font-size:12px; line-height:1.7; color:#2a2a2a; margin-bottom:4px;">${escapeHtml(durLine)}</div>` : ''}
                   <div style="font-size:12px; line-height:1.7; color:#2a2a2a;">${escapeHtml(etaLine)}</div>
-                  ${calLine ? `<div style="font-size:12px; line-height:1.7; color:#2a2a2a; margin-top:4px; font-weight:600;">${escapeHtml(calLine)}</div>` : ''}
                   ${gapLine ? `<div style="font-size:12px; line-height:1.7; color:#2a2a2a; margin-top:4px;">${escapeHtml(gapLine)}</div>` : ''}
                   <div style="font-size:11px; line-height:1.6; color:#8a8980; margin-top:8px;">${lang === 'en'
                     ? 'A model estimate from historical pace, not a guarantee — the bulletin can speed up, slow down, or retrogress.'
