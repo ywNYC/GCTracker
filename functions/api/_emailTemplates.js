@@ -513,8 +513,12 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
   const hasNeg = maxDown > 0;
 
   const UP_PX = 60;
-  const perDay = UP_PX / Math.max(maxUp, maxDown, 1);
-  const DOWN_PX = hasNeg ? Math.max(Math.ceil(maxDown * perDay), 4) : 0;
+  // 12px headroom: value labels live INSIDE each bar's cell, stacked right on the
+  // bar's own top — a separate label row parked every number at the same height,
+  // which left short bars with digits floating in space.
+  const LABEL_H = 12;
+  const perDay = (UP_PX - LABEL_H) / Math.max(maxUp, maxDown, 1);
+  const DOWN_PX = hasNeg ? Math.ceil(maxDown * perDay) + LABEL_H : 0;
   const TREND_PX = 40;
   const TREND_FILL_GREEN = '#dfeae3'; // light tint of CUMULATIVE_COLOR for the position layer
 
@@ -569,16 +573,13 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
     trendCaption = '';
   }
 
-  // ---- Movement layer (the bars): value on every non-zero column, one aligned row.
-  const topLabelRow = series.map((sm) => {
-    const d = days(sm);
-    return `<td align="center" valign="bottom" style="padding:0 1px 2px; ${labelStyle}">${d > 0 ? d : ''}</td>`;
-  }).join('');
-
+  // ---- Movement layer: each cell stacks [value label]+[bar], bottom-anchored, so
+  // the number rides its own bar's top no matter how short the bar is.
   const upBarRow = series.map((sm) => {
     const d = days(sm);
     const inner = d > 0
-      ? `<div style="height:${Math.max(Math.round(d * perDay), 2)}px; font-size:0; background:${ADVANCE_COLOR};">&nbsp;</div>`
+      ? `<div align="center" style="height:${LABEL_H}px; line-height:${LABEL_H}px; text-align:center; ${labelStyle}">${d}</div>`
+        + `<div style="height:${Math.max(Math.round(d * perDay), 2)}px; font-size:0; background:${ADVANCE_COLOR};">&nbsp;</div>`
       : d === 0
         ? `<div style="width:60%; margin:0 auto; height:2px; font-size:0; background:#c5c2b4;">&nbsp;</div>`
         : '';
@@ -590,14 +591,9 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
         const d = days(sm);
         const inner = d < 0
           ? `<div style="height:${Math.max(Math.round(-d * perDay), 2)}px; font-size:0; background:${RETROGRESS_COLOR};">&nbsp;</div>`
+            + `<div align="center" style="height:${LABEL_H}px; line-height:${LABEL_H}px; text-align:center; ${labelStyle}">−${Math.abs(d)}</div>`
           : '';
         return `<td valign="top" height="${DOWN_PX}" style="padding:0 4px; height:${DOWN_PX}px; border-top:1px solid #b8b6ac;">${inner}</td>`;
-      }).join('')
-    : '';
-  const downLabelRow = hasNeg
-    ? series.map((sm) => {
-        const d = days(sm);
-        return `<td align="center" valign="top" style="padding:2px 1px 0; ${labelStyle}">${d < 0 ? `−${Math.abs(d)}` : ''}</td>`;
       }).join('')
     : '';
 
@@ -657,9 +653,8 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
   return `
     <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? 'Bulletin chart · Chart A' : '排期图表 · 表 A'}</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">${trendRows}
-      <tr>${topLabelRow}</tr>
       <tr>${upBarRow}</tr>
-      ${hasNeg ? `<tr>${downBarRow}</tr><tr>${downLabelRow}</tr>` : ''}
+      ${hasNeg ? `<tr>${downBarRow}</tr>` : ''}
       <tr>${tickRow}</tr>${streakRow}
     </table>
     ${caption ? `<div style="font-size:11px; line-height:1.6; color:#8a8980; margin-top:8px;">${escapeHtml(caption)}</div>` : ''}${legend}`;
