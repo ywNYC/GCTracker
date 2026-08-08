@@ -4960,7 +4960,12 @@ const MonthlyUpdate = ({ userCase }) => {
   // (earliest month in archive has no previous reference)
   const hasPreviousData = bulletinPrevious && bulletinPrevious.finalAction && Object.keys(bulletinPrevious.finalAction).length > 0;
 
-  const changes = useMemo(() => {
+  // NOT useMemo. bulletinCurrent/bulletinPrevious are module objects mutated in place
+  // when history.json loads (and by the Time Machine); a memo keyed on props caches the
+  // seeded May-2026 numbers from the first render and never recomputes — this tab spent
+  // a whole release showing "+30 days" under an August header because of exactly that.
+  // The computation is 8 categories of date diffs; per-render cost is negligible.
+  const changes = (() => {
     const cats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
     const catLabels = { EB1: t.eb1, EB2: t.eb2, EB3: t.eb3, F1: t.f1, F2A: t.f2a, F2B: t.f2b, F3: t.f3, F4: t.f4 };
     if (!hasPreviousData) {
@@ -4980,12 +4985,11 @@ const MonthlyUpdate = ({ userCase }) => {
       primary: computeMovement(bulletinCurrent.finalAction[c][userCountry], bulletinPrevious.finalAction[c][userCountry]),
       secondary: userCountry !== 'Other' ? computeMovement(bulletinCurrent.finalAction[c].Other, bulletinPrevious.finalAction[c].Other) : null,
     }));
-  }, [t, userCountry, hasPreviousData]);
+  })();
 
-  const userImpact = useMemo(() => {
-    if (!hasPreviousData) return { type: 'none', days: 0 };
-    return computeMovement(bulletinCurrent.finalAction[userCase.category][userCountry], bulletinPrevious.finalAction[userCase.category][userCountry]);
-  }, [userCase, userCountry, hasPreviousData]);
+  const userImpact = !hasPreviousData
+    ? { type: 'none', days: 0 }
+    : computeMovement(bulletinCurrent.finalAction[userCase.category][userCountry], bulletinPrevious.finalAction[userCase.category][userCountry]);
 
   const impactText = { advanced: t.impactAdvanced, retrogressed: t.impactRetrogressed, none: t.impactNoChange, current: t.impactBecameCurrent }[userImpact.type];
   const impactTone = {
@@ -5018,22 +5022,30 @@ const MonthlyUpdate = ({ userCase }) => {
           </p>
         </div>
       )}
-      {/* Overall summary is hardcoded for the current (latest) month. Hide it when viewing historical months. */}
-      {BULLETIN_CURRENT_MONTH.zh === '2026年5月' ? (
+      {/* The narrative summary was written for May 2026 and only shows for that month.
+          The "historical view" note shows only when the Time Machine is on an OLD month
+          — the latest month is not "historical", and labeling live August data that way
+          read as a bug. Latest month simply shows no extra banner; the table speaks. */}
+      {BULLETIN_CURRENT_MONTH.zh === '2026年5月' && DEFAULT_VIEWING_MONTH === '2026-05' ? (
         <div className="p-2.5 bg-slate-50 rounded-xl mb-2.5">
           <p className="text-[12px] text-slate-700 leading-relaxed">{t.overallSummary}</p>
         </div>
-      ) : (
-        <div className="p-2.5 bg-slate-50 rounded-xl mb-2.5 border border-dashed border-slate-200">
-          <p className="text-[11px] text-slate-500 leading-relaxed italic">
-            {lang === 'en'
-              ? `Historical view of ${BULLETIN_CURRENT_MONTH.en}. See the category table below for month-over-month changes in your case.`
-              : lang === 'tw'
-                ? `${BULLETIN_CURRENT_MONTH.tw} 歷史視角。月度變化詳見下方類別表格。`
-                : `${BULLETIN_CURRENT_MONTH.zh}历史视角。月度变化详见下方类别表格。`}
-          </p>
-        </div>
-      )}
+      ) : (() => {
+        const [ly, lm] = DEFAULT_VIEWING_MONTH.split('-');
+        const latestZh = `${ly}年${parseInt(lm, 10)}月`;
+        const viewingLatest = BULLETIN_CURRENT_MONTH.zh === latestZh;
+        return viewingLatest ? null : (
+          <div className="p-2.5 bg-slate-50 rounded-xl mb-2.5 border border-dashed border-slate-200">
+            <p className="text-[11px] text-slate-500 leading-relaxed italic">
+              {lang === 'en'
+                ? `Historical view of ${BULLETIN_CURRENT_MONTH.en}. See the category table below for month-over-month changes in your case.`
+                : lang === 'tw'
+                  ? `${BULLETIN_CURRENT_MONTH.tw} 歷史視角。月度變化詳見下方類別表格。`
+                  : `${BULLETIN_CURRENT_MONTH.zh}历史视角。月度变化详见下方类别表格。`}
+            </p>
+          </div>
+        );
+      })()}
       <div className={`p-2.5 rounded-xl border mb-2.5 ${impactTone}`}>
         <div className="text-[10px] font-bold uppercase tracking-wider opacity-60 mb-0.5">{t.yourImpact}</div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -5101,7 +5113,10 @@ const Forecast = ({ userCase }) => {
   const { t, lang } = useLang();
   // Defaults to the cautious end. The user can switch, but they have to choose to.
   const [paceBasis, setPaceBasis] = useState('conservative');
-  const forecast = useMemo(() => computeForecast(userCase, paceBasis), [userCase, paceBasis]);
+  // Not memoized: computeForecast reads the mutated-in-place BULLETIN_ARCHIVE, so a
+  // memo keyed on props serves pre-history.json seed numbers forever (same trap as
+  // MonthlyUpdate's changes). The hybrid simulation is a few hundred iterations — cheap.
+  const forecast = computeForecast(userCase, paceBasis);
   // Switch to years past two years. The conservative basis routinely lands past the old
   // "> 60 months" ceiling, and "60+" tells the reader almost nothing.
   // Threshold matches formatMonthsCompact() in functions/api/_emailTemplates.js — the
@@ -13393,9 +13408,9 @@ export default function App() {
             {/* Data source line */}
             <div className="text-center gc-eyebrow" style={{ letterSpacing: '0.12em' }}>
               <span className="gc-mono" style={{ letterSpacing: '0.02em', textTransform: 'none', color: 'var(--gc-muted)' }}>
-                {lang === 'zh' ? '数据来自美国国务院 travel.state.gov · 2026年5月 · 仅供参考,不构成法律建议'
-                  : lang === 'tw' ? '資料來自美國國務院 travel.state.gov · 2026年5月 · 僅供參考,不構成法律建議'
-                  : 'Data sourced from US State Department travel.state.gov · May 2026 · Informational only, not legal advice'}
+                {lang === 'zh' ? `数据来自美国国务院 travel.state.gov · ${BULLETIN_CURRENT_MONTH.zh} · 仅供参考,不构成法律建议`
+                  : lang === 'tw' ? `資料來自美國國務院 travel.state.gov · ${BULLETIN_CURRENT_MONTH.tw} · 僅供參考,不構成法律建議`
+                  : `Data sourced from US State Department travel.state.gov · ${BULLETIN_CURRENT_MONTH.en} · Informational only, not legal advice`}
               </span>
             </div>
             {/* Copyright + small theme dropdown in the same low-emphasis line.
