@@ -457,42 +457,43 @@ const PANEL_BORDER = '#e4e1d6';
 // outline so white stripes survive the cream surface. Outlook's Word engine can't do
 // inline-block, so the whole flag is wrapped in a non-mso conditional — Outlook simply
 // shows no flag rather than a broken one.
-const countryFlagHtml = (country) => {
-  const W = 30, H = 20;
+const countryFlagHtml = (country, k = 1) => {
+  // k = integer scale. k=1 (30×20) rides inline with text; k=2 (60×40) is the case
+  // card's standalone flag, big enough for the five-star arc to read clearly.
+  const W = 30 * k, H = 20 * k;
   const box = (inner, extra = '') =>
-    `<div style="display:inline-block; vertical-align:-4px; width:${W}px; height:${H}px; font-size:0; line-height:0; border:1px solid rgba(26,26,26,0.25); overflow:hidden;${extra}">${inner}</div>`;
+    `<div style="display:inline-block; vertical-align:${k > 1 ? 'top' : '-4px'}; width:${W}px; height:${H}px; font-size:0; line-height:0; border:1px solid rgba(26,26,26,0.25); overflow:hidden;${extra}">${inner}</div>`;
   const hStripes = (colors, hs) => colors.map((c, i) =>
-    `<div style="width:${W}px; height:${hs[i]}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
+    `<div style="width:${W}px; height:${hs[i] * k}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
   const vStripes = (colors, ws) => colors.map((c, i) =>
-    `<div style="display:inline-block; width:${ws[i]}px; height:${H}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
+    `<div style="display:inline-block; width:${ws[i] * k}px; height:${H}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
   const flags = {
-    // 五星红旗：大星居左，四颗小星呈纵向弧线环拱其右侧（中间两颗外凸、上下
-    // 两颗内收——即真旗上小星所在的圆弧）。6px 小星渲染为圆点，与真旗缩略一致；
-    // 邮件里无法做每颗星的指向旋转，圆点无方向性，不失真。
+    // 五星红旗：大星居左，四颗小星呈纵向弧线环拱其右侧（0/3/3/0 缩进 = 真旗小星
+    // 所在圆弧：中间两颗外凸、上下两颗内收）。
     China: box(
       `<div style="width:${W}px; height:${H}px; background:#DE2910; text-align:left; font-size:0; line-height:0;">`
-      + `<div style="display:inline-block; vertical-align:top; width:12px; text-align:center; padding-top:2px; font-size:12px; line-height:15px; color:#FFDE00;">&#9733;</div>`
-      + `<div style="display:inline-block; vertical-align:top; width:14px; padding-top:1px;">`
-      + `<div style="font-size:5px; line-height:4px; color:#FFDE00; padding-left:0;">&#9733;</div>`
-      + `<div style="font-size:5px; line-height:4px; color:#FFDE00; padding-left:3px;">&#9733;</div>`
-      + `<div style="font-size:5px; line-height:5px; color:#FFDE00; padding-left:3px;">&#9733;</div>`
-      + `<div style="font-size:5px; line-height:5px; color:#FFDE00; padding-left:0;">&#9733;</div>`
+      + `<div style="display:inline-block; vertical-align:top; width:${12 * k}px; text-align:center; padding-top:${2 * k}px; font-size:${12 * k}px; line-height:${15 * k}px; color:#FFDE00;">&#9733;</div>`
+      + `<div style="display:inline-block; vertical-align:top; width:${14 * k}px; padding-top:${1 * k}px;">`
+      + `<div style="font-size:${5 * k}px; line-height:${4 * k}px; color:#FFDE00; padding-left:0;">&#9733;</div>`
+      + `<div style="font-size:${5 * k}px; line-height:${4 * k}px; color:#FFDE00; padding-left:${3 * k}px;">&#9733;</div>`
+      + `<div style="font-size:${5 * k}px; line-height:${5 * k}px; color:#FFDE00; padding-left:${3 * k}px;">&#9733;</div>`
+      + `<div style="font-size:${5 * k}px; line-height:${5 * k}px; color:#FFDE00; padding-left:0;">&#9733;</div>`
       + `</div>`
       + `</div>`),
     India: box(hStripes(['#FF9933', '#ffffff', '#138808'], [7, 6, 7])),
     Mexico: box(vStripes(['#006847', '#ffffff', '#CE1126'], [10, 10, 10])),
     Philippines: box(
-      `<div style="display:inline-block; width:8px; height:${H}px; font-size:0; line-height:0; background:#ffffff;"></div>`
-      + `<div style="display:inline-block; width:${W - 8}px; height:${H}px; font-size:0; line-height:0; vertical-align:top;">`
-      + `<div style="width:${W - 8}px; height:10px; font-size:0; line-height:0; background:#0038A8;"></div>`
-      + `<div style="width:${W - 8}px; height:10px; font-size:0; line-height:0; background:#CE1126;"></div>`
+      `<div style="display:inline-block; width:${8 * k}px; height:${H}px; font-size:0; line-height:0; background:#ffffff;"></div>`
+      + `<div style="display:inline-block; width:${W - 8 * k}px; height:${H}px; font-size:0; line-height:0; vertical-align:top;">`
+      + `<div style="width:${W - 8 * k}px; height:${10 * k}px; font-size:0; line-height:0; background:#0038A8;"></div>`
+      + `<div style="width:${W - 8 * k}px; height:${10 * k}px; font-size:0; line-height:0; background:#CE1126;"></div>`
       + `</div>`),
     // The site shows its blue globe for the ROW pool; a bordered blue disc is the
     // closest email-safe stand-in.
-    Taiwan: `<div style="display:inline-block; vertical-align:-3px; width:14px; height:14px; font-size:0; line-height:0; background:#3b82f6; border:1px solid #1e40af; border-radius:50%;"></div>`,
+    Taiwan: `<div style="display:inline-block; vertical-align:${k > 1 ? 'top' : '-3px'}; width:${14 * k}px; height:${14 * k}px; font-size:0; line-height:0; background:#3b82f6; border:1px solid #1e40af; border-radius:50%;"></div>`,
   };
   const f = flags[country];
-  return f ? `<!--[if !mso]><!-->&nbsp;${f}<!--<![endif]-->` : '';
+  return f ? `<!--[if !mso]><!-->${k > 1 ? '' : '&nbsp;'}${f}<!--<![endif]-->` : '';
 };
 
 // One composed figure, price-and-volume style: the cutoff-position step line on top
@@ -939,8 +940,15 @@ ${emailHead(subject)}
               <tr>
                 <td style="padding:16px 18px;">
                   <div style="font-family:'Courier New',monospace; font-size:9px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? 'Your Case' : '你的案子'}</div>
-                  <div style="font-family:'Courier New',monospace; font-size:16px; font-weight:700; color:#1a1a1a; letter-spacing:0.02em;">${escapeHtml(category)} · ${escapeHtml(country)}${countryFlagHtml(userCase?.country)}</div>
-                  <div style="font-size:12px; color:#6b6a64; margin:3px 0 14px;">${lang === 'en' ? 'Priority Date' : '优先日'}&nbsp;&nbsp;<span style="font-family:'Courier New',monospace; font-size:13px; color:#1a1a1a;">${priorityDate}</span></div>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td>
+                        <div style="font-family:'Courier New',monospace; font-size:16px; font-weight:700; color:#1a1a1a; letter-spacing:0.02em;">${escapeHtml(category)} · ${escapeHtml(country)}</div>
+                        <div style="font-size:12px; color:#6b6a64; margin:3px 0 14px;">${lang === 'en' ? 'Priority Date' : '优先日'}&nbsp;&nbsp;<span style="font-family:'Courier New',monospace; font-size:13px; color:#1a1a1a;">${priorityDate}</span></div>
+                      </td>
+                      <td align="right" valign="top" style="padding-left:12px;">${countryFlagHtml(userCase?.country, 2)}</td>
+                    </tr>
+                  </table>
                   ${rowsHtml}
                   <div style="border-top:1px solid #e4e1d6; padding-top:9px; font-size:11px; line-height:1.5; color:#8a8980;">${escapeHtml(chartNote)}</div>
                 </td>
