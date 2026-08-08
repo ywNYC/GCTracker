@@ -1171,6 +1171,9 @@ const monthlyMovementFromArchive = (cat, country, windowMonths = 12) => {
     const usable = a && b && a !== 'C' && a !== 'U' && b !== 'C' && b !== 'U';
     out.push({
       month: win[i],
+      // Raw cutoff for that month (date string, 'C', or null≈U) — the chart's tap
+      // readout shows it alongside the movement.
+      cutoff: b ?? null,
       days: usable
         ? Math.round((new Date(`${b}T00:00:00`) - new Date(`${a}T00:00:00`)) / 86400000)
         : null,
@@ -3028,13 +3031,17 @@ const BulletinMovementChart = ({ cat, country }) => {
     const [y, mo] = m.split('-');
     return lang === 'en' ? `${mo}/${y.slice(2)}` : `${y.slice(2)}年${parseInt(mo, 10)}月`;
   };
+  // Tapped-month readout: what happened + where the cutoff stood that month.
+  const cutText = selPt.cutoff === 'C'
+    ? (lang === 'en' ? 'Current' : '无排期（C）')
+    : selPt.cutoff || (lang === 'en' ? 'U' : '无名额（U）');
   const readout = selPt.days === null
-    ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no cutoff (C/U)` : `${fmtMonth(selPt.month)} · 无截止日（C/U）`)
+    ? (lang === 'en' ? `${fmtMonth(selPt.month)} · cutoff ${cutText}` : `${fmtMonth(selPt.month)} · 截止日 ${cutText}`)
     : selPt.days === 0
-      ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no movement` : `${fmtMonth(selPt.month)} · 没有变化`)
+      ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no movement · cutoff ${cutText}` : `${fmtMonth(selPt.month)} · 没有变化 · 停在 ${cutText}`)
       : (lang === 'en'
-          ? `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? 'advanced' : 'retrogressed'} ${Math.abs(selPt.days)} days`
-          : `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? '前进' : '倒退'} ${Math.abs(selPt.days)} 天`);
+          ? `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? 'advanced' : 'retrogressed'} ${Math.abs(selPt.days)} days · cutoff ${cutText}`
+          : `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? '前进' : '倒退'} ${Math.abs(selPt.days)} 天 · ${selPt.days > 0 ? '排到' : '回到'} ${cutText}`);
 
   const hasNegative = maxDown > 0;
   const manual = sel !== null;
@@ -3153,10 +3160,24 @@ const BulletinMovementChart = ({ cat, country }) => {
       {/* Baseline */}
       <div style={{ height: '1px', background: 'var(--gc-rule)', marginTop: hasNegative ? '0' : '-1px' }} />
 
-      {/* X labels: first · last */}
-      <div className="flex items-center justify-between gc-mono" style={{ fontSize: '8.5px', color: 'var(--gc-muted-soft)', marginTop: '3px' }}>
-        <span>{fmtMonth(points[0].month)}</span>
-        <span>{fmtMonth(points[points.length - 1].month)}</span>
+      {/* X ticks: every 3rd month (12-mo view) / every 6th (24-mo), plus the latest.
+          Cells mirror the bar columns exactly (same flex + gutter), so each tick sits
+          centered under its own column instead of floating at the row's edges. */}
+      <div className="gc-mono" style={{ display: 'flex', gap: '2px', paddingRight: showLine ? '34px' : 0, marginTop: '3px', fontSize: '8.5px', color: 'var(--gc-muted-soft)' }}>
+        {points.map((p, i) => {
+          const every = windowMonths === 24 ? 6 : 3;
+          const show = (i % every === 0 && i < n - 2) || i === n - 1;
+          const isSel = i === selIdx && sel !== null;
+          return (
+            <span key={p.month} style={{
+              flex: '1 1 0', minWidth: 0, textAlign: 'center', whiteSpace: 'nowrap',
+              overflow: 'visible', fontWeight: isSel ? 700 : 400,
+              color: isSel ? 'var(--gc-ink-soft)' : 'var(--gc-muted-soft)',
+            }}>
+              {show ? fmtMonth(p.month) : ''}
+            </span>
+          );
+        })}
       </div>
 
       {/* Readout for the tapped column (defaults to the latest month) */}
