@@ -255,7 +255,7 @@ ${emailHead(subject)}
                     </tr>
                     <tr>
                       <td style="padding:3px 0; color:#6b6a64;">${escapeHtml(t.labelCountry)}</td>
-                      <td align="right" style="padding:3px 0; font-family:'Courier New',monospace; color:#1a1a1a;">${escapeHtml(country)}${COUNTRY_FLAG[userCase?.country] ? ' ' + COUNTRY_FLAG[userCase.country] : ''}</td>
+                      <td align="right" style="padding:3px 0; font-family:'Courier New',monospace; color:#1a1a1a;">${escapeHtml(country)}${countryFlagHtml(userCase?.country)}</td>
                     </tr>
                     <tr>
                       <td style="padding:3px 0; color:#6b6a64;">${escapeHtml(t.labelPriorityDate)}</td>
@@ -445,11 +445,34 @@ const CUMULATIVE_COLOR = '#0e6b3e';
 const PANEL_BG = '#f7f5ee';
 const PANEL_BORDER = '#e4e1d6';
 
-// Same emoji set the site's COUNTRY_FLAGS uses (App.jsx). Taiwan is deliberately
-// blank there, so it is here too; unknown countries just get no flag. Windows renders
-// emoji flags as letter pairs ("CN") — acceptable degradation, never broken.
-const COUNTRY_FLAG = {
-  China: '🇨🇳', India: '🇮🇳', Mexico: '🇲🇽', Philippines: '🇵🇭',
+// Flat rectangular flags mirroring the site's CountryFlag SVGs — NOT emoji (the user
+// wants the site's crisp non-waving flags, and emoji flags render as waving art on iOS
+// and as bare letter pairs on Windows). SVG dies in Gmail, so these are the same
+// background-color-block technique as the charts: stacked/joined divs, 21×14px, 1px
+// outline so white stripes survive the cream surface. Outlook's Word engine can't do
+// inline-block, so the whole flag is wrapped in a non-mso conditional — Outlook simply
+// shows no flag rather than a broken one.
+const countryFlagHtml = (country) => {
+  const W = 21, H = 14;
+  const box = (inner, w = W, h = H, extra = '') =>
+    `<div style="display:inline-block; vertical-align:-2px; width:${w}px; height:${h}px; font-size:0; line-height:0; border:1px solid rgba(26,26,26,0.25); overflow:hidden;${extra}">${inner}</div>`;
+  const hStripes = (colors, hs) => colors.map((c, i) =>
+    `<div style="width:${W}px; height:${hs[i]}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
+  const vStripes = (colors, ws) => colors.map((c, i) =>
+    `<div style="display:inline-block; width:${ws[i]}px; height:${H}px; font-size:0; line-height:0; background:${c};"></div>`).join('');
+  const flags = {
+    China: box(`<div style="width:${W}px; height:${H}px; background:#DE2910; text-align:left;"><span style="display:inline-block; margin:0 0 0 2px; font-size:9px; line-height:${H}px; color:#FFDE00;">★</span></div>`),
+    India: box(hStripes(['#FF9933', '#ffffff', '#138808'], [5, 4, 5])),
+    Mexico: box(vStripes(['#006847', '#ffffff', '#CE1126'], [7, 7, 7])),
+    Philippines: box(
+      `<div style="display:inline-block; width:6px; height:${H}px; font-size:0; line-height:0; background:#ffffff;"></div>`
+      + `<div style="display:inline-block; width:${W - 6}px; height:${H}px; font-size:0; line-height:0; vertical-align:top;">${hStripes(['#0038A8', '#CE1126'], [7, 7]).replace(new RegExp(`width:${W}px`, 'g'), `width:${W - 6}px`)}</div>`),
+    // The site shows its blue globe for the ROW pool; a bordered blue disc is the
+    // closest email-safe stand-in.
+    Taiwan: `<div style="display:inline-block; vertical-align:-2px; width:12px; height:12px; font-size:0; line-height:0; background:#3b82f6; border:1px solid #1e40af; border-radius:50%;"></div>`,
+  };
+  const f = flags[country];
+  return f ? `<!--[if !mso]><!-->&nbsp;${f}<!--<![endif]-->` : '';
 };
 
 // Monthly columns + one separated cumulative column, mirroring the site's in-app
@@ -928,7 +951,7 @@ ${emailHead(subject)}
               <tr>
                 <td style="padding:16px 18px;">
                   <div style="font-family:'Courier New',monospace; font-size:9px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? 'Your Case' : '你的案子'}</div>
-                  <div style="font-family:'Courier New',monospace; font-size:16px; font-weight:700; color:#1a1a1a; letter-spacing:0.02em;">${escapeHtml(category)} · ${escapeHtml(country)}${COUNTRY_FLAG[userCase?.country] ? ' ' + COUNTRY_FLAG[userCase.country] : ''}</div>
+                  <div style="font-family:'Courier New',monospace; font-size:16px; font-weight:700; color:#1a1a1a; letter-spacing:0.02em;">${escapeHtml(category)} · ${escapeHtml(country)}${countryFlagHtml(userCase?.country)}</div>
                   <div style="font-size:12px; color:#6b6a64; margin:3px 0 14px;">${lang === 'en' ? 'Priority Date' : '优先日'}&nbsp;&nbsp;<span style="font-family:'Courier New',monospace; font-size:13px; color:#1a1a1a;">${priorityDate}</span></div>
                   ${rowsHtml}
                   <div style="border-top:1px solid #e4e1d6; padding-top:9px; font-size:11px; line-height:1.5; color:#8a8980;">${escapeHtml(chartNote)}</div>
