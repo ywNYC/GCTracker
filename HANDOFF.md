@@ -162,12 +162,42 @@ Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19
 1. **`U`（Unavailable）被 `parseDate` 转成 `null`**，与「缺数据」撞车。2026-08 的 EB2 印度
    即为 `U`，前端只判断 `days === null`，会渲染成「排期未到」，语义错误。
    改动涉及数据契约（scraper 输出 + App.jsx 渲染）。
-2. **`_emailTemplates.js` 的 `formatCountry` 映射从未命中。** 它映射 `CHN`/`IND`/`ROW`
-   三字母码，但订阅记录存的是 App 原始格式（`China`/`Taiwan`）。靠 `map[c] || c` 兜底
-   才显示正常，想要的「China · 中国」永远出不来。
-3. **Turnstile 验证码未加** —— 需要用户在 Cloudflare 建 Turnstile 拿 key，AI 拿不到。
-4. `DEPLOY-BACKEND.md` 已过时（描述手动拉 CSV 发信的旧方案）。
-5. `src/App.jsx` 单文件约 11000 行；主包 545 KB 未做代码分割。
+2. **Turnstile 验证码未加** —— 需要用户在 Cloudflare 建 Turnstile 拿 key，AI 拿不到。
+3. `DEPLOY-BACKEND.md` 已过时（描述手动拉 CSV 发信的旧方案）。
+4. `src/App.jsx` 单文件约 11000 行；主包 545 KB 未做代码分割。
+5. **`node_modules/`（6767 个文件）整个被 commit 在这个公开仓库里，且没有 `.gitignore`。**
+   用户已知悉，待清理（涉及删除已跟踪文件，动手前先问）。
+6. I-485 卡收起态的「排期到达 预计 XX年X月」用的是「差多少天就等多少天」的天真算法，
+   与本月小结卡（乐观/中等/悲观三速）和预测页模型都不一致。用户已知悉，尚未决定改法。
+
+## 2026-08-07 第三轮：总结页图表 + 邮件套件全面翻新（分支 feat/email-suite-overview-charts）
+
+**App（src/App.jsx）：**
+- 新增 `BulletinMovementChart`：I-485 卡「仍在排期中」时显示逐月推进柱状图
+  （12/24 月切换、数字标签自动错行、倒退挂基线下、右侧独立累计柱、点按读数）。
+  数据来自新的模块级 `monthlyMovementFromArchive()`。
+- 「建议下一步」卡改成「本月小结」：本期 A/B 变化 + 近12月累计 + ETA 一段话，
+  配乐观/中等/悲观三速切换（按数值排序贴标签，不是固定映射）+「看公式」展开
+  （距离 ÷ 速度 ≈ 月数 → 日历时间）。原建议文案融入收尾句。
+- 配色过了 dataviz 验证器；主题 token 全适配，consulate 主题蓝绿同色靠分隔线+标签兜底。
+
+**邮件（functions/api/_emailTemplates.js，全部本地渲染+截图验证过）：**
+- 月度邮件：逐月推进图改 12 月窗口（数字一行对齐）、单月柱与累计柱独立比例
+  （图注明示）、柱下自动括注最显著连续段（如「连续 5 个月没动」）、走势图无缝
+  连柱成线 + 起/现端点标签、ETA 面板加「换算到日历上」一行、乐观端/保守端措辞
+  与站内统一、preheader 改为增量信息（表A cutoff · 距优先日 · 乐观日历）、
+  纯文本版补齐所有新事实。
+- `formatCountry` 修复（原 CHN/IND 键永远打不中；`Taiwan` 现在显示 ROW·全球/港澳台，
+  三字母码留作 legacy 别名）——原「已知问题 2」已消。
+- 欢迎邮件：发布日 8–15 号的**错误文案**改为中旬 12–22 号（4 处）、中文 footer 残句
+  补全、CTA 换 `buildCaseUrl` 深链、案子卡加国旗、masthead 收成单行。
+- 确认邮件（双重确认）按报纸风重做：masthead + 墨线 + 方角 + 黑色方按钮，
+  与另两封统一设计语言。
+- 新增共享 `emailHead()`：三封邮件共用 `<head>`（含 color-scheme:light 双保险），
+  消除每封各自拷贝导致的漂移。
+
+**发送验证计划**：合并上线后用 `?force=1` 对唯一订阅者重发 2026-08 验证新模板
+（`lastNotifiedMonth` 已是 2026-08，需 force 覆盖幂等保护）。
 
 ---
 

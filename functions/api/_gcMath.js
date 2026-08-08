@@ -223,6 +223,23 @@ export function observedRates(historyMonths, cat, country, windowSize = 12) {
   };
 }
 
+// Month-by-month cutoff VALUES (not deltas) over the trailing window — the email's
+// trend chart plots these to show where the line actually sits, complementing the
+// per-month bars. Returns [{month, cutoff: 'YYYY-MM-DD'}], skipping C/U months.
+export function cutoffHistory(historyMonths, cat, country, windowSize = 24) {
+  const cats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+  const asc = (historyMonths || [])
+    .filter((m) => m && m.month && m.finalAction && cats.every((c) => m.finalAction[c]))
+    .sort((a, b) => a.month.localeCompare(b.month));
+  const points = [];
+  for (const m of asc.slice(-(windowSize + 1))) {
+    const v = m.finalAction?.[cat]?.[country];
+    if (!v || v === 'C' || v === 'U') continue;
+    points.push({ month: m.month, cutoff: v });
+  }
+  return points.length >= 2 ? points : null;
+}
+
 // Per-case "what changed and what's next" summary for one visa category/country,
 // comparing the two most recent months in history.json. Used by the monthly update email.
 // `historyMonths` (optional) enables the two-ended forecast range; without it the
@@ -251,6 +268,10 @@ export function computeCaseUpdate({ cat, country, priorityDate, current, previou
       : null);
 
     const obs = observedRates(historyMonths, cat, resolvedCountry);
+    // Chart window is wider than the model window on purpose: the forecast's slow end
+    // is defined as the 12-month average (that's what the email copy promises), while
+    // the charts show 24 months so the stall-then-move rhythm is visible.
+    const obsChart = observedRates(historyMonths, cat, resolvedCountry, 24);
     // Which of the two estimators is the optimistic end isn't fixed — a month that
     // moved less than the trailing average flips them — so order by value, not by name.
     const fastRate = obs ? Math.max(singleMonthRate, obs.windowMean) : singleMonthRate;
@@ -261,6 +282,7 @@ export function computeCaseUpdate({ cat, country, priorityDate, current, previou
       windowMean: obs ? obs.windowMean : null,
       windowSize: obs ? obs.windowSize : null,
       series: obs ? obs.series : null,
+      chartSeries: obsChart ? obsChart.series : (obs ? obs.series : null),
       fastRate,
       slowRate,
       fastMonths: monthsAt(fastRate),
@@ -275,5 +297,6 @@ export function computeCaseUpdate({ cat, country, priorityDate, current, previou
     finalAction: { current: faCurrent, previous: faPrevious, movement: faMovement, status: faStatus },
     filing: { current: filCurrent, previous: filPrevious, movement: filMovement, status: filStatus },
     forecast,
+    cutoffHistory: historyMonths ? cutoffHistory(historyMonths, cat, resolvedCountry, 24) : null,
   };
 }
