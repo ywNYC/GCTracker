@@ -86,7 +86,13 @@ export const computeMovement = (current, previous) => {
   if (current === 'C' && previous === 'C') return { type: 'none', days: 0, wasCurrent: true };
   if (current === 'C' && previous !== 'C') return { type: 'current', days: null };
   if (current !== 'C' && previous === 'C') return { type: 'retrogressed', days: null, fromCurrent: true };
-  if (!current || !previous || current === 'U' || previous === 'U') return { type: 'none', days: 0 };
+  // null/'U' = the bulletin printed no cutoff (U = no visas this month). Mirror of the
+  // App-side semantics: "went unavailable" is a de-facto retrogression to zero, and
+  // "resumed" means numbers came back — neither is "no change".
+  const noCut = (v) => !v || v === 'U';
+  if (noCut(current) && noCut(previous)) return { type: 'unavailable', days: null, still: true };
+  if (noCut(current)) return { type: 'unavailable', days: null, became: true };
+  if (noCut(previous)) return { type: 'resumed', days: null };
   const d = daysBetween(parseDate(current), parseDate(previous));
   if (d > 0) return { type: 'advanced', days: d };
   if (d < 0) return { type: 'retrogressed', days: Math.abs(d) };
