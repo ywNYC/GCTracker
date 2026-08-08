@@ -62,10 +62,22 @@ async function main() {
   // not a real subscriber send, so the unsubscribe link is a labeled placeholder.
   const unsubscribeUrl = `${SITE_URL}/api/unsubscribe?email=${encodeURIComponent(PREVIEW_TO)}&token=preview-not-functional`;
 
+  // bulletin.json carries the notice sections and USCIS designation that history.json
+  // lacks — same two extra sources the production sender fetches over HTTP.
+  let notices = null, uscisChart = null;
+  try {
+    const bulletin = JSON.parse(await readFile(path.join(REPO_ROOT, 'public/bulletin.json'), 'utf-8'));
+    if (Array.isArray(bulletin?.current?.notices)) notices = bulletin.current.notices;
+    const uscis = JSON.parse(await readFile(path.join(REPO_ROOT, 'public/uscis-charts.json'), 'utf-8'));
+    if (uscis?.current?.month === current.month) uscisChart = uscis.current;
+  } catch {}
+
   const { subject, html, text } = renderMonthlyUpdateEmail({
     email: PREVIEW_TO,
     userCase: USER_CASE,
     update,
+    notices,
+    uscisChart,
     bulletinMonthLabel: monthLabel(current.month, LANGUAGE),
     language: LANGUAGE,
     siteUrl: SITE_URL,

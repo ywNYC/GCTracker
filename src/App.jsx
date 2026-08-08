@@ -1154,6 +1154,31 @@ const observedPaceFromArchive = (cat, country, windowMonths = 12) => {
   return days / span;
 };
 
+// Per-month signed movement (days) over the trailing window, from consecutive pairs in
+// BULLETIN_ARCHIVE. Unlike observedPaceFromArchive (one two-ended average for the
+// projection anchor), this keeps every month separate so a chart can show the real
+// stall-then-jump rhythm. days === null when either end is C/U/missing (no cutoff to
+// diff) — callers must treat null as "no data", not zero.
+const monthlyMovementFromArchive = (cat, country, windowMonths = 12) => {
+  const keys = Object.keys(BULLETIN_ARCHIVE).sort();
+  if (keys.length < 2) return null;
+  const win = keys.slice(-(windowMonths + 1));
+  const valueAt = (k) => BULLETIN_ARCHIVE[k]?.data?.finalAction?.[cat]?.[country];
+  const out = [];
+  for (let i = 1; i < win.length; i++) {
+    const a = valueAt(win[i - 1]);
+    const b = valueAt(win[i]);
+    const usable = a && b && a !== 'C' && a !== 'U' && b !== 'C' && b !== 'U';
+    out.push({
+      month: win[i],
+      days: usable
+        ? Math.round((new Date(`${b}T00:00:00`) - new Date(`${a}T00:00:00`)) / 86400000)
+        : null,
+    });
+  }
+  return out.some((p) => p.days !== null) ? out : null;
+};
+
 // ==============================================================
 // AI HYBRID PREDICTION MODEL
 // Blends 4 time horizons:
@@ -2888,10 +2913,238 @@ const ShareCardModal = ({ userCase, greenCardInfo, lang, onClose }) => {
 // ============================================================
 // Overview - Summary page showing user's status at a glance
 // ============================================================
+// While the case is still queued, the I-485 card has nothing procedural to show — so it
+// shows the thing the subscriber actually watches: how the bulletin moved. Monthly
+// signed columns (advance up in blue, retrogression down in red — polarity is carried
+// by POSITION relative to the baseline, color is reinforcement) plus one separated,
+// direct-labeled cumulative column in green. All marks use theme tokens; identity never
+// rides on color alone (the consulate theme's blue and green are the same navy by
+// design, so the divider + 「累计」 label do that work there).
+const BulletinMovementChart = ({ cat, country }) => {
+  const { lang } = useLang();
+  const [windowMonths, setWindowMonths] = useState(12);
+  const [sel, setSel] = useState(null); // null → latest month
+
+  const points = monthlyMovementFromArchive(cat, country, windowMonths);
+  if (!points || points.filter((p) => p.days !== null).length < 3) return null;
+
+  const total = points.reduce((s, p) => s + (p.days || 0), 0);
+  const maxUp = Math.max(...points.map((p) => Math.max(p.days || 0, 0)), 0);
+  const maxDown = Math.max(...points.map((p) => Math.max(-(p.days || 0), 0)), 0);
+  const scaleMax = Math.max(total, maxUp, 1);
+
+  const UP_PX = 84;
+  // Bars get value labels on their caps, so the tallest bar stops short of the top:
+  // 20px of headroom fits two staggered 9px label rows (adjacent labeled bars offset
+  // vertically so 3-digit numbers don't collide on ~13px-wide 24-month columns).
+  const LABEL_ROOM = 20;
+  const perDay = (UP_PX - LABEL_ROOM) / scaleMax;
+  const downPx = maxDown > 0 ? Math.ceil(maxDown * perDay) + LABEL_ROOM : 0;
+
+  // Stagger assignment: walk the columns; a labeled column whose immediate left
+  // neighbor is labeled on the same side of the baseline takes the raised row.
+  const labelRow = points.map(() => 0);
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1].days, b = points[i].days;
+    if (a && b && Math.sign(a) === Math.sign(b) && labelRow[i - 1] === 0) labelRow[i] = 1;
+  }
+
+  const selIdx = sel === null ? points.length - 1 : sel;
+  const selPt = selIdx === -1 ? null : points[selIdx];
+
+  const fmtMonth = (m) => {
+    const [y, mo] = m.split('-');
+    return lang === 'en' ? `${mo}/${y.slice(2)}` : `${y.slice(2)}年${parseInt(mo, 10)}月`;
+  };
+  const readout = selIdx === -1
+    ? (lang === 'en'
+        ? `Net ${total >= 0 ? '+' : ''}${total} days over ${points.length} months`
+        : `${points.length} 个月累计${total >= 0 ? '前进' : '倒退'} ${Math.abs(total)} 天`)
+    : selPt.days === null
+      ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no cutoff (C/U)` : `${fmtMonth(selPt.month)} · 无截止日（C/U）`)
+      : selPt.days === 0
+        ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no movement` : `${fmtMonth(selPt.month)} · 没有变化`)
+        : (lang === 'en'
+            ? `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? 'advanced' : 'retrogressed'} ${Math.abs(selPt.days)} days`
+            : `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? '前进' : '倒退'} ${Math.abs(selPt.days)} 天`);
+
+  // Cumulative column: solid green at true scale; hairline separators overlaid at the
+  // running-total breakpoints so it reads as this window's months stacked up. Separators
+  // are drawn only when segments are ≥3px apart — thinner would smear into noise.
+  const cumH = Math.max(total * perDay, 2);
+  const separators = [];
+  if (total > 0) {
+    let run = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      run += Math.max(points[i].days || 0, 0);
+      const y = run * perDay;
+      if (y >= 3 && cumH - y >= 3 && (separators.length === 0 || y - separators[separators.length - 1] >= 3)) {
+        separators.push(y);
+      }
+    }
+  }
+
+  const hasNegative = maxDown > 0;
+
+  return (
+    <div style={{ padding: '10px 12px 9px', borderTop: '1px solid var(--gc-rule-soft)' }}>
+      {/* Header: eyebrow + 12/24 window toggle */}
+      <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
+        <span className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)' }}>
+          {lang === 'en' ? 'Bulletin movement · Chart A' : '排期推进 · 表 A'}
+        </span>
+        <div className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
+          {[12, 24].map((w, i) => (
+            <button key={w} type="button"
+              onClick={() => { setWindowMonths(w); setSel(null); }}
+              className="gc-mono"
+              style={{
+                fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.4,
+                border: 'none', cursor: 'pointer',
+                borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                background: windowMonths === w ? 'var(--gc-ink)' : 'transparent',
+                color: windowMonths === w ? 'var(--gc-paper)' : 'var(--gc-muted)',
+              }}>
+              {lang === 'en' ? `${w}mo` : `${w}月`}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Plot: monthly columns · divider · cumulative column */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px' }}>
+        {points.map((p, i) => {
+          const isSel = i === selIdx;
+          // Emphasis, not a background block: a tapped month keeps full ink while the
+          // rest recede. A full-height highlight behind the column reads as data.
+          const manual = sel !== null;
+          const barOpacity = manual ? (isSel ? 1 : 0.35) : 0.9;
+          const upH = p.days > 0 ? Math.max(p.days * perDay, 2) : 0;
+          const dnH = p.days < 0 ? Math.max(-p.days * perDay, 2) : 0;
+          return (
+            <button key={p.month} type="button"
+              onClick={() => setSel(i === selIdx && sel !== null ? null : i)}
+              aria-label={readout}
+              style={{
+                flex: '1 1 0', minWidth: 0, padding: 0, border: 'none', cursor: 'pointer',
+                background: 'transparent',
+              }}>
+              <div style={{ height: `${UP_PX}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+                {p.days > 0 && (
+                  <>
+                    <span className="gc-mono" style={{
+                      fontSize: '8px', lineHeight: '9px', fontWeight: 600,
+                      color: 'var(--gc-ink-soft)', whiteSpace: 'nowrap',
+                      transform: labelRow[i] ? 'translateY(-9px)' : 'none',
+                      opacity: barOpacity, marginBottom: '1px',
+                    }}>{p.days}</span>
+                    <div style={{
+                      width: '100%', maxWidth: '18px', height: `${upH}px`,
+                      background: 'var(--gc-blue)', borderRadius: '2px 2px 0 0',
+                      opacity: barOpacity,
+                    }} />
+                  </>
+                )}
+                {p.days === 0 && (
+                  <div style={{ width: '100%', maxWidth: '18px', height: '2px', background: 'var(--gc-subtle)', opacity: manual && !isSel ? 0.4 : 1 }} />
+                )}
+                {p.days === null && (
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid var(--gc-subtle)', marginBottom: '-1px' }} />
+                )}
+              </div>
+              {hasNegative && (
+                <div style={{ height: `${downPx}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
+                  {p.days < 0 && (
+                    <>
+                      <div style={{
+                        width: '100%', maxWidth: '18px', height: `${dnH}px`,
+                        background: 'var(--gc-red)', borderRadius: '0 0 2px 2px',
+                        opacity: barOpacity,
+                      }} />
+                      <span className="gc-mono" style={{
+                        fontSize: '8px', lineHeight: '9px', fontWeight: 600,
+                        color: 'var(--gc-red-ink)', whiteSpace: 'nowrap',
+                        transform: labelRow[i] ? 'translateY(9px)' : 'none',
+                        opacity: barOpacity, marginTop: '1px',
+                      }}>−{Math.abs(p.days)}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </button>
+          );
+        })}
+
+        {/* Divider between the monthly series and the cumulative total */}
+        <div style={{ alignSelf: 'stretch', width: '1px', background: 'var(--gc-rule)', margin: '0 4px' }} />
+
+        {/* Cumulative column — direct-labeled on the cap */}
+        <button type="button"
+          onClick={() => setSel(-1 === selIdx && sel !== null ? null : -1)}
+          style={{
+            flex: '0 0 34px', padding: 0, border: 'none', cursor: 'pointer',
+            background: 'transparent',
+            opacity: sel !== null && selIdx !== -1 ? 0.35 : 1,
+          }}>
+          <div style={{ height: `${UP_PX}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <span className="gc-mono" style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+              {total >= 0 ? '+' : '−'}{Math.abs(total)}
+            </span>
+            <div style={{ position: 'relative', width: '22px', height: `${cumH}px`, background: 'var(--gc-green)', borderRadius: '2px 2px 0 0', overflow: 'hidden' }}>
+              {separators.map((y) => (
+                <div key={y} style={{ position: 'absolute', left: 0, right: 0, bottom: `${y}px`, height: '1px', background: 'var(--gc-surface)', opacity: 0.9 }} />
+              ))}
+            </div>
+          </div>
+          {hasNegative && <div style={{ height: `${downPx}px` }} />}
+        </button>
+      </div>
+
+      {/* Baseline */}
+      <div style={{ height: '1px', background: 'var(--gc-rule)', marginTop: hasNegative ? '0' : '-1px' }} />
+
+      {/* X labels: first · last · 累计 */}
+      <div className="flex items-center justify-between gc-mono" style={{ fontSize: '8.5px', color: 'var(--gc-muted-soft)', marginTop: '3px' }}>
+        <span>{fmtMonth(points[0].month)}</span>
+        <span>{fmtMonth(points[points.length - 1].month)}</span>
+        <span style={{ flex: '0 0 42px', textAlign: 'center' }}>{lang === 'en' ? 'total' : '累计'}</span>
+      </div>
+
+      {/* Readout for the tapped column (defaults to the latest month) */}
+      <div className="gc-mono" style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--gc-ink-soft)', marginTop: '6px' }}>
+        {readout}
+      </div>
+
+      {/* Legend — identity spelled out, swatches beside text (text stays in text tokens) */}
+      <div className="flex items-center gap-3" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginTop: '4px', flexWrap: 'wrap' }}>
+        <span className="inline-flex items-center gap-1">
+          <span style={{ width: '7px', height: '7px', background: 'var(--gc-blue)', borderRadius: '1px', display: 'inline-block' }} />
+          {lang === 'en' ? 'Monthly advance' : '单月前进'}
+        </span>
+        {hasNegative && (
+          <span className="inline-flex items-center gap-1">
+            <span style={{ width: '7px', height: '7px', background: 'var(--gc-red)', borderRadius: '1px', display: 'inline-block' }} />
+            {lang === 'en' ? 'Retrogression' : '倒退'}
+          </span>
+        )}
+        <span className="inline-flex items-center gap-1">
+          <span style={{ width: '7px', height: '7px', background: 'var(--gc-green)', borderRadius: '1px', display: 'inline-block' }} />
+          {lang === 'en' ? `${windowMonths}-month total` : `${windowMonths}个月累计`}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCompletedI485Steps = () => {}, greenCardInfo = { approvalDate: null, isConditional: false, celebrated: false }, setGreenCardInfo = () => {}, travelRecords = [], setTravelRecords = () => {}, i485ServiceCenter = 'average', setI485ServiceCenter = () => {}, stepActualDates = {}, setStepActualDates = () => {} }) => {
   const { t, lang } = useLang();
   const country = resolveCountry(userCase.country);
   const [i485Expanded, setI485Expanded] = useState(false);
+  // Monthly-summary ETA controls: which pace anchors the estimate, and whether the
+  // arithmetic behind it is unfolded. Lives here because hooks can't sit inside the
+  // render-time IIFE that builds the card.
+  const [sumPaceIdx, setSumPaceIdx] = useState(1);
+  const [sumFormulaOpen, setSumFormulaOpen] = useState(false);
   // Ref to the I-485 card wrapper — used to scroll it back into view when
   // collapsing, so the ~250px height reduction doesn't jumble the user's visual anchor.
   const i485CardRef = useRef(null);
@@ -3750,6 +4003,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 ? (lang === 'en' ? `est. ${fmtDate(filingBaseline)}` : `预计 ${fmtDate(filingBaseline)}`)
                 : fmtDateRange(stepInfos[nextStepIndex].earliestDate, stepInfos[nextStepIndex].latestDate);
               return (
+                <>
                 <div style={{
                   padding: '8px 12px 10px',
                   borderTop: '1px solid var(--gc-rule-soft)',
@@ -3790,6 +4044,12 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                     {dateText}
                   </span>
                 </div>
+                {/* Still queued → nothing procedural to track yet, so show how the
+                    bulletin has actually been moving instead of a 10-years-out date. */}
+                {isWaitingForPD && (
+                  <BulletinMovementChart cat={userCase.category} country={country} />
+                )}
+                </>
               );
             })()}
 
@@ -4491,27 +4751,188 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
         );
       })()}
 
-      {/* Recommended Action */}
-      <div style={{
-        background: 'var(--gc-green-soft)',
-        border: '1px solid var(--gc-green-border)',
-        borderLeft: '2px solid var(--gc-green)',
-        borderRadius: '4px',
-        padding: '8px 12px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-      }}>
-        <CheckCircle2 size={14} style={{ color: 'var(--gc-green)', flexShrink: 0 }} />
-        <div className="min-w-0 flex-1 flex items-baseline gap-2 flex-wrap">
-          <span className="gc-eyebrow" style={{ color: 'var(--gc-green-ink)', flexShrink: 0 }}>
-            {t.nextAction}
-          </span>
-          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gc-green-ink)', lineHeight: 1.3 }}>
-            {getActionRec(finalActionStatus, filingStatus, filingAuthorized)}
-          </span>
-        </div>
-      </div>
+      {/* Monthly summary — replaces the bare "next step" chip. The same numbers the
+          cards above show, composed into a short narrative that changes with every
+          bulletin; the old recommendation survives as the bolded closing line. */}
+      {(() => {
+        const cat = userCase.category;
+        const hasPrev = bulletinPrevious?.finalAction && Object.keys(bulletinPrevious.finalAction).length > 0;
+        const mvA = hasPrev ? computeMovement(bulletinCurrent.finalAction[cat]?.[country], bulletinPrevious.finalAction[cat]?.[country]) : null;
+        const mvB = hasPrev ? computeMovement(bulletinCurrent.filing[cat]?.[country], bulletinPrevious.filing[cat]?.[country]) : null;
+        const hist = monthlyMovementFromArchive(cat, country, 12);
+        const total12 = hist ? hist.reduce((s, p) => s + (p.days || 0), 0) : null;
+
+        const seg = (m, label) => {
+          if (!m) return '';
+          if (m.type === 'current') return lang === 'en' ? `${label} became current (C)` : lang === 'tw' ? `${label}轉為無需排隊（C）` : `${label}转为无需排队（C）`;
+          if (m.type === 'advanced') return lang === 'en' ? `${label} advanced ${m.days} days` : lang === 'tw' ? `${label}前進 ${m.days} 天` : `${label}前进 ${m.days} 天`;
+          if (m.type === 'retrogressed') return m.days === null
+            ? (lang === 'en' ? `${label} retrogressed from current` : lang === 'tw' ? `${label}從 C 回落` : `${label}从 C 回落`)
+            : (lang === 'en' ? `${label} retrogressed ${m.days} days` : lang === 'tw' ? `${label}倒退 ${m.days} 天` : `${label}倒退 ${m.days} 天`);
+          if (m.wasCurrent) return lang === 'en' ? `${label} stayed current (C)` : lang === 'tw' ? `${label}維持無需排隊（C）` : `${label}保持无需排队（C）`;
+          return lang === 'en' ? `${label} held steady` : lang === 'tw' ? `${label}原地不動` : `${label}没有变化`;
+        };
+
+        const sentences = [];
+        if (mvA && mvB) {
+          sentences.push(lang === 'en'
+            ? `This bulletin: ${seg(mvA, 'Chart A')}, ${seg(mvB, 'Chart B')}.`
+            : `本期${seg(mvA, '表A')}，${seg(mvB, '表B')}。`);
+        }
+        if (total12 !== null && total12 !== 0) {
+          sentences.push(lang === 'en'
+            ? `Over the past 12 months Chart A has ${total12 >= 0 ? 'advanced' : 'retrogressed'} ${Math.abs(total12).toLocaleString('en-US')} days in total.`
+            : lang === 'tw'
+              ? `近 12 個月表A累計${total12 >= 0 ? '前進' : '倒退'} ${Math.abs(total12).toLocaleString('en-US')} 天。`
+              : `近 12 个月表A累计${total12 >= 0 ? '前进' : '倒退'} ${Math.abs(total12).toLocaleString('en-US')} 天。`);
+        }
+        const isSuspicious = finalActionStatus.status === 'suspicious' || filingStatus.status === 'suspicious';
+        const stillQueued = !isSuspicious && finalActionStatus.days !== null && finalActionStatus.days > 0;
+
+        // Three candidate paces (this month / 12-mo mean / 24-mo mean), sorted fast →
+        // slow and labeled 乐观/中等/悲观 by their ORDER, not their source — a hot month
+        // makes "this month" the optimistic anchor, a stall makes it the pessimistic
+        // one. Complements the 预测 tab rather than replacing it: same idea, one tap.
+        const hist24 = monthlyMovementFromArchive(cat, country, 24);
+        const total24 = hist24 ? hist24.reduce((s, p) => s + (p.days || 0), 0) : null;
+        const paceCandidates = stillQueued ? [
+          { rate: mvA && mvA.type === 'advanced' && mvA.days > 0 ? mvA.days : null,
+            basis: lang === 'en' ? 'this month' : lang === 'tw' ? '本月速度' : '本月速度' },
+          { rate: total12 > 0 ? total12 / 12 : null,
+            basis: lang === 'en' ? '12-mo avg' : lang === 'tw' ? '近12月均速' : '近12月均速' },
+          { rate: total24 > 0 ? total24 / 24 : null,
+            basis: lang === 'en' ? '24-mo avg' : lang === 'tw' ? '近24月均速' : '近24月均速' },
+        ].filter((c) => c.rate !== null && isFinite(c.rate)).sort((a, b) => b.rate - a.rate) : [];
+        // Same-value candidates collapse (a flat year makes 12-mo == 24-mo).
+        const paceOptions = paceCandidates.filter((c, i, arr) => i === 0 || Math.round(c.rate) !== Math.round(arr[i - 1].rate));
+        const paceLabels = paceOptions.length >= 3
+          ? (lang === 'en' ? ['Optimistic', 'Middle', 'Pessimistic'] : lang === 'tw' ? ['樂觀', '中等', '悲觀'] : ['乐观', '中等', '悲观'])
+          : (lang === 'en' ? ['Optimistic', 'Pessimistic'] : lang === 'tw' ? ['樂觀', '悲觀'] : ['乐观', '悲观']);
+        const paceIdx = Math.min(sumPaceIdx, Math.max(paceOptions.length - 1, 0));
+        const pace = paceOptions[paceIdx] || null;
+
+        let etaBlock = null;
+        if (pace) {
+          const gapDays = finalActionStatus.days;
+          const months = gapDays / pace.rate;
+          const etaText = months > 360
+            ? (lang === 'en' ? 'over 30 years' : '30 年以上')
+            : months >= 24
+              ? (lang === 'en' ? `about ${(months / 12).toFixed(1)} years` : lang === 'tw' ? `約 ${(months / 12).toFixed(1)} 年` : `约 ${(months / 12).toFixed(1)} 年`)
+              : (lang === 'en' ? `about ${Math.max(Math.round(months), 1)} months` : lang === 'tw' ? `約 ${Math.max(Math.round(months), 1)} 個月` : `约 ${Math.max(Math.round(months), 1)} 个月`);
+          const target = new Date();
+          target.setDate(target.getDate() + Math.round(months * 30.44));
+          const targetText = months > 360 ? null
+            : lang === 'en'
+              ? target.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+              : `${target.getFullYear()}年${target.getMonth() + 1}月`;
+          const rateText = `${Math.round(pace.rate)} ${lang === 'en' ? 'd/mo' : '天/月'}`;
+          const sentence = lang === 'en'
+            ? `At the ${pace.basis} pace (${rateText}), Chart A reaches your priority date in ${etaText}${targetText ? ` — around ${targetText}` : ''}.`
+            : lang === 'tw'
+              ? `按${pace.basis}（${rateText}），表A排到你的優先日預計還需${etaText}${targetText ? `，約在 ${targetText}` : ''}。`
+              : `按${pace.basis}（${rateText}），表A排到你的优先日预计还需${etaText}${targetText ? `，约在 ${targetText}` : ''}。`;
+          const formula = lang === 'en'
+            ? `${gapDays.toLocaleString('en-US')} days ÷ ${rateText} ≈ ${Math.round(months).toLocaleString('en-US')} mo${targetText ? ` → now + ${Math.round(months)} mo ≈ ${targetText}` : ''}`
+            : lang === 'tw'
+              ? `${gapDays.toLocaleString('en-US')} 天 ÷ ${rateText} ≈ ${Math.round(months).toLocaleString('en-US')} 個月${targetText ? ` → 今天 + ${Math.round(months)} 個月 ≈ ${targetText}` : ''}`
+              : `${gapDays.toLocaleString('en-US')} 天 ÷ ${rateText} ≈ ${Math.round(months).toLocaleString('en-US')} 个月${targetText ? ` → 今天 + ${Math.round(months)} 个月 ≈ ${targetText}` : ''}`;
+          etaBlock = { sentence, formula };
+        }
+
+        // Same branch order as getActionRec, but pulling the description strings.
+        const closeDesc = isSuspicious
+          ? (lang === 'en' ? 'Verify your priority date first — the numbers above assume it is right.' : lang === 'tw' ? '請先核實優先日——以上結論都建立在它正確的前提上。' : '请先核实优先日——以上结论都建立在它正确的前提上。')
+          : (filingAuthorized && (filingStatus.status === 'current' || filingStatus.status === 'overdue')) || finalActionStatus.status === 'current' || finalActionStatus.status === 'overdue'
+            ? t.actionCurrentDesc
+            : (filingAuthorized && filingStatus.status === 'eligible') || finalActionStatus.status === 'eligible'
+              ? t.actionFileDesc
+              : finalActionStatus.days !== null && finalActionStatus.days < 180
+                ? t.actionPrepareDesc
+                : t.actionMonitorDesc;
+        const closeTitle = getActionRec(finalActionStatus, filingStatus, filingAuthorized);
+
+        return (
+          <div style={{
+            background: 'var(--gc-green-soft)',
+            border: '1px solid var(--gc-green-border)',
+            borderLeft: '2px solid var(--gc-green)',
+            borderRadius: '4px',
+            padding: '10px 12px 11px',
+          }}>
+            <div className="flex items-center justify-between gap-2" style={{ marginBottom: '5px' }}>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <CheckCircle2 size={13} style={{ color: 'var(--gc-green)', flexShrink: 0 }} />
+                <span className="gc-eyebrow" style={{ color: 'var(--gc-green-ink)' }}>
+                  {lang === 'en' ? 'This month in summary' : lang === 'tw' ? '本月小結' : '本月小结'}
+                </span>
+              </div>
+              {paceOptions.length >= 2 && (
+                <div className="inline-flex flex-shrink-0" style={{ border: '1px solid var(--gc-green-border)', borderRadius: '3px', overflow: 'hidden' }}>
+                  {paceOptions.map((_, i) => (
+                    <button key={i} type="button"
+                      onClick={() => setSumPaceIdx(i)}
+                      style={{
+                        fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.5,
+                        border: 'none', cursor: 'pointer', letterSpacing: '0.05em',
+                        borderLeft: i === 0 ? 'none' : '1px solid var(--gc-green-border)',
+                        background: paceIdx === i ? 'var(--gc-green)' : 'transparent',
+                        color: paceIdx === i ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                      }}>
+                      {paceLabels[i]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {sentences.length > 0 && (
+              <p style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', margin: 0 }}>
+                {sentences.join(' ')}
+              </p>
+            )}
+            {etaBlock && (
+              <p style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', margin: '2px 0 0' }}>
+                {etaBlock.sentence}
+                {' '}
+                <button type="button"
+                  onClick={() => setSumFormulaOpen((v) => !v)}
+                  style={{
+                    border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
+                    fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline',
+                    textUnderlineOffset: '2px', fontWeight: 600,
+                  }}>
+                  {sumFormulaOpen
+                    ? (lang === 'en' ? 'hide formula' : lang === 'tw' ? '收起公式' : '收起公式')
+                    : (lang === 'en' ? 'show formula' : lang === 'tw' ? '看公式' : '看公式')}
+                </button>
+              </p>
+            )}
+            {etaBlock && sumFormulaOpen && (
+              <div className="gc-mono" style={{
+                fontSize: '10.5px', lineHeight: 1.6, color: 'var(--gc-ink-soft)',
+                background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)',
+                borderRadius: '3px', padding: '6px 9px', margin: '6px 0 0',
+                overflowX: 'auto', whiteSpace: 'nowrap',
+              }}>
+                {etaBlock.formula}
+              </div>
+            )}
+            {etaBlock && (
+              <p style={{ fontSize: '10.5px', lineHeight: 1.6, color: 'var(--gc-muted)', margin: '4px 0 0' }}>
+                {lang === 'en'
+                  ? 'A straight-line estimate — the Forecast tab models acceleration and policy shifts.'
+                  : lang === 'tw'
+                    ? '直線外推的粗估——「預測」頁有考慮加速與政策變化的完整模型。'
+                    : '直线外推的粗估——「预测」页有考虑加速与政策变化的完整模型。'}
+              </p>
+            )}
+            <p style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--gc-green-ink)', margin: sentences.length > 0 || etaBlock ? '4px 0 0' : 0 }}>
+              <span style={{ fontWeight: 700 }}>{closeTitle}</span>
+              <span style={{ color: 'var(--gc-ink-soft)' }}>{lang === 'en' ? ' — ' : '——'}{closeDesc}</span>
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Share card modal — shown when user clicks "分享喜讯" in the celebration panel */}
       {showShareCard && (

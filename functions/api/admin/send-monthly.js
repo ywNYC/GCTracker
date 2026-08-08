@@ -91,6 +91,20 @@ export async function onRequestPost(context) {
     }
   } catch {}
 
+  // Bulletin notice sections (D onward) — bulletin.json carries them, history.json
+  // does not. The template filters to the subscriber's own category, so passing the
+  // full list is fine. Optional: absence just means no warning block.
+  let notices = null;
+  try {
+    const r = await fetch(`${siteUrl}/bulletin.json`, { cf: { cacheTtl: 0 } });
+    if (r.ok) {
+      const data = await r.json();
+      if (data?.current?.month === current.month && Array.isArray(data.current.notices)) {
+        notices = data.current.notices;
+      }
+    }
+  } catch {}
+
   // ---- Walk subscribers ----
   const report = {
     bulletinMonth: current.month,
@@ -144,6 +158,7 @@ export async function onRequestPost(context) {
           userCase: uc,
           update,
           uscisChart,
+          notices,
           bulletinMonthLabel: monthLabel(current.month, record.language === 'en' ? 'en' : 'zh'),
           language: record.language,
           siteUrl,
