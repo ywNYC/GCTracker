@@ -159,16 +159,34 @@ Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19
 
 ## 其他已知问题（按优先级）
 
-1. **`U`（Unavailable）被 `parseDate` 转成 `null`**，与「缺数据」撞车。2026-08 的 EB2 印度
-   即为 `U`，前端只判断 `days === null`，会渲染成「排期未到」，语义错误。
-   改动涉及数据契约（scraper 输出 + App.jsx 渲染）。
-2. **Turnstile 验证码未加** —— 需要用户在 Cloudflare 建 Turnstile 拿 key，AI 拿不到。
-3. `DEPLOY-BACKEND.md` 已过时（描述手动拉 CSV 发信的旧方案）。
-4. `src/App.jsx` 单文件约 11000 行；主包 545 KB 未做代码分割。
-5. **`node_modules/`（6767 个文件）整个被 commit 在这个公开仓库里，且没有 `.gitignore`。**
+1. **Turnstile 验证码未加** —— 需要用户在 Cloudflare 建 Turnstile 拿 key，AI 拿不到。
+2. `DEPLOY-BACKEND.md` 已过时（描述手动拉 CSV 发信的旧方案）。
+3. `src/App.jsx` 单文件约 13500 行；主包 ~550 KB 未做代码分割。
+4. **`node_modules/`（6767 个文件）整个被 commit 在这个公开仓库里，且没有 `.gitignore`。**
    用户已知悉，待清理（涉及删除已跟踪文件，动手前先问）。
-6. I-485 卡收起态的「排期到达 预计 XX年X月」用的是「差多少天就等多少天」的天真算法，
-   与本月小结卡（乐观/中等/悲观三速）和预测页模型都不一致。用户已知悉，尚未决定改法。
+5. 邮件侧（functions/api/_gcMath.js 的 computeMovement）对 U 仍按「无变化」处理——
+   App 侧已修（unavailable/resumed），邮件侧未同步。U 订阅者的月度邮件会说「无变化」。
+6. 英文界面长单词（"Philippines"、"retrogressed 107 days"）在窄卡里的换行未实测过。
+
+## 2026-08-08 第四轮：整站审计修复（分支 fix/stale-data-and-ui-audit，6 个 commit）
+
+1. **旧数据家族（最重要）**：MonthlyUpdate 两个 useMemo + Forecast 的 useMemo 按 props
+   做依赖，缓存了 history.json 加载前的 2026-05 种子数据——动态页整页、下月预测的速度
+   与区间全是五月数。**教训：bulletinCurrent/BULLETIN_ARCHIVE 是原地变异的模块对象，
+   任何 useMemo 包住它们的读取都会烂**。已全部拆成直接计算。页脚月份改读运行时标签，
+   「历史视角」横幅只在时光机指向旧月份时出现。
+2. **U 语义链（App 侧）**：U 在数据里是 null（scraper parseDate 契约，null≈U 因为四表
+   解析是硬契约）。新增 unavailable/resumed 状态与变化类型，贯通 computeStatus/
+   computeMovement/formatDate/状态卡/本月变化/动态页/本月小结。
+3. **I-485 日期估算**：paceDaysToCalendar()——「差 N 天等 N 天」改为近12月表A均速换算，
+   37年3月 → 32年12月，与本月小结/预测页口径一致；U 案子显示「待定」。
+4. **桌面 max-width**：`.visa-root * { max-width:100% }` 兜底规则特异性压过 Tailwind
+   容器类，桌面全宽。加恢复规则，主容器 max-w-3xl（768px）。
+5. **?tab= 深链**（overview/trends/update/compare/index/alerts）；重置按钮独立成行；
+   对比页天数千分位。
+6. **三页并入主题 token**：主题级 CSS 覆盖（App.jsx 大 style 块里「Legacy Tailwind
+   palette → theme tokens」段）把 bg-white/slate/emerald/indigo/violet 映射到 --gc-*。
+   下月预测层级反转（概率置顶、长期 ETA 降级+口径说明）；走势图药丸改「41年10月」格式。
 
 ## 2026-08-07 第三轮：总结页图表 + 邮件套件全面翻新（分支 feat/email-suite-overview-charts）
 

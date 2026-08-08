@@ -1179,6 +1179,20 @@ const monthlyMovementFromArchive = (cat, country, windowMonths = 12) => {
   return out.some((p) => p.days !== null) ? out : null;
 };
 
+// Gap-days → estimated calendar days at the observed 12-month Chart A pace. The old
+// reading — wait one calendar day per day of cutoff gap — had the I-485 card promising
+// "2037" while the summary card and Forecast tab said "2033" on the same screen.
+// Chart A pace is the only observed pace we track; applying it to a Chart B gap is an
+// approximation (the two charts move roughly together). No usable pace → degrade to
+// the old 1:1 reading rather than invent a number.
+const paceDaysToCalendar = (cat, country, gapDays) => {
+  if (!gapDays || gapDays <= 0) return 0;
+  const hist = monthlyMovementFromArchive(cat, country, 12);
+  const total = hist ? hist.reduce((s, p) => s + (p.days || 0), 0) : 0;
+  if (total <= 0) return gapDays;
+  return Math.round((gapDays / (total / 12)) * 30.44);
+};
+
 // ==============================================================
 // AI HYBRID PREDICTION MODEL
 // Blends 4 time horizons:
@@ -1315,7 +1329,9 @@ const formatDate = (s, lang) => {
     if (lang === 'tw') return '無排期';
     return 'Current';
   }
-  if (!s) return lang === 'en' ? 'N/A' : '无';
+  // null = the bulletin's U (see computeStatus). "无" read as missing data; say what
+  // it actually means.
+  if (!s || s === 'U') return lang === 'en' ? 'No visas (U)' : lang === 'tw' ? '本月無名額（U）' : '本月无名额（U）';
   const d = parseDate(s);
   if (lang === 'zh' || lang === 'tw') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -1323,14 +1339,19 @@ const formatDate = (s, lang) => {
 
 const formatDateShort = (s, lang) => {
   if (s === 'C') return lang === 'zh' ? '无排期' : lang === 'tw' ? '無排期' : 'Current';
-  if (!s) return '';
+  if (s === 'U') return 'U';
+  if (!s) return 'U'; // null = the bulletin's U (no visas), not missing data
   const d = parseDate(s);
   if (lang === 'zh' || lang === 'tw') return `${d.getFullYear().toString().slice(-2)}年${d.getMonth() + 1}月`;
   return d.toLocaleDateString('en-US', { year: '2-digit', month: 'short' });
 };
 const computeStatus = (priorityDate, cutoff) => {
   if (cutoff === 'C') return { status: 'current', days: 0 };
-  if (!cutoff) return { status: 'notCurrent', days: null };
+  // null is what the scraper emits for the bulletin's "U" (and bare dashes) — see
+  // parseDate in scrape-bulletin.mjs. The four-chart parse is a hard contract, so a
+  // null cell means the bulletin itself printed no cutoff: no visas this month.
+  // That is NOT the same as "排期未到" — there is no queue position to measure.
+  if (!cutoff || cutoff === 'U') return { status: 'unavailable', days: null };
   const pd = parseDate(priorityDate);
   const co = parseDate(cutoff);
   if (!pd) return { status: 'notCurrent', days: null };
@@ -1361,7 +1382,13 @@ const computeMovement = (current, previous) => {
   if (current === 'C' && previous === 'C') return { type: 'none', days: 0, wasCurrent: true };
   if (current === 'C' && previous !== 'C') return { type: 'current', days: null };
   if (current !== 'C' && previous === 'C') return { type: 'retrogressed', days: null, fromCurrent: true };
-  if (!current || !previous) return { type: 'none', days: 0 };
+  // null/'U' = the bulletin printed no cutoff (U). Distinguish "went unavailable"
+  // (a de-facto retrogression to zero) from "resumed" (numbers came back) — both used
+  // to collapse into "no change", which is the opposite of what happened.
+  const noCut = (v) => !v || v === 'U';
+  if (noCut(current) && noCut(previous)) return { type: 'unavailable', days: null, still: true };
+  if (noCut(current)) return { type: 'unavailable', days: null, became: true };
+  if (noCut(previous)) return { type: 'resumed', days: null };
   const d = daysBetween(parseDate(current), parseDate(previous));
   if (d > 0) return { type: 'advanced', days: d };
   if (d < 0) return { type: 'retrogressed', days: Math.abs(d) };
@@ -1492,6 +1519,10 @@ const StatusBadge = ({ status, daysAgo }) => {
     overdue:    { bg: 'var(--gc-green-soft)',  bd: 'var(--gc-green-border)', fg: 'var(--gc-green-ink)',
                   label: lang === 'en' ? 'No wait needed' : '无需排期', icon: CheckCircle2 },
     notCurrent: { bg: 'var(--gc-amber-soft)',  bd: 'var(--gc-amber-border)', fg: 'var(--gc-amber-ink)', label: t.statusNotCurrent, icon: Clock },
+    // The bulletin printed U — no visas at all this month. Distinct from notCurrent:
+    // there is no cutoff to be behind.
+    unavailable: { bg: 'var(--gc-red-soft)',   bd: 'var(--gc-red-border)',   fg: 'var(--gc-red-ink)',
+                  label: lang === 'en' ? 'No visas (U)' : lang === 'tw' ? '本月無名額' : '本月无名额', icon: Clock },
     suspicious: { bg: 'var(--gc-red-soft)',    bd: 'var(--gc-red-border)',   fg: 'var(--gc-red-ink)',
                   label: lang === 'en' ? 'Check your PD' : '请检查优先日', icon: AlertCircle },
   };
@@ -2174,8 +2205,8 @@ const ProgressTimeline = ({ priorityDate, cutoff, chartLabel, sharedScale, showP
               <Clock size={12} />
               <span>
                 {lang === 'en'
-                  ? `${daysRemaining} days to go (~${monthsRemaining} mo)`
-                  : `还差 ${daysRemaining} 天（约${monthsRemaining}个月）`}
+                  ? `${daysRemaining.toLocaleString('en-US')} days to go (~${monthsRemaining} mo)`
+                  : `还差 ${daysRemaining.toLocaleString('en-US')} 天（约${monthsRemaining}个月）`}
               </span>
             </div>
           )}
@@ -2565,7 +2596,7 @@ const I485ProgressBar = ({ completedSteps = [], userCase }) => {
 // Movement Indicator
 // ============================================================
 const MovementIndicator = ({ movement, compact }) => {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const size = compact ? 14 : 16;
   const textSize = compact ? 'text-xs' : 'text-sm';
   if (movement.type === 'advanced') return (
@@ -2578,6 +2609,18 @@ const MovementIndicator = ({ movement, compact }) => {
     <div className="flex items-center gap-1 text-red-600">
       <TrendingDown size={size} strokeWidth={2.5} />
       <span className={`${textSize} font-bold`}>{movement.days ? `-${movement.days}` : '↓'}</span>
+    </div>
+  );
+  if (movement.type === 'unavailable') return (
+    <div className="flex items-center gap-1 text-red-600">
+      <TrendingDown size={size} strokeWidth={2.5} />
+      <span className={`${textSize} font-bold`}>{movement.still ? 'U' : '→U'}</span>
+    </div>
+  );
+  if (movement.type === 'resumed') return (
+    <div className="flex items-center gap-1 text-emerald-600">
+      <TrendingUp size={size} strokeWidth={2.5} />
+      <span className={`${textSize} font-bold`}>{lang === 'en' ? 'resumed' : '恢复'}</span>
     </div>
   );
   if (movement.type === 'current') return (
@@ -3459,7 +3502,12 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           //   12-24mo → ink         (approaching)
           //   6-12mo  → amber       (close, start preparing)
           //   < 6mo   → green       (imminent)
-          if (months === null) {
+          if (ps.status === 'unavailable') {
+            // The bulletin printed U — no visas this month, no queue position to show.
+            accentColor = 'var(--gc-amber, var(--gc-ink))';
+            waitingTitle = lang === 'en' ? 'No visas this month (U)' : lang === 'tw' ? '本月無名額（U）' : '本月无名额（U）';
+            waitingSub = lang === 'en' ? 'The bulletin lists no cutoff — numbers may resume in a future month' : lang === 'tw' ? '公告未給出截止日，之後月份可能恢復名額' : '公告未给出截止日，之后月份可能恢复名额';
+          } else if (months === null) {
             accentColor = 'var(--gc-ink)';
             waitingTitle = lang === 'en' ? 'In queue' : lang === 'tw' ? '你已在排期中' : '你已在排期中';
             waitingSub = lang === 'en' ? 'Awaiting cutoff advancement' : lang === 'tw' ? '等待截止日推進' : '等待截止日推进';
@@ -3679,14 +3727,16 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
               const mvB = computeMovement(currentFiling, previousFiling);
               const mvColor = (type) => {
                 if (type === 'advanced') return 'var(--gc-green)';
-                if (type === 'retrogressed') return 'var(--gc-red)';
-                if (type === 'current') return 'var(--gc-green)';
+                if (type === 'retrogressed' || type === 'unavailable') return 'var(--gc-red)';
+                if (type === 'current' || type === 'resumed') return 'var(--gc-green)';
                 return 'var(--gc-muted)';
               };
               const mvText = (m) => {
                 if (m.type === 'advanced') return `+${m.days}${lang === 'en' ? 'd' : '天'}`;
                 if (m.type === 'retrogressed') return `−${m.days}${lang === 'en' ? 'd' : '天'}`;
                 if (m.type === 'current') return 'C';
+                if (m.type === 'unavailable') return m.still ? 'U' : `→U`;
+                if (m.type === 'resumed') return lang === 'en' ? 'resumed' : '恢复名额';
                 return '—';
               };
               return (
@@ -3773,16 +3823,20 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 
         // Determine filing baseline:
         //   if user can file now (current/eligible/overdue) → today
-        //   otherwise → today + days-until-PD-reaches-cutoff (projected)
+        //   otherwise → today + the gap CONVERTED AT OBSERVED PACE (not 1 day per day —
+        //   that naive reading put this card four years apart from the summary card)
         const today = new Date();
         const filingBaseline = (() => {
           if (primaryStatus.status === 'current' || primaryStatus.status === 'eligible' || primaryStatus.status === 'overdue' || primaryCutoff === 'C') {
             return today;
           }
-          const daysAway = primaryStatus.days || 0;
+          const daysAway = paceDaysToCalendar(userCase.category, country, primaryStatus.days || 0);
           return new Date(today.getTime() + daysAway * 24 * 60 * 60 * 1000);
         })();
         const isFilingProjected = !(primaryStatus.status === 'current' || primaryStatus.status === 'eligible' || primaryStatus.status === 'overdue' || primaryCutoff === 'C');
+        // U (stored as null — see computeStatus) means no visas this month: no gap to
+        // convert, no date to promise. Downstream shows 待定 instead of a fake "today".
+        const filingDateUnknown = primaryStatus.status === 'unavailable' || (isFilingProjected && primaryStatus.days === null);
 
         const addDays = (date, days) => {
           const d = new Date(date);
@@ -3830,7 +3884,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                       || finalActionStatus.status === 'overdue';
         const aCurrentDate = aCurrent
           ? today
-          : new Date(today.getTime() + (finalActionStatus.days || 0) * 24 * 60 * 60 * 1000);
+          : new Date(today.getTime() + paceDaysToCalendar(userCase.category, country, finalActionStatus.days || 0) * 24 * 60 * 60 * 1000);
         // After A becomes current, USCIS typically issues approval within ~30–90 days.
         const postACurrentMin = 30;
         const postACurrentMax = 90;
@@ -4000,7 +4054,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 ? (lang === 'en' ? 'Priority date reached' : lang === 'tw' ? '排期到達' : '排期到达')
                 : stepInfos[nextStepIndex].title;
               const dateText = isWaitingForPD
-                ? (lang === 'en' ? `est. ${fmtDate(filingBaseline)}` : `预计 ${fmtDate(filingBaseline)}`)
+                ? (filingDateUnknown
+                    ? (lang === 'en' ? 'TBD — no visas (U)' : lang === 'tw' ? '待定 · 本月無名額（U）' : '待定 · 本月无名额（U）')
+                    : (lang === 'en' ? `est. ${fmtDate(filingBaseline)}` : `预计 ${fmtDate(filingBaseline)}`))
                 : fmtDateRange(stepInfos[nextStepIndex].earliestDate, stepInfos[nextStepIndex].latestDate);
               return (
                 <>
@@ -4770,6 +4826,10 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
             ? (lang === 'en' ? `${label} retrogressed from current` : lang === 'tw' ? `${label}從 C 回落` : `${label}从 C 回落`)
             : (lang === 'en' ? `${label} retrogressed ${m.days} days` : lang === 'tw' ? `${label}倒退 ${m.days} 天` : `${label}倒退 ${m.days} 天`);
           if (m.wasCurrent) return lang === 'en' ? `${label} stayed current (C)` : lang === 'tw' ? `${label}維持無需排隊（C）` : `${label}保持无需排队（C）`;
+          if (m.type === 'unavailable') return m.still
+            ? (lang === 'en' ? `${label} remains unavailable (U)` : lang === 'tw' ? `${label}持續無名額（U）` : `${label}持续无名额（U）`)
+            : (lang === 'en' ? `${label} went unavailable (U — no visas this month)` : lang === 'tw' ? `${label}轉為無名額（U，本月不發名額）` : `${label}转为无名额（U，本月不发名额）`);
+          if (m.type === 'resumed') return lang === 'en' ? `${label} resumed (numbers are back)` : lang === 'tw' ? `${label}恢復名額` : `${label}恢复名额`;
           return lang === 'en' ? `${label} held steady` : lang === 'tw' ? `${label}原地不動` : `${label}没有变化`;
         };
 
@@ -4960,7 +5020,12 @@ const MonthlyUpdate = ({ userCase }) => {
   // (earliest month in archive has no previous reference)
   const hasPreviousData = bulletinPrevious && bulletinPrevious.finalAction && Object.keys(bulletinPrevious.finalAction).length > 0;
 
-  const changes = useMemo(() => {
+  // NOT useMemo. bulletinCurrent/bulletinPrevious are module objects mutated in place
+  // when history.json loads (and by the Time Machine); a memo keyed on props caches the
+  // seeded May-2026 numbers from the first render and never recomputes — this tab spent
+  // a whole release showing "+30 days" under an August header because of exactly that.
+  // The computation is 8 categories of date diffs; per-render cost is negligible.
+  const changes = (() => {
     const cats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
     const catLabels = { EB1: t.eb1, EB2: t.eb2, EB3: t.eb3, F1: t.f1, F2A: t.f2a, F2B: t.f2b, F3: t.f3, F4: t.f4 };
     if (!hasPreviousData) {
@@ -4980,17 +5045,22 @@ const MonthlyUpdate = ({ userCase }) => {
       primary: computeMovement(bulletinCurrent.finalAction[c][userCountry], bulletinPrevious.finalAction[c][userCountry]),
       secondary: userCountry !== 'Other' ? computeMovement(bulletinCurrent.finalAction[c].Other, bulletinPrevious.finalAction[c].Other) : null,
     }));
-  }, [t, userCountry, hasPreviousData]);
+  })();
 
-  const userImpact = useMemo(() => {
-    if (!hasPreviousData) return { type: 'none', days: 0 };
-    return computeMovement(bulletinCurrent.finalAction[userCase.category][userCountry], bulletinPrevious.finalAction[userCase.category][userCountry]);
-  }, [userCase, userCountry, hasPreviousData]);
+  const userImpact = !hasPreviousData
+    ? { type: 'none', days: 0 }
+    : computeMovement(bulletinCurrent.finalAction[userCase.category][userCountry], bulletinPrevious.finalAction[userCase.category][userCountry]);
 
-  const impactText = { advanced: t.impactAdvanced, retrogressed: t.impactRetrogressed, none: t.impactNoChange, current: t.impactBecameCurrent }[userImpact.type];
+  const impactText = {
+    advanced: t.impactAdvanced, retrogressed: t.impactRetrogressed, none: t.impactNoChange, current: t.impactBecameCurrent,
+    unavailable: lang === 'en' ? 'Your category is unavailable this month (U) — no visas issued.' : lang === 'tw' ? '你的類別本月無名額（U）。' : '你的类别本月无名额（U）。',
+    resumed: lang === 'en' ? 'Your category resumed — numbers are back.' : lang === 'tw' ? '你的類別恢復名額了。' : '你的类别恢复名额了。',
+  }[userImpact.type];
   const impactTone = {
     advanced: 'bg-emerald-50 text-emerald-900 border-emerald-200',
     retrogressed: 'bg-red-50 text-red-900 border-red-200',
+    unavailable: 'bg-red-50 text-red-900 border-red-200',
+    resumed: 'bg-emerald-50 text-emerald-900 border-emerald-200',
     none: 'bg-slate-50 text-slate-700 border-slate-200',
     current: 'bg-emerald-50 text-emerald-900 border-emerald-200',
   }[userImpact.type];
@@ -5018,22 +5088,30 @@ const MonthlyUpdate = ({ userCase }) => {
           </p>
         </div>
       )}
-      {/* Overall summary is hardcoded for the current (latest) month. Hide it when viewing historical months. */}
-      {BULLETIN_CURRENT_MONTH.zh === '2026年5月' ? (
+      {/* The narrative summary was written for May 2026 and only shows for that month.
+          The "historical view" note shows only when the Time Machine is on an OLD month
+          — the latest month is not "historical", and labeling live August data that way
+          read as a bug. Latest month simply shows no extra banner; the table speaks. */}
+      {BULLETIN_CURRENT_MONTH.zh === '2026年5月' && DEFAULT_VIEWING_MONTH === '2026-05' ? (
         <div className="p-2.5 bg-slate-50 rounded-xl mb-2.5">
           <p className="text-[12px] text-slate-700 leading-relaxed">{t.overallSummary}</p>
         </div>
-      ) : (
-        <div className="p-2.5 bg-slate-50 rounded-xl mb-2.5 border border-dashed border-slate-200">
-          <p className="text-[11px] text-slate-500 leading-relaxed italic">
-            {lang === 'en'
-              ? `Historical view of ${BULLETIN_CURRENT_MONTH.en}. See the category table below for month-over-month changes in your case.`
-              : lang === 'tw'
-                ? `${BULLETIN_CURRENT_MONTH.tw} 歷史視角。月度變化詳見下方類別表格。`
-                : `${BULLETIN_CURRENT_MONTH.zh}历史视角。月度变化详见下方类别表格。`}
-          </p>
-        </div>
-      )}
+      ) : (() => {
+        const [ly, lm] = DEFAULT_VIEWING_MONTH.split('-');
+        const latestZh = `${ly}年${parseInt(lm, 10)}月`;
+        const viewingLatest = BULLETIN_CURRENT_MONTH.zh === latestZh;
+        return viewingLatest ? null : (
+          <div className="p-2.5 bg-slate-50 rounded-xl mb-2.5 border border-dashed border-slate-200">
+            <p className="text-[11px] text-slate-500 leading-relaxed italic">
+              {lang === 'en'
+                ? `Historical view of ${BULLETIN_CURRENT_MONTH.en}. See the category table below for month-over-month changes in your case.`
+                : lang === 'tw'
+                  ? `${BULLETIN_CURRENT_MONTH.tw} 歷史視角。月度變化詳見下方類別表格。`
+                  : `${BULLETIN_CURRENT_MONTH.zh}历史视角。月度变化详见下方类别表格。`}
+            </p>
+          </div>
+        );
+      })()}
       <div className={`p-2.5 rounded-xl border mb-2.5 ${impactTone}`}>
         <div className="text-[10px] font-bold uppercase tracking-wider opacity-60 mb-0.5">{t.yourImpact}</div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -5101,7 +5179,10 @@ const Forecast = ({ userCase }) => {
   const { t, lang } = useLang();
   // Defaults to the cautious end. The user can switch, but they have to choose to.
   const [paceBasis, setPaceBasis] = useState('conservative');
-  const forecast = useMemo(() => computeForecast(userCase, paceBasis), [userCase, paceBasis]);
+  // Not memoized: computeForecast reads the mutated-in-place BULLETIN_ARCHIVE, so a
+  // memo keyed on props serves pre-history.json seed numbers forever (same trap as
+  // MonthlyUpdate's changes). The hybrid simulation is a few hundred iterations — cheap.
+  const forecast = computeForecast(userCase, paceBasis);
   // Switch to years past two years. The conservative basis routinely lands past the old
   // "> 60 months" ceiling, and "60+" tells the reader almost nothing.
   // Threshold matches formatMonthsCompact() in functions/api/_emailTemplates.js — the
@@ -5124,21 +5205,19 @@ const Forecast = ({ userCase }) => {
     high: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   }[forecast.confidence];
 
-  const ProbBar = ({ label, value, color }) => {
+  // Token-colored meter: fill carries the outcome's color, track is a light step of
+  // the same surface. Gradients were Tailwind blues/greens outside the theme system.
+  const ProbBar = ({ label, value, tone }) => {
     const pct = Math.round(value * 100);
-    const gradientMap = {
-      'text-emerald-600': 'bg-gradient-to-r from-emerald-400 to-emerald-500',
-      'text-blue-600': 'bg-gradient-to-r from-blue-400 to-blue-500',
-      'text-red-600': 'bg-gradient-to-r from-red-400 to-red-500',
-    };
+    const fill = { good: 'var(--gc-green)', neutral: 'var(--gc-blue)', bad: 'var(--gc-red)' }[tone] || 'var(--gc-muted)';
     return (
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-slate-700">{label}</span>
-          <span className={`text-sm font-bold ${color}`}>{pct}%</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--gc-ink-soft)' }}>{label}</span>
+          <span className="text-sm font-bold gc-mono" style={{ color: fill }}>{pct}%</span>
         </div>
-        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${gradientMap[color]}`} style={{ width: `${pct}%` }}></div>
+        <div style={{ height: '8px', background: 'var(--gc-rule-soft)', borderRadius: '4px', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: fill, borderRadius: '4px', transition: 'width 200ms' }}></div>
         </div>
       </div>
     );
@@ -5179,17 +5258,27 @@ const Forecast = ({ userCase }) => {
           </div>
         ) : (
           <>
-            <div className="p-4 mb-4 bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200 rounded-xl">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-violet-700 mb-1">{t.probMonths}</div>
+            {/* This sub-tab is called 下月预测 — so NEXT MONTH's probabilities lead.
+                The long-term ETA used to sit on top in a violet hero card, which made
+                the page answer a question nobody asked it. */}
+            <div className="space-y-3 mb-4">
+              <ProbBar label={t.probBecomeCurrent} value={forecast.probCurrentNext} tone="good" />
+              <ProbBar label={t.probAdvance} value={forecast.probAdvance} tone="neutral" />
+              <ProbBar label={t.probRetrogress} value={forecast.probRetrogress} tone="bad" />
+            </div>
+
+            {/* Long-term ETA, demoted to a reference card and tokenized (was violet). */}
+            <div style={{ background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius)', padding: '14px' }}>
+              <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '4px' }}>{t.probMonths}</div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-violet-900">
+                <span className="text-3xl font-black" style={{ color: 'var(--gc-ink)' }}>
                   {durationParts(forecast.monthsToCurrent).value}
                 </span>
-                <span className="text-sm font-semibold text-violet-700">
+                <span className="text-sm font-semibold" style={{ color: 'var(--gc-ink-soft)' }}>
                   {durationParts(forecast.monthsToCurrent).unit}
                 </span>
               </div>
-              <div className="mt-2 text-[11px] text-violet-700">
+              <div className="mt-2 text-[11px]" style={{ color: 'var(--gc-ink-soft)' }}>
                 {t.avgMovement}: <span className="font-bold">+{forecast.avgMovement} {t.days}/{lang === 'en' ? 'mo' : t.months}</span>
               </div>
 
@@ -5197,44 +5286,50 @@ const Forecast = ({ userCase }) => {
                 <>
                   {/* The basis switch. Conservative is preselected; picking the optimistic
                       end is a deliberate act, and the copy under it says what that costs. */}
-                  <div className="mt-3 pt-3 border-t border-violet-200">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-violet-700 mb-1.5">{t.paceBasisLabel}</div>
-                    <div className="inline-flex rounded-lg overflow-hidden ring-1 ring-violet-300">
+                  <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--gc-rule-soft)' }}>
+                    <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '6px' }}>{t.paceBasisLabel}</div>
+                    <div className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
                       {[
                         { key: 'conservative', label: t.paceBasisConservative, pace: forecast.paceSlow, months: forecast.monthsSlow },
                         { key: 'recent', label: t.paceBasisRecent, pace: forecast.paceFast, months: forecast.monthsFast },
-                      ].map((opt) => (
+                      ].map((opt, i) => (
                         <button
                           key={opt.key}
                           onClick={() => setPaceBasis(opt.key)}
                           aria-pressed={paceBasis === opt.key}
-                          className={`px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
-                            paceBasis === opt.key
-                              ? 'bg-violet-700 text-white'
-                              : 'bg-white text-violet-700 hover:bg-violet-50'
-                          }`}
+                          className="px-2.5 py-1.5 text-[11px] font-semibold transition-colors"
+                          style={{
+                            border: 'none', cursor: 'pointer',
+                            borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                            background: paceBasis === opt.key ? 'var(--gc-ink)' : 'var(--gc-surface)',
+                            color: paceBasis === opt.key ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
+                          }}
                         >
                           {opt.label}
-                          <span className="ml-1 font-mono opacity-80">+{opt.pace}{lang === 'en' ? 'd' : '天'}</span>
+                          <span className="ml-1 gc-mono" style={{ opacity: 0.8 }}>+{opt.pace}{lang === 'en' ? 'd' : '天'}</span>
                         </button>
                       ))}
                     </div>
-                    <div className="mt-2 text-[11px] leading-relaxed text-violet-800">
+                    <div className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--gc-ink-soft)' }}>
                       {paceBasis === 'recent' ? t.paceExplainRecent : t.paceExplainConservative}
                     </div>
-                    <div className="mt-1.5 text-[11px] leading-relaxed text-violet-600">
+                    <div className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--gc-ink-soft)' }}>
                       {t.paceRangeLabel}: <span className="font-bold">{fmtDuration(forecast.monthsFast)} – {fmtDuration(forecast.monthsSlow)}</span>
                     </div>
-                    <div className="mt-1 text-[10px] leading-relaxed text-violet-500">{t.paceRangeNote}</div>
+                    <div className="mt-1 text-[10px] leading-relaxed" style={{ color: 'var(--gc-muted)' }}>{t.paceRangeNote}</div>
                   </div>
                 </>
               )}
-            </div>
 
-            <div className="space-y-3">
-              <ProbBar label={t.probBecomeCurrent} value={forecast.probCurrentNext} color="text-emerald-600" />
-              <ProbBar label={t.probAdvance} value={forecast.probAdvance} color="text-blue-600" />
-              <ProbBar label={t.probRetrogress} value={forecast.probRetrogress} color="text-red-600" />
+              {/* Why this number differs from the long-term chart and the summary card —
+                  three estimators with different assumptions, stated once, here. */}
+              <div className="mt-3 pt-2 text-[10px] leading-relaxed" style={{ borderTop: '1px solid var(--gc-rule-soft)', color: 'var(--gc-muted)' }}>
+                {lang === 'en'
+                  ? 'This figure blends the current month with the 21-year long-term average. The Long-term chart and the Overview summary extrapolate observed pace directly, so their numbers differ — different assumptions, same data.'
+                  : lang === 'tw'
+                    ? '口徑說明：此處為混合模型（當月速度＋21 年長期均值）。「長期走勢」圖與總結頁按觀測均速直線外推，數字會不同——是假設不同，不是資料錯了。'
+                    : '口径说明：此处为混合模型（当月速度＋21 年长期均值）。「长期走势」图与总结页按观测均速直线外推，数字会不同——是假设不同，不是数据错了。'}
+              </div>
             </div>
           </>
         )}
@@ -5609,7 +5704,7 @@ const CompareByCountry = ({ userCase }) => {
                   return (
                     <span className="flex items-center gap-0.5 text-amber-700 font-semibold flex-shrink-0 text-[11px]">
                       <Clock size={11} strokeWidth={2.5} />
-                      {lang === 'en' ? `${daysA}d (~${monthsA}m)` : `还差${daysA}天(${monthsA}月)`}
+                      {lang === 'en' ? `${daysA.toLocaleString('en-US')}d (~${monthsA}m)` : `还差${daysA.toLocaleString('en-US')}天(${monthsA}月)`}
                     </span>
                   );
                 })()}
@@ -5666,7 +5761,7 @@ const CompareByCountry = ({ userCase }) => {
                   return (
                     <span className="flex items-center gap-0.5 text-amber-700 font-semibold flex-shrink-0 text-[11px]">
                       <Clock size={11} strokeWidth={2.5} />
-                      {lang === 'en' ? `${daysB}d (~${monthsB}m)` : `还差${daysB}天(${monthsB}月)`}
+                      {lang === 'en' ? `${daysB.toLocaleString('en-US')}d (~${monthsB}m)` : `还差${daysB.toLocaleString('en-US')}天(${monthsB}月)`}
                     </span>
                   );
                 })()}
@@ -7624,7 +7719,10 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
             const fractionalDays = (monthsToReach - wholeMonths) * 30;
             crossoverCalDate.setMonth(crossoverCalDate.getMonth() + wholeMonths);
             crossoverCalDate.setDate(crossoverCalDate.getDate() + Math.round(fractionalDays));
-            const crossoverLabel = `${String(crossoverCalDate.getFullYear()).slice(-2)}/${crossoverCalDate.getMonth() + 1}`;
+            // Readable "41年10月" / "Oct '41", not the cryptic "41/10" two-digit slash form.
+            const crossoverLabel = lang === 'en'
+              ? `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][crossoverCalDate.getMonth()]} '${String(crossoverCalDate.getFullYear()).slice(-2)}`
+              : `${String(crossoverCalDate.getFullYear()).slice(-2)}年${crossoverCalDate.getMonth() + 1}月`;
 
             // APPROVAL DATE ESTIMATE — mirrors Overview's I-485 card approval logic EXACTLY
             // so both views show the same range. The Overview calc is:
@@ -7676,12 +7774,23 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
               latestApproval = actual;
             }
 
-            // For the small chart pill, show a RANGE directly: "27/3 – 27/5"
-            // (previously was single-point = latest end; user feedback: too conservative
-            //  and people understand ranges just fine).
-            const earliestLabel = `${String(earliestApproval.getFullYear()).slice(-2)}/${earliestApproval.getMonth() + 1}`;
-            const latestLabel   = `${String(latestApproval.getFullYear()).slice(-2)}/${latestApproval.getMonth() + 1}`;
-            const approvalLabel = earliestLabel === latestLabel ? earliestLabel : `${earliestLabel}–${latestLabel}`;
+            // For the small chart pill, show a RANGE directly ("27年3–5月"), readable
+            // year-month words instead of the cryptic YY/M slash form. Same-year ranges
+            // collapse the year so the text still fits the 144px pill.
+            const enMon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const fmtYM = (d) => lang === 'en'
+              ? `${enMon[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`
+              : `${String(d.getFullYear()).slice(-2)}年${d.getMonth() + 1}月`;
+            const approvalLabel = (() => {
+              const a = earliestApproval, b = latestApproval;
+              if (a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()) return fmtYM(a);
+              if (a.getFullYear() === b.getFullYear()) {
+                return lang === 'en'
+                  ? `${enMon[a.getMonth()]}–${enMon[b.getMonth()]} '${String(a.getFullYear()).slice(-2)}`
+                  : `${String(a.getFullYear()).slice(-2)}年${a.getMonth() + 1}–${b.getMonth() + 1}月`;
+              }
+              return `${fmtYM(a)}–${fmtYM(b)}`;
+            })();
             // If the user has already completed the approval step in Overview,
             // celebrate that instead of showing a forecast.
             const alreadyApproved = completedI485Steps.includes('approval');
@@ -11893,7 +12002,15 @@ export default function App() {
     try { window.localStorage.setItem('gc_lang', lang); }
     catch (e) { /* noop */ }
   }, [lang]);
-  const [tab, setTab] = useState('overview');
+  // ?tab= deep link (e.g. ?tab=alerts to land on the subscription page from an email).
+  // Read-only: switching tabs afterwards doesn't write back to the URL.
+  const [tab, setTab] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get('tab');
+      if (['overview', 'trends', 'update', 'compare', 'index', 'alerts'].includes(p)) return p;
+    } catch (e) { /* noop */ }
+    return 'overview';
+  });
   // Track the tab the user came from, for the "← back" button in The Index
   const [previousTab, setPreviousTab] = useState('overview');
 
@@ -12420,6 +12537,41 @@ export default function App() {
         svg { max-width: 100%; height: auto; }
         .visa-root * { max-width: 100%; box-sizing: border-box; }
         .visa-root input, .visa-root select, .visa-root button { max-width: 100%; }
+        /* The blanket .visa-root * max-width:100% outranks Tailwind's .max-w-3xl
+           (0,0,1,1 vs 0,0,1,0), which silently un-capped the desktop layout — every
+           card stretched to the full 1280px viewport. Restore the container caps. */
+        .visa-root .max-w-3xl { max-width: 48rem; }
+        .visa-root .max-w-4xl { max-width: 56rem; }
+
+        /* Legacy Tailwind palette → theme tokens. 动态/对比/下月预测 predate the token
+           system (white cards, slate text, indigo/purple accents) and ignored the four
+           themes entirely. Scoped overrides fold every remaining call site into the
+           token system at once — redseal/monocle now restyle these pages too. */
+        .visa-root .bg-white { background-color: var(--gc-surface) !important; }
+        .visa-root .bg-slate-50 { background-color: var(--gc-paper-soft) !important; }
+        .visa-root .bg-slate-100 { background-color: var(--gc-rule-soft) !important; }
+        .visa-root .border-slate-100, .visa-root .border-slate-200 { border-color: var(--gc-rule) !important; }
+        .visa-root .text-slate-800, .visa-root .text-slate-900 { color: var(--gc-ink) !important; }
+        .visa-root .text-slate-600, .visa-root .text-slate-700 { color: var(--gc-ink-soft) !important; }
+        .visa-root .text-slate-400, .visa-root .text-slate-500 { color: var(--gc-muted) !important; }
+        .visa-root .rounded-xl, .visa-root .rounded-2xl { border-radius: var(--gc-radius) !important; }
+        .visa-root .shadow-sm { box-shadow: none !important; }
+        .visa-root .bg-emerald-50 { background-color: var(--gc-green-soft) !important; }
+        .visa-root .border-emerald-200 { border-color: var(--gc-green-border) !important; }
+        .visa-root .text-emerald-600, .visa-root .text-emerald-700 { color: var(--gc-green) !important; }
+        .visa-root .text-emerald-900 { color: var(--gc-green-ink) !important; }
+        .visa-root .bg-red-50 { background-color: var(--gc-red-soft) !important; }
+        .visa-root .border-red-200 { border-color: var(--gc-red-border) !important; }
+        .visa-root .text-red-600, .visa-root .text-red-700 { color: var(--gc-red) !important; }
+        .visa-root .text-red-900 { color: var(--gc-red-ink) !important; }
+        .visa-root .bg-amber-50 { background-color: var(--gc-amber-soft) !important; }
+        .visa-root .border-amber-200 { border-color: var(--gc-amber-border) !important; }
+        .visa-root .text-amber-600, .visa-root .text-amber-700 { color: var(--gc-amber) !important; }
+        .visa-root .bg-blue-50, .visa-root .bg-indigo-50, .visa-root .bg-purple-50 { background-color: var(--gc-blue-soft) !important; }
+        .visa-root .border-blue-200, .visa-root .border-indigo-200, .visa-root .border-purple-200 { border-color: var(--gc-blue-border) !important; }
+        .visa-root .text-blue-600, .visa-root .text-blue-700, .visa-root .text-blue-800, .visa-root .text-blue-900,
+        .visa-root .text-indigo-600, .visa-root .text-indigo-700,
+        .visa-root .text-purple-600, .visa-root .text-purple-700 { color: var(--gc-blue) !important; }
 
         /* ========================================================
            THEME SYSTEM
@@ -12911,8 +13063,8 @@ export default function App() {
 
           {/* Header — editorial masthead */}
           <header style={{ width: '100%', maxWidth: '100vw', boxSizing: 'border-box', background: 'var(--gc-surface)' }}>
-            <div className="max-w-4xl mx-auto flex items-center gap-2"
-                 style={{ padding: '9px 12px', boxSizing: 'border-box', width: '100%', maxWidth: '100%' }}>
+            <div className="max-w-3xl mx-auto flex items-center gap-2"
+                 style={{ padding: '9px 12px', boxSizing: 'border-box', width: '100%' }}>
 
               {/* Wordmark: Green Card miniature + serif title.
                   Static design — no animation. Captures the "in-flight" moment:
@@ -13266,7 +13418,7 @@ export default function App() {
           {/* Time Machine banner — only shown when viewing a non-default month */}
           {isTimeMachineActive && (
             <div style={{ width: '100%', background: 'var(--gc-amber-soft)', borderTop: '1px solid var(--gc-amber-border)', borderBottom: '1px solid var(--gc-amber-border)' }}>
-              <div className="max-w-4xl mx-auto flex items-center gap-2" style={{ padding: '6px 12px' }}>
+              <div className="max-w-3xl mx-auto flex items-center gap-2" style={{ padding: '6px 12px' }}>
                 <Clock size={11} style={{ color: 'var(--gc-amber)' }} strokeWidth={2.2} />
                 <p style={{ fontSize: '11px', color: 'var(--gc-amber-ink)', flex: 1, minWidth: 0, lineHeight: 1.3 }}>
                   {lang === 'en'
@@ -13296,7 +13448,7 @@ export default function App() {
 
           {/* Navigation — single-row document tabs with hairline active indicator */}
           <nav style={{ width: '100%', maxWidth: '100vw', boxSizing: 'border-box', background: 'var(--gc-surface)' }}>
-            <div className="max-w-4xl mx-auto" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+            <div className="max-w-3xl mx-auto" style={{ width: '100%', boxSizing: 'border-box' }}>
               <div className="flex" style={{ width: '100%' }}>
                 {tabs.map(tb => {
                   const Icon = tb.icon;
@@ -13345,12 +13497,14 @@ export default function App() {
         </div>
         {/* End fixed header wrapper */}
 
-        <main className="max-w-4xl mx-auto"
+        {/* max-w-3xl (768px), and no inline maxWidth — an inline maxWidth:'100%' was
+            overriding the Tailwind cap entirely, so desktop rendered every card at full
+            viewport width (60+ CJK chars per line at 1280px). */}
+        <main className="max-w-3xl mx-auto"
               style={{
                 padding: '12px',
                 boxSizing: 'border-box',
                 width: '100%',
-                maxWidth: '100%'
               }}>
           {(() => {
             // Overview now uses the same CompactCaseBar as other tabs (no more full sidebar).
@@ -13393,9 +13547,9 @@ export default function App() {
             {/* Data source line */}
             <div className="text-center gc-eyebrow" style={{ letterSpacing: '0.12em' }}>
               <span className="gc-mono" style={{ letterSpacing: '0.02em', textTransform: 'none', color: 'var(--gc-muted)' }}>
-                {lang === 'zh' ? '数据来自美国国务院 travel.state.gov · 2026年5月 · 仅供参考,不构成法律建议'
-                  : lang === 'tw' ? '資料來自美國國務院 travel.state.gov · 2026年5月 · 僅供參考,不構成法律建議'
-                  : 'Data sourced from US State Department travel.state.gov · May 2026 · Informational only, not legal advice'}
+                {lang === 'zh' ? `数据来自美国国务院 travel.state.gov · ${BULLETIN_CURRENT_MONTH.zh} · 仅供参考,不构成法律建议`
+                  : lang === 'tw' ? `資料來自美國國務院 travel.state.gov · ${BULLETIN_CURRENT_MONTH.tw} · 僅供參考,不構成法律建議`
+                  : `Data sourced from US State Department travel.state.gov · ${BULLETIN_CURRENT_MONTH.en} · Informational only, not legal advice`}
               </span>
             </div>
             {/* Copyright + small theme dropdown in the same low-emphasis line.
@@ -13532,8 +13686,10 @@ export default function App() {
               {/* Reset all data — destructive, two-stage confirmation.
                   First click: button turns amber, shows "确认?" + "取消".
                   Second click within 5s: wipes all gc_* localStorage, reloads app.
-                  After 5s idle, reverts to neutral. */}
-              <span style={{ opacity: 0.4 }}>·</span>
+                  After 5s idle, reverts to neutral.
+                  Forced onto its own line, pushed away from the theme picker: a
+                  wipe-everything action should not sit 8px from a cosmetic toggle. */}
+              <span style={{ flexBasis: '100%', height: 0 }} aria-hidden="true" />
               {confirmReset === null ? (
                 <button
                   onClick={() => {
