@@ -148,6 +148,9 @@ const translations = {
     eb2: 'EB-2 Advanced Degree',
     eb3: 'EB-3 Skilled Worker',
     ew: 'EB-3 Other Workers',
+    eb4: 'EB-4 Special Immigrants (incl. SIJ)',
+    sr: 'EB-4 Religious Workers (SR)',
+    eb5: 'EB-5 Investors (Unreserved)',
     f1: 'F1 Unmarried Adult Children of Citizens',
     f2a: 'F2A Spouses & Children of LPRs',
     f2b: 'F2B Unmarried Adult Children of LPRs',
@@ -414,6 +417,9 @@ const translations = {
     eb2: 'EB-2 高学历',
     eb3: 'EB-3 技术工',
     ew: 'EB-3 非技术劳工',
+    eb4: 'EB-4 特殊移民（含SIJ青少年）',
+    sr: 'EB-4 宗教工作者（SR）',
+    eb5: 'EB-5 投资移民（未预留）',
     f1: 'F1 公民成年未婚子女',
     f2a: 'F2A 绿卡持有人配偶与子女',
     f2b: 'F2B 绿卡持有人成年未婚子女',
@@ -677,6 +683,9 @@ const translations = {
     eb2: 'EB-2 高學歷',
     eb3: 'EB-3 技術工',
     ew: 'EB-3 非技術勞工',
+    eb4: 'EB-4 特殊移民（含SIJ青少年）',
+    sr: 'EB-4 宗教工作者（SR）',
+    eb5: 'EB-5 投資移民（未預留）',
     f1: 'F1 公民成年未婚子女',
     f2a: 'F2A 綠卡持有人配偶與子女',
     f2b: 'F2B 綠卡持有人成年未婚子女',
@@ -821,7 +830,7 @@ const bulletinAnchorDate = (day = 1) => {
 // USCIS announced for May 2026: EB uses Final Action Dates (Chart A),
 // Family categories continue to use Dates for Filing (Chart B)
 const FILING_AUTHORIZED = {
-  EB1: false, EB2: false, EB3: false, EW: false,
+  EB1: false, EB2: false, EB3: false, EW: false, EB4: false, SR: false, EB5: false,
   F1: true, F2A: true, F2B: true, F3: true, F4: true,
 };
 
@@ -1144,6 +1153,10 @@ const RATES_DB = {
   'EB3-India': {long: 203, mid: 320, recent: 281},
   'EB3-Mexico': {long: 400, mid: 324, recent: 250},
   'EB3-Philippines': {long: 370, mid: 328, recent: 310},
+  // EB4/SR/EB5: neutral anchors — observed 12-month pace carries the forecast.
+  'EB4-Other': {long: 365, mid: 365, recent: 365},
+  'SR-Other': {long: 365, mid: 365, recent: 365},
+  'EB5-Other': {long: 365, mid: 365, recent: 365},
 };
 
 // Get 3-layer rates for a category+country
@@ -1643,6 +1656,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
   const categories = [
     { v: 'EB1', label: t.eb1 }, { v: 'EB2', label: t.eb2 }, { v: 'EB3', label: t.eb3 },
     { v: 'EW', label: t.ew },
+    { v: 'EB4', label: t.eb4 }, { v: 'SR', label: t.sr }, { v: 'EB5', label: t.eb5 },
     { v: 'F1', label: t.f1 }, { v: 'F2A', label: t.f2a }, { v: 'F2B', label: t.f2b },
     { v: 'F3', label: t.f3 }, { v: 'F4', label: t.f4 },
   ];
@@ -1912,6 +1926,7 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const categories = [
     { v: 'EB1' }, { v: 'EB2' }, { v: 'EB3' }, { v: 'EW' },
+    { v: 'EB4' }, { v: 'SR' }, { v: 'EB5' },
     { v: 'F1' }, { v: 'F2A' }, { v: 'F2B' }, { v: 'F3' }, { v: 'F4' },
   ];
   const countries = [
@@ -5436,7 +5451,7 @@ const MonthlyUpdate = ({ userCase }) => {
   // a whole release showing "+30 days" under an August header because of exactly that.
   // The computation is 8 categories of date diffs; per-render cost is negligible.
   const changes = (() => {
-    const cats = ['EB1', 'EB2', 'EB3', 'EW', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+    const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
     const catLabels = { EB1: t.eb1, EB2: t.eb2, EB3: t.eb3, EW: t.ew, F1: t.f1, F2A: t.f2a, F2B: t.f2b, F3: t.f3, F4: t.f4 };
     if (!hasPreviousData) {
       // Return category rows but with no movement deltas
@@ -5955,6 +5970,7 @@ const CompareByCountry = ({ userCase }) => {
   const categories = [
     { v: 'EB1', label: t.eb1 }, { v: 'EB2', label: t.eb2 }, { v: 'EB3', label: t.eb3 },
     { v: 'EW', label: t.ew },
+    { v: 'EB4', label: t.eb4 }, { v: 'SR', label: t.sr }, { v: 'EB5', label: t.eb5 },
     { v: 'F1', label: t.f1 }, { v: 'F2A', label: t.f2a }, { v: 'F2B', label: t.f2b },
     { v: 'F3', label: t.f3 }, { v: 'F4', label: t.f4 },
   ];
@@ -12220,6 +12236,9 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     { v: 'EB2', en: 'EB-2', zh: 'EB-2', tw: 'EB-2' },
     { v: 'EB3', en: 'EB-3', zh: 'EB-3', tw: 'EB-3' },
     { v: 'EW',  en: 'EB-3 Other', zh: 'EB-3非技术', tw: 'EB-3非技術' },
+    { v: 'EB4', en: 'EB-4 / SIJ', zh: 'EB-4特殊移民', tw: 'EB-4特殊移民' },
+    { v: 'SR',  en: 'EB-4 Religious', zh: 'EB-4宗教', tw: 'EB-4宗教' },
+    { v: 'EB5', en: 'EB-5', zh: 'EB-5投资', tw: 'EB-5投資' },
     { v: 'F1',  en: 'F1',   zh: 'F1',   tw: 'F1' },
     { v: 'F2A', en: 'F2A',  zh: 'F2A',  tw: 'F2A' },
     { v: 'F2B', en: 'F2B',  zh: 'F2B',  tw: 'F2B' },
@@ -12925,7 +12944,7 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('history-fetch-not-ok'))))
       .then((hist) => {
         if (cancelled || !hist || !Array.isArray(hist.months)) return;
-        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
         const asc = hist.months
           .filter((m) => m && m.month && m.finalAction && cats.every((c) => m.finalAction[c]))
           .sort((a, b) => a.month.localeCompare(b.month));
@@ -13034,7 +13053,7 @@ export default function App() {
       .then((data) => {
         if (cancelled || !data || !data.current || !data.current.finalAction) return;
         // Sanity check — must have all 8 categories in finalAction
-        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
         const ok = cats.every((c) => data.current.finalAction[c]);
         if (!ok) {
           console.warn('[bulletin] Remote data missing categories, keeping hardcoded fallback');

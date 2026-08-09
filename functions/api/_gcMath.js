@@ -7,7 +7,7 @@
 
 // Which chart each category ADOPTS for filing this month's I-485 (mirror of App.jsx).
 export const FILING_AUTHORIZED = {
-  EB1: false, EB2: false, EB3: false, EW: false,
+  EB1: false, EB2: false, EB3: false, EW: false, EB4: false, SR: false, EB5: false,
   F1: true, F2A: true, F2B: true, F3: true, F4: true,
 };
 
@@ -59,6 +59,11 @@ export const RATES_DB = {
   'EB3-India': {long: 203, mid: 320, recent: 281},
   'EB3-Mexico': {long: 400, mid: 324, recent: 250},
   'EB3-Philippines': {long: 370, mid: 328, recent: 310},
+  // EB4/SR/EB5 have no regression anchors yet — neutral 365 so the hybrid model
+  // leans on the observed 12-month pace, which is what we actually trust here.
+  'EB4-Other': {long: 365, mid: 365, recent: 365},
+  'SR-Other': {long: 365, mid: 365, recent: 365},
+  'EB5-Other': {long: 365, mid: 365, recent: 365},
 };
 
 export const getRates = (cat, country) => {
@@ -215,23 +220,31 @@ export function observedRates(historyMonths, cat, country, windowSize = 12, char
     .sort((a, b) => a.month.localeCompare(b.month));
   const toTime = (v) => (v && v !== 'C' && v !== 'U' ? Date.parse(`${v}T00:00:00Z`) : null);
 
-  const deltas = [];
-  for (let i = 1; i < asc.length; i++) {
-    const a = toTime(asc[i - 1][chart]?.[cat]?.[country]);
-    const b = toTime(asc[i][chart]?.[cat]?.[country]);
-    if (a === null || b === null) continue;
-    deltas.push({ month: asc[i].month, days: (b - a) / 86400000 });
+  // CALENDAR-window semantics, mirroring the App's monthlyMovementFromArchive: the
+  // window is the last N calendar months with a published bulletin, and months where
+  // no delta is observable (U/C on either side) count as ZERO movement — the
+  // subscriber still lived through them. The old version skipped those months and
+  // averaged only observable deltas, which for U-heavy categories (EB4 in FY2025)
+  // stretched the window years back and made the email's pace disagree with the site.
+  const winMonths = asc.slice(-(windowSize + 1));
+  if (winMonths.length < 2) return null;
+  const series = [];
+  for (let i = 1; i < winMonths.length; i++) {
+    const a = toTime(winMonths[i - 1][chart]?.[cat]?.[country]);
+    const b = toTime(winMonths[i][chart]?.[cat]?.[country]);
+    series.push({ month: winMonths[i].month, days: (a === null || b === null) ? null : (b - a) / 86400000 });
   }
-  if (!deltas.length) return null;
+  const observed = series.filter((d) => d.days !== null);
+  if (!observed.length) return null;
 
-  const win = deltas.slice(-windowSize);
   return {
-    latest: deltas[deltas.length - 1].days,
-    windowMean: win.reduce((s, d) => s + d.days, 0) / win.length,
-    windowSize: win.length,
+    latest: observed[observed.length - 1].days,
+    windowMean: observed.reduce((s, d) => s + d.days, 0) / series.length,
+    windowSize: series.length,
     // The month-by-month series behind the average — the email charts this so the
-    // reader can see the stall-then-jump pattern that makes the range wide.
-    series: win,
+    // reader can see the stall-then-jump pattern that makes the range wide. Null
+    // days = months with no observable delta (charted as zero).
+    series,
   };
 }
 

@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "2026-08-09T03:48:56.800Z",
+  "lastUpdated": "2026-08-09T16:01:20.335Z",
   "source": "github-actions-auto",
   "sourceUrl": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-august-2026.html",
   "current": {
     "month": "2026-08",
-    "scrapedAt": "2026-08-09T03:48:56.797Z",
+    "scrapedAt": "2026-08-09T16:01:20.331Z",
     "finalAction": {
       "EB1": {
         "Other": "C",
@@ -33,6 +33,27 @@
         "India": "2014-01-01",
         "Mexico": "2022-04-01",
         "Philippines": "2021-12-01"
+      },
+      "EB4": {
+        "Other": "2022-10-15",
+        "China": "2022-10-15",
+        "India": "2022-10-15",
+        "Mexico": "2022-10-15",
+        "Philippines": "2022-10-15"
+      },
+      "SR": {
+        "Other": "2022-10-15",
+        "China": "2022-10-15",
+        "India": "2022-10-15",
+        "Mexico": "2022-10-15",
+        "Philippines": "2022-10-15"
+      },
+      "EB5": {
+        "Other": "C",
+        "China": "2016-12-01",
+        "India": null,
+        "Mexico": "C",
+        "Philippines": "C"
       },
       "F1": {
         "Other": "2018-12-15",
@@ -98,6 +119,27 @@
         "India": "2015-01-15",
         "Mexico": "2022-08-01",
         "Philippines": "2022-08-01"
+      },
+      "EB4": {
+        "Other": "2023-01-01",
+        "China": "2023-01-01",
+        "India": "2023-01-01",
+        "Mexico": "2023-01-01",
+        "Philippines": "2023-01-01"
+      },
+      "SR": {
+        "Other": "2023-01-01",
+        "China": "2023-01-01",
+        "India": "2023-01-01",
+        "Mexico": "2023-01-01",
+        "Philippines": "2023-01-01"
+      },
+      "EB5": {
+        "Other": "C",
+        "China": "2017-03-01",
+        "India": "2024-05-01",
+        "Mexico": "C",
+        "Philippines": "C"
       },
       "F1": {
         "Other": "2019-06-15",
@@ -285,6 +327,27 @@
         "India": "2006-11-01",
         "Mexico": "2001-04-08",
         "Philippines": "2007-08-01"
+      },
+      "EB4": {
+        "Other": "2022-09-15",
+        "China": "2022-09-15",
+        "India": "2022-09-15",
+        "Mexico": "2022-09-15",
+        "Philippines": "2022-09-15"
+      },
+      "SR": {
+        "Other": "2022-09-15",
+        "China": "2022-09-15",
+        "India": "2022-09-15",
+        "Mexico": "2022-09-15",
+        "Philippines": "2022-09-15"
+      },
+      "EB5": {
+        "Other": "C",
+        "China": "2016-12-01",
+        "India": null,
+        "Mexico": "C",
+        "Philippines": "C"
       }
     },
     "filing": {
@@ -343,6 +406,27 @@
         "India": "2006-12-15",
         "Mexico": "2001-04-30",
         "Philippines": "2008-03-22"
+      },
+      "EB4": {
+        "Other": "2023-01-01",
+        "China": "2023-01-01",
+        "India": "2023-01-01",
+        "Mexico": "2023-01-01",
+        "Philippines": "2023-01-01"
+      },
+      "SR": {
+        "Other": "2023-01-01",
+        "China": "2023-01-01",
+        "India": "2023-01-01",
+        "Mexico": "2023-01-01",
+        "Philippines": "2023-01-01"
+      },
+      "EB5": {
+        "Other": "C",
+        "China": "2017-03-01",
+        "India": "2024-05-01",
+        "Mexico": "C",
+        "Philippines": "C"
       }
     }
   }
