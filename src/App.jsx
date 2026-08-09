@@ -1687,7 +1687,11 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
     const close = (e) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
     };
-    const onScroll = () => setOpen(false);
+    const onScroll = (e) => {
+      // The panel scrolls internally — only close when the PAGE scrolls.
+      if (wrapRef.current && wrapRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', close);
     document.addEventListener('touchstart', close);
     window.addEventListener('scroll', onScroll, true);
@@ -1735,6 +1739,7 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
           bottom: openUp ? (vh - rect.top + 4) : undefined,
           left: Math.max(8, Math.min(rect.left, vw - Math.min(vw * 0.78, 300) - 8)),
           width: 'min(78vw, 300px)', maxHeight: `${panelMaxH}px`, overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
           background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)',
           borderTop: '2px solid var(--gc-green)', borderRadius: '4px',
           boxShadow: '0 14px 40px rgba(0,0,0,0.18)',
@@ -1882,7 +1887,7 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
           <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
             {lang === 'en' ? 'YEAR' : '年'}
           </div>
-          <div ref={yearRowRef} style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '4px', WebkitOverflowScrolling: 'touch' }}>
+          <div ref={yearRowRef} style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '4px', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
             {years.map((yy) => (
               <button key={yy} type="button" data-sel={yy === y ? '1' : '0'}
                 onClick={() => setDate(yy, m, d)}
