@@ -344,6 +344,36 @@ notices（三语）+DV+配额+Vol/No 从动态页拆出，独立「公告」tab 
 
 ---
 
+## 第 13 轮（2026-08-09 下午）：backlog 清理
+
+**垃圾订阅排查结论（虚惊）**：KV 里「纯数字键」是 QQ 邮箱（24182822@qq.com 等 5 个真实
+用户），值为 1/2 的是 `rl:` 限流计数器，`an:` 是访问统计。19 个订阅者全真实，无垃圾。
+服务端 `isValidEmail` 本来就在 POST/DELETE 强制执行，本轮只补了 254 字符长度上限。
+
+**admin 转正接口** `/api/admin/confirm-subscriber?email=x`（POST + ADMIN_TOKEN）：给确认
+邮件掉垃圾箱的真实用户手动完成 double opt-in，等效用户点链接（发欢迎邮件），带
+`adminConfirmed` 标记；`&welcome=0` 静默转正。比在 CF 后台手改 JSON 好——不会漏字段、
+不会改坏格式。**只给挂着真实案子的地址用**。
+
+**大陆「打不开」元凶**：`fonts.googleapis.com` 的 CSS `@import` 写在 <style> 里，大陆被墙
+→ 渲染阻塞到超时=白屏。已改为 monocle 主题激活时 JS 异步注入 <link>，失败只回退系统
+字体。Cloudflare 边缘部分大陆线路仍可能慢/断，那层无解（除非国内备案托管）。
+
+**EB4/SR/EB5 接入**（小红书三条评论催的）：scraper 认 `4th`/`Certain Religious`/`5th
+Unreserved`（set-aside 行暂不解析），`--seed --force` 重抓当月 + backfill 24 个月。
+bulletin.json 的 previous 是旧解析时，要从 history 补新类别（/tmp/fix_privious 模式），
+否则月度对比把新类别误判「恢复名额」。UI 数组共 7 处（两个 label 下拉 × 同一字面量、
+紧凑条、3 个 cats 数组、onboarding）。EB4 全球一个截止日（2026-08: 2022-10-15）。
+
+**observedRates 改日历窗口语义（重要口径修正）**：旧版跳过 U/C 月只平均可观测差值，
+EB4 这种 FY 断供类别的窗口被拉到几年前，邮件 pace 26.4 vs 网站 70 天/月。现在镜像
+App 的 monthlyMovementFromArchive：窗口=最近 N 个日历月，U 月计零（订阅者的等待是
+日历时间）。series 里 null=不可观测月，邮件图表按零柱画。
+
+**提醒 tab → 订阅**：改名 + Mail 图标 + 常驻绿底（唯一转化动作，像按钮不像页签）。
+
+---
+
 ## 别重踩的坑
 
 - **推 `main` 即上线**（Cloudflare Pages 自动部署），推送前先问用户。改动走功能分支 + PR。
