@@ -5822,7 +5822,7 @@ const MonthlyUpdate = ({ userCase }) => {
   // The computation is 8 categories of date diffs; per-render cost is negligible.
   const changes = (() => {
     const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'EB5R', 'EB5H', 'EB5I', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
-    const catLabels = { EB1: t.eb1, EB2: t.eb2, EB3: t.eb3, EW: t.ew, F1: t.f1, F2A: t.f2a, F2B: t.f2b, F3: t.f3, F4: t.f4 };
+    const catLabels = { EB1: t.eb1, EB2: t.eb2, EB3: t.eb3, EW: t.ew, EB4: t.eb4, SR: t.sr, EB5: t.eb5, EB5R: t.eb5r, EB5H: t.eb5h, EB5I: t.eb5i, F1: t.f1, F2A: t.f2a, F2B: t.f2b, F3: t.f3, F4: t.f4 };
     if (!hasPreviousData) {
       // Return category rows but with no movement deltas
       return cats.map(c => ({
