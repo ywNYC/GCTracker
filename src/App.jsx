@@ -12767,15 +12767,22 @@ const SubscribeNudge = ({ userCase, hasOnboarded, theme = 'passport' }) => {
     : `${userCase.priorityDate.slice(0, 4)}年${parseInt(userCase.priorityDate.slice(5, 7), 10)}月`;
 
   return (
-    <div className="visa-root" data-theme={theme} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 900, padding: '0 12px 12px', pointerEvents: 'none', background: 'transparent' }}>
+    <div className="visa-root" data-theme={theme} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 900, padding: '0 12px calc(14px + env(safe-area-inset-bottom, 0px))', pointerEvents: 'none', background: 'transparent' }}>
       <div style={{
         maxWidth: '420px', margin: '0 auto', pointerEvents: 'auto',
+        position: 'relative',
         background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderTop: '3px solid var(--gc-green)',
         borderRadius: '6px', padding: '14px 16px 12px', boxShadow: '0 12px 40px rgba(0,0,0,0.22)',
       }}>
+        <button type="button" aria-label="close" onClick={dismiss}
+          style={{
+            position: 'absolute', top: '2px', right: '2px', width: '36px', height: '36px',
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            fontSize: '18px', lineHeight: 1, color: 'var(--gc-muted)',
+          }}>×</button>
         {status === 'sent' ? (
           <>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '4px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '4px', paddingRight: '28px' }}>
               {lang === 'en' ? 'One more step — confirm in your inbox' : lang === 'tw' ? '還差一步：去郵箱點確認' : '还差一步：去邮箱点确认'}
             </div>
             <div style={{ fontSize: '11.5px', lineHeight: 1.6, color: 'var(--gc-ink-soft)' }}>
@@ -12799,7 +12806,7 @@ const SubscribeNudge = ({ userCase, hasOnboarded, theme = 'passport' }) => {
           </>
         ) : (
           <>
-            <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '3px' }}>
+            <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '3px', paddingRight: '28px' }}>
               {lang === 'en' ? 'Get an email the moment this case moves' : lang === 'tw' ? '這個案子的排期一動，就發郵件告訴你' : '这个案子的排期一动，就发邮件告诉你'}
             </div>
             <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '8px' }}>
@@ -12838,7 +12845,7 @@ const SubscribeNudge = ({ userCase, hasOnboarded, theme = 'passport' }) => {
                 {lang === 'en' ? 'Monthly bulletin + movement alerts. Unsubscribe anytime.' : lang === 'tw' ? '每月公告＋異動提醒，隨時可退訂。' : '每月公告＋异动提醒，随时可退订。'}
               </span>
               <button type="button" onClick={dismiss}
-                style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px', whiteSpace: 'nowrap', marginLeft: '10px' }}>
+                style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-paper)', padding: '7px 12px', cursor: 'pointer', fontSize: '11px', color: 'var(--gc-ink-soft)', whiteSpace: 'nowrap', marginLeft: '10px' }}>
                 {lang === 'en' ? 'Not now' : lang === 'tw' ? '以後再說' : '以后再说'}
               </button>
             </div>
@@ -14373,11 +14380,11 @@ export default function App() {
                         position: 'relative',
                         padding: stackVertical ? '6px 3px 5px' : '10px 4px 9px',
                         fontSize: '11px',
-                        fontWeight: active ? 700 : isSubscribeTab ? 600 : 500,
+                        fontWeight: isSubscribeTab ? 700 : active ? 700 : 500,
                         letterSpacing: '0.02em',
-                        color: isSubscribeTab ? 'var(--gc-green-ink)' : active ? 'var(--gc-ink)' : 'var(--gc-muted)',
-                        background: isSubscribeTab ? 'var(--gc-green-soft)' : active ? 'var(--gc-paper-soft)' : 'transparent',
-                        borderBottom: active ? '2px solid var(--gc-green)' : '2px solid transparent',
+                        color: isSubscribeTab ? 'var(--gc-paper)' : active ? 'var(--gc-ink)' : 'var(--gc-muted)',
+                        background: isSubscribeTab ? 'var(--gc-green)' : active ? 'var(--gc-paper-soft)' : 'transparent',
+                        borderBottom: active ? (isSubscribeTab ? '2px solid var(--gc-ink)' : '2px solid var(--gc-green)') : '2px solid transparent',
                         transition: 'all 120ms',
                       }}
                       className={stackVertical
