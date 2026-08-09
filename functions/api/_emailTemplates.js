@@ -676,7 +676,7 @@ const buildCaseUrl = (siteUrl, userCase) => {
   return `${base}/?${p.toString()}`;
 };
 
-export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, notices, bulletinMonthLabel, language, siteUrl, unsubscribeUrl }) => {
+export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, notices, noticeI18n, bulletinMonthLabel, language, siteUrl, unsubscribeUrl }) => {
   const lang = language === 'en' ? 'en' : 'zh';
   const caseUrl = buildCaseUrl(siteUrl, userCase);
 
@@ -803,12 +803,20 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   const relevantNotices = (Array.isArray(notices) ? notices : [])
     .filter((n) => n && (catRe.test(n.title || '') || catRe.test(n.text || '')))
     .slice(0, 2);
-  const noticesHtml = relevantNotices.map((n) => `
+  const noticesHtml = relevantNotices.map((n) => {
+    // Chinese-language subscribers get the AI translation (marked as such, original
+    // authoritative); English subscribers get the original verbatim.
+    const tr = lang === 'zh' ? noticeI18n?.[n.letter]?.zh : null;
+    const title = tr?.title || n.title || '';
+    const body = tr ? (tr.text || '') : (n.text || '').slice(0, 320) + ((n.text || '').length > 320 ? '…' : '');
+    return `
     <div style="border-left:2px solid ${RETROGRESS_COLOR}; padding:10px 14px; background:#f9f1ec; margin-top:10px;">
       <div style="font-family:'Courier New',monospace; font-size:9px; letter-spacing:0.12em; color:${RETROGRESS_COLOR}; text-transform:uppercase; margin-bottom:6px;">${lang === 'en' ? 'From the bulletin' : '公告原文提醒'} · ${escapeHtml(n.letter || '')}</div>
-      <div style="font-size:12px; font-weight:600; color:#1a1a1a; margin-bottom:4px;">${escapeHtml(n.title || '')}</div>
-      <div style="font-size:12px; line-height:1.65; color:#4a4a45;">${escapeHtml((n.text || '').slice(0, 320))}${(n.text || '').length > 320 ? '…' : ''}</div>
-    </div>`).join('');
+      <div style="font-size:12px; font-weight:600; color:#1a1a1a; margin-bottom:4px;">${escapeHtml(title)}</div>
+      <div style="font-size:12px; line-height:1.65; color:#4a4a45;">${escapeHtml(body)}</div>
+      ${tr ? `<div style="font-size:9px; color:#8a8980; margin-top:5px;">AI 译文，以英文原文为准 · 原题：${escapeHtml((n.title || '').slice(0, 80))}</div>` : ''}
+    </div>`;
+  }).join('');
 
   // "表 A / 表 B" mirrors the bulletin's own section lettering (A. FINAL ACTION DATES,
   // B. DATES FOR FILING) and is what Chinese-language immigration discussion uses.

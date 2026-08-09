@@ -64,10 +64,14 @@ async function main() {
 
   // bulletin.json carries the notice sections and USCIS designation that history.json
   // lacks — same two extra sources the production sender fetches over HTTP.
-  let notices = null, uscisChart = null;
+  let notices = null, uscisChart = null, noticeI18n = null;
   try {
     const bulletin = JSON.parse(await readFile(path.join(REPO_ROOT, 'public/bulletin.json'), 'utf-8'));
     if (Array.isArray(bulletin?.current?.notices)) notices = bulletin.current.notices;
+    try {
+      const trs = JSON.parse(await readFile(path.join(REPO_ROOT, 'public/notice-translations.json'), 'utf-8'));
+      noticeI18n = trs?.months?.[bulletin?.current?.month] || null;
+    } catch {}
     const uscis = JSON.parse(await readFile(path.join(REPO_ROOT, 'public/uscis-charts.json'), 'utf-8'));
     if (uscis?.current?.month === current.month) uscisChart = uscis.current;
   } catch {}
@@ -77,6 +81,7 @@ async function main() {
     userCase: USER_CASE,
     update,
     notices,
+    noticeI18n,
     uscisChart,
     bulletinMonthLabel: monthLabel(current.month, LANGUAGE),
     language: LANGUAGE,

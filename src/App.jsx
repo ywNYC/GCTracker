@@ -994,9 +994,22 @@ let VIEWING_MONTH_KEY = null;
 // in the monthly summary. Never fabricated: empty until the fetch fills it.
 let BULLETIN_NOTICES = [];
 let BULLETIN_NOTICES_MONTH = null;
+// Localized view of a notice: zh/tw get the AI translation when available; the
+// English body is always reachable (shown via a per-item expander in the UI).
+const locNotice = (n, lang) => {
+  if (!n) return { title: '', text: '', translated: false };
+  if (lang === 'en') return { title: n.title || '', text: n.text || '', translated: false };
+  const tr = NOTICE_I18N?.months?.[BULLETIN_NOTICES_MONTH]?.[n.letter]?.[lang === 'tw' ? 'tw' : 'zh'];
+  if (tr) return { title: tr.title || n.title || '', text: tr.text ?? n.text ?? '', translated: true };
+  return { title: n.title || '', text: n.text || '', translated: false };
+};
+
 // Full extras block from /bulletin.json (dv, dvNext, f2aExempt, meta) — all real
 // scraped bulletin content that never had a UI until now.
 let BULLETIN_EXTRAS = null;
+// AI translations of the notices (public/notice-translations.json). English original
+// stays authoritative; missing translations fall back to it.
+let NOTICE_I18N = null;
 
 // Average monthly movement (days) — approximate, from Nov 2025 - Apr 2026 trend
 // ==============================================================
@@ -5019,11 +5032,12 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           if (isViewingNoticeMonth) {
             const hit = BULLETIN_NOTICES.find((nz) => nz && (catRe2.test(nz.title || '') || catRe2.test(nz.text || '')));
             if (hit) {
+              const locT = locNotice(hit, lang).title;
               officialNotes.push(lang === 'en'
-                ? `Official notice (section ${hit.letter || '—'}): “${(hit.title || '').slice(0, 90)}”.`
+                ? `Official notice (section ${hit.letter || '—'}): “${locT.slice(0, 90)}”.`
                 : lang === 'tw'
-                  ? `官方提醒（公告 ${hit.letter || '—'} 節）：「${(hit.title || '').slice(0, 90)}」。`
-                  : `官方提醒（公告 ${hit.letter || '—'} 节）：「${(hit.title || '').slice(0, 90)}」。`);
+                  ? `官方提醒（公告 ${hit.letter || '—'} 節）：「${locT.slice(0, 90)}」。`
+                  : `官方提醒（公告 ${hit.letter || '—'} 节）：「${locT.slice(0, 90)}」。`);
             }
           }
           if (userCase.category === 'F2A' && BULLETIN_EXTRAS?.f2aExempt) {
@@ -5233,6 +5247,7 @@ const MonthlyUpdate = ({ userCase }) => {
   const userCountry = resolveCountry(userCase.country);
   // Which chart the whole page reads: A (finalAction) or B (filing).
   const [updChart, setUpdChart] = useState('A');
+  const [openNotice, setOpenNotice] = useState(null);
   const chartKey = updChart === 'B' ? 'filing' : 'finalAction';
   const showsTwoColumns = userCase.country === 'China' || userCase.country === 'India'; // These have separate cutoffs from ROW
 
@@ -5394,16 +5409,35 @@ const MonthlyUpdate = ({ userCase }) => {
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
             {lang === 'en' ? 'Official notices (from the bulletin)' : lang === 'tw' ? '公告原文提醒（官方）' : '公告原文提醒（官方）'}
           </div>
-          {BULLETIN_NOTICES.map((nz, ni) => (
+          {BULLETIN_NOTICES.map((nz, ni) => {
+            const loc = locNotice(nz, lang);
+            const isOpen = openNotice === ni;
+            return (
             <div key={ni} style={{ borderLeft: '2px solid var(--gc-amber-border)', padding: '6px 10px', marginBottom: '6px', background: 'var(--gc-paper-soft)' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)' }}>
-                {nz.letter ? `${nz.letter} · ` : ''}{nz.title}
+                {nz.letter ? `${nz.letter} · ` : ''}{loc.title}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.6, marginTop: '2px' }}>
-                {(nz.text || '').slice(0, 220)}{(nz.text || '').length > 220 ? '…' : ''}
+              <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.65, marginTop: '2px' }}>
+                {loc.translated ? loc.text : `${(loc.text || '').slice(0, 220)}${(loc.text || '').length > 220 ? '…' : ''}`}
               </div>
+              {loc.translated && (
+                <div style={{ marginTop: '3px' }}>
+                  <button type="button" onClick={() => setOpenNotice(isOpen ? null : ni)}
+                    style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '9.5px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                    {isOpen
+                      ? (lang === 'tw' ? '收起英文原文' : '收起英文原文')
+                      : (lang === 'tw' ? 'AI 譯文 · 查看英文原文' : 'AI 译文 · 查看英文原文')}
+                  </button>
+                  {isOpen && (
+                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.6, marginTop: '3px', fontStyle: 'italic' }}>
+                      {nz.title}{nz.text ? ` — ${nz.text}` : ''}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -12590,6 +12624,10 @@ export default function App() {
   // Rebuilt newest-first so the picker lists recent months at the top.
   useEffect(() => {
     let cancelled = false;
+    fetch('/notice-translations.json', { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d2) => { if (d2?.months) { NOTICE_I18N = d2; setBulletinTick((t) => t + 1); } })
+      .catch(() => {});
     fetch('/bulletin.json', { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
