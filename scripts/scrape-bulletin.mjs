@@ -85,6 +85,10 @@ function classifyRow(rowLabel, section) {
     if (/^1ST\b/.test(t) || t === '1ST' || t.startsWith('FIRST')) return 'EB1';
     if (/^2ND\b/.test(t) || t === '2ND' || t.startsWith('SECOND')) return 'EB2';
     if (/^3RD\b/.test(t) || t === '3RD' || t.startsWith('THIRD')) return 'EB3';
+    // EB-3 "Other Workers" (unskilled) — its own statutory 10,000/yr sub-cap and
+    // often a much older cutoff than skilled EB-3. Label variants: "Other Workers",
+    // "Other Worker".
+    if (t.startsWith('OTHER WORKER')) return 'EW';
     return null;
   } else {
     if (t === 'F1' || t.startsWith('F1 ')) return 'F1';

@@ -147,6 +147,7 @@ const translations = {
     eb1: 'EB-1 Priority Workers',
     eb2: 'EB-2 Advanced Degree',
     eb3: 'EB-3 Skilled Worker',
+    ew: 'EB-3 Other Workers',
     f1: 'F1 Unmarried Adult Children of Citizens',
     f2a: 'F2A Spouses & Children of LPRs',
     f2b: 'F2B Unmarried Adult Children of LPRs',
@@ -412,6 +413,7 @@ const translations = {
     eb1: 'EB-1 杰出人才',
     eb2: 'EB-2 高学历',
     eb3: 'EB-3 技术工',
+    ew: 'EB-3 其他劳工',
     f1: 'F1 公民成年未婚子女',
     f2a: 'F2A 绿卡持有人配偶与子女',
     f2b: 'F2B 绿卡持有人成年未婚子女',
@@ -674,6 +676,7 @@ const translations = {
     eb1: 'EB-1 傑出人才',
     eb2: 'EB-2 高學歷',
     eb3: 'EB-3 技術工',
+    ew: 'EB-3 其他勞工',
     f1: 'F1 公民成年未婚子女',
     f2a: 'F2A 綠卡持有人配偶與子女',
     f2b: 'F2B 綠卡持有人成年未婚子女',
@@ -818,7 +821,7 @@ const bulletinAnchorDate = (day = 1) => {
 // USCIS announced for May 2026: EB uses Final Action Dates (Chart A),
 // Family categories continue to use Dates for Filing (Chart B)
 const FILING_AUTHORIZED = {
-  EB1: false, EB2: false, EB3: false,
+  EB1: false, EB2: false, EB3: false, EW: false,
   F1: true, F2A: true, F2B: true, F3: true, F4: true,
 };
 
@@ -1594,6 +1597,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
   const { t, lang } = useLang();
   const categories = [
     { v: 'EB1', label: t.eb1 }, { v: 'EB2', label: t.eb2 }, { v: 'EB3', label: t.eb3 },
+    { v: 'EW', label: t.ew },
     { v: 'F1', label: t.f1 }, { v: 'F2A', label: t.f2a }, { v: 'F2B', label: t.f2b },
     { v: 'F3', label: t.f3 }, { v: 'F4', label: t.f4 },
   ];
@@ -5242,8 +5246,8 @@ const MonthlyUpdate = ({ userCase }) => {
   // a whole release showing "+30 days" under an August header because of exactly that.
   // The computation is 8 categories of date diffs; per-render cost is negligible.
   const changes = (() => {
-    const cats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
-    const catLabels = { EB1: t.eb1, EB2: t.eb2, EB3: t.eb3, F1: t.f1, F2A: t.f2a, F2B: t.f2b, F3: t.f3, F4: t.f4 };
+    const cats = ['EB1', 'EB2', 'EB3', 'EW', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+    const catLabels = { EB1: t.eb1, EB2: t.eb2, EB3: t.eb3, EW: t.ew, F1: t.f1, F2A: t.f2a, F2B: t.f2b, F3: t.f3, F4: t.f4 };
     if (!hasPreviousData) {
       // Return category rows but with no movement deltas
       return cats.map(c => ({
@@ -5841,6 +5845,7 @@ const CompareByCountry = ({ userCase }) => {
 
   const categories = [
     { v: 'EB1', label: t.eb1 }, { v: 'EB2', label: t.eb2 }, { v: 'EB3', label: t.eb3 },
+    { v: 'EW', label: t.ew },
     { v: 'F1', label: t.f1 }, { v: 'F2A', label: t.f2a }, { v: 'F2B', label: t.f2b },
     { v: 'F3', label: t.f3 }, { v: 'F4', label: t.f4 },
   ];
@@ -7143,7 +7148,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
   const country = resolveCountry(userCase.country);
 
   // Category configuration
-  const ebCategories = ['EB1', 'EB2', 'EB3'];
+  const ebCategories = ['EB1', 'EB2', 'EB3', 'EW'];
   const fCategories = ['F1', 'F2A', 'F3', 'F4'];
   const allCategories = [...ebCategories, ...fCategories];
 
@@ -12607,7 +12612,7 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('history-fetch-not-ok'))))
       .then((hist) => {
         if (cancelled || !hist || !Array.isArray(hist.months)) return;
-        const cats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
         const asc = hist.months
           .filter((m) => m && m.month && m.finalAction && cats.every((c) => m.finalAction[c]))
           .sort((a, b) => a.month.localeCompare(b.month));
@@ -12716,7 +12721,7 @@ export default function App() {
       .then((data) => {
         if (cancelled || !data || !data.current || !data.current.finalAction) return;
         // Sanity check — must have all 8 categories in finalAction
-        const cats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
         const ok = cats.every((c) => data.current.finalAction[c]);
         if (!ok) {
           console.warn('[bulletin] Remote data missing categories, keeping hardcoded fallback');

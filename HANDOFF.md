@@ -168,6 +168,14 @@ Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19
 6. U 案子的月度邮件没有图表和 ETA（forecast 为 null 时整块跳过）——语义正确但可以
    考虑降级显示历史柱图。
 
+## 2026-08-08 第九轮：新增 EB-3 Other Workers（EW）类别（PR #24）
+
+网友提问驱动。scraper classifyRow 加 OTHER WORKER 行 → 回补 24 个月 history.json
++ --force 重抓当月 bulletin.json → 前端全链路（translations ew、FILING_AUTHORIZED、
+四处类别选择器、动态页 cats、catLabels、邮件 formatCategory）。EW 中国 A 表
+2019-05-01，比技术工 EB3 落后近 3 年——独立类别的价值所在。
+注意：RATES_DB 无 EW-* 条目，预测 tab（已隐藏）对 EW 走默认回退；如恢复该 tab 需补。
+
 ## 2026-08-08 第八轮：「如果」简化为零选择一页纸（PR #23）
 
 用户反馈三场景版太复杂。重写为自动一页纸：按案子自动出 2 张结论卡
