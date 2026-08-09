@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, memo, createContext, useContext, useEffect, useRef } from 'react';
-import { Globe, Calendar, MapPin, Briefcase, Home, TrendingUp, TrendingDown, Minus, AlertCircle, AlertTriangle, CheckCircle2, Clock, Info, FileText, Zap, Shield, Users, Target, Database, RefreshCw, ExternalLink, Sparkles, Eye, Bell, BarChart3, Mail, Download, History, HelpCircle, DollarSign, Scale, Plane, Activity, Ruler, Dot, ClipboardList } from 'lucide-react';
+import { Globe, Calendar, MapPin, Briefcase, Home, TrendingUp, TrendingDown, Minus, AlertCircle, AlertTriangle, CheckCircle2, Clock, Info, FileText, Zap, Shield, Users, Target, Database, RefreshCw, ExternalLink, Sparkles, Eye, Bell, BarChart3, Mail, Download, History, HelpCircle, DollarSign, Scale, Plane, Activity, Ruler, Dot, ClipboardList, Share2 } from 'lucide-react';
 
 // ============================================================
 // i18n — Translation dictionaries (EN / Simplified / Traditional)
@@ -3226,6 +3226,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
   const [newTripTo, setNewTripTo] = useState('');
   // Share card modal state
   const [showShareCard, setShowShareCard] = useState(false);
+  const [showStatusShare, setShowStatusShare] = useState(false);
 
   const finalActionCutoff = bulletinCurrent.finalAction[userCase.category]?.[country];
   const filingCutoff = bulletinCurrent.filing[userCase.category]?.[country];
@@ -3245,6 +3246,15 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
     if (faStatus.days !== null && faStatus.days < 180) return t.actionPrepare;
     return t.actionMonitor;
   };
+
+  // De-emphasized text version of StatusBadge for the non-adopted chart (#12):
+  // same words, no pill chrome, so the adopted side keeps the visual weight.
+  const plainStatusText = (status) => ({
+    current: t.statusCurrent, eligible: t.statusEligibleFile, overdue: t.statusCurrent,
+    notCurrent: t.statusNotCurrent,
+    unavailable: lang === 'en' ? 'No visas (U)' : lang === 'tw' ? '本月無名額' : '本月无名额',
+    suspicious: lang === 'en' ? 'Check PD' : '请核实优先日',
+  }[status] || '—');
 
   const countryLabel = userCase.country === 'China' ? (lang === 'en' ? 'China (Mainland)' : '中国大陆')
     : userCase.country === 'Taiwan' ? (lang === 'en' ? 'ROW / HK / TW / Macao' : lang === 'tw' ? '全球/港澳台' : '全球/港澳台')
@@ -3343,106 +3353,6 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           </button>
         );
       })()}
-
-      {/* HERO CARD — editorial document style */}
-      <div style={{
-        background: 'var(--gc-surface)',
-        border: '1px solid var(--gc-rule)',
-        borderRadius: '4px',
-        overflow: 'hidden',
-      }}>
-        {/* Hero row: category + PD + country pill (all one line) */}
-        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--gc-rule-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-          <div className="flex items-baseline gap-2 flex-wrap" style={{ minWidth: 0 }}>
-            <span className="gc-serif" style={{ fontSize: '20px', fontWeight: 600, color: 'var(--gc-ink)', letterSpacing: '-0.01em', lineHeight: 1.1 }}>
-              {t[userCase.category.toLowerCase()]}
-            </span>
-            <span style={{ color: 'var(--gc-rule)' }}>·</span>
-            <span className="gc-mono" style={{ fontSize: '12px', fontWeight: 500, color: 'var(--gc-ink-soft)' }}>
-              {formatDate(userCase.priorityDate, lang)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0" style={{
-            padding: '2px 7px',
-            background: 'var(--gc-paper-soft)',
-            border: '1px solid var(--gc-rule-soft)',
-            borderRadius: '2px',
-          }}>
-            <CountryFlag country={userCase.country} size={11} />
-            <span className="gc-mono" style={{ fontSize: '10px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '0.06em' }}>
-              {COUNTRY_CODE[userCase.country] || userCase.country.slice(0, 3).toUpperCase()}
-            </span>
-          </div>
-        </div>
-
-        {/* Tables A + B — a small data spread */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-          {/* Table A */}
-          <div style={{
-            padding: '8px 12px',
-            borderRight: '1px solid var(--gc-rule-soft)',
-            background: !filingAuthorized ? 'var(--gc-green-soft)' : 'transparent',
-            position: 'relative',
-          }}>
-            {!filingAuthorized && (
-              <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '2px', background: 'var(--gc-green)' }}></div>
-            )}
-            <div className="flex items-center justify-between" style={{ marginBottom: '3px' }}>
-              <span className="gc-eyebrow" style={{ fontSize: '9px' }}>
-                {lang === 'en' ? 'Final Action · A' : lang === 'tw' ? '排期表A' : '排期表A'}
-              </span>
-              {!filingAuthorized && (
-                <span className="gc-eyebrow" style={{ color: 'var(--gc-green)', fontSize: '8px' }}>
-                  {lang === 'en' ? 'ACTIVE' : '采用'}
-                </span>
-              )}
-            </div>
-            <div className="gc-mono" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gc-ink)', marginBottom: '4px', lineHeight: 1.2 }}>
-              {formatDate(finalActionCutoff, lang)}
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <StatusBadge status={finalActionStatus.status} />
-              {finalActionStatus.days !== null && finalActionStatus.status === 'notCurrent' && (
-                <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>
-                  ≈ {Math.ceil(finalActionStatus.days / 30)}{lang === 'en' ? ' mo' : ' 个月'}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Table B */}
-          <div style={{
-            padding: '8px 12px',
-            background: filingAuthorized ? 'var(--gc-green-soft)' : 'transparent',
-            position: 'relative',
-          }}>
-            {filingAuthorized && (
-              <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '2px', background: 'var(--gc-green)' }}></div>
-            )}
-            <div className="flex items-center justify-between" style={{ marginBottom: '3px' }}>
-              <span className="gc-eyebrow" style={{ fontSize: '9px' }}>
-                {lang === 'en' ? 'Filing · B' : lang === 'tw' ? '遞件表B' : '递件表B'}
-              </span>
-              {filingAuthorized && (
-                <span className="gc-eyebrow" style={{ color: 'var(--gc-green)', fontSize: '8px' }}>
-                  {lang === 'en' ? 'ACTIVE' : '采用'}
-                </span>
-              )}
-            </div>
-            <div className="gc-mono" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gc-ink)', marginBottom: '4px', lineHeight: 1.2 }}>
-              {formatDate(filingCutoff, lang)}
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <StatusBadge status={filingStatus.status} />
-              {filingStatus.days !== null && filingStatus.status === 'notCurrent' && (
-                <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>
-                  ≈ {Math.ceil(filingStatus.days / 30)}{lang === 'en' ? ' mo' : ' 个月'}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Countdown block — big-number distance to active cutoff (theme-aware) */}
       {(() => {
@@ -3630,45 +3540,107 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 </div>
               </div>
             ) : waitingLayout ? (
-              <div style={{ padding: '14px 14px 10px' }}>
-                {/* Eyebrow */}
-                <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '4px' }}>
-                  {lang === 'en' ? 'Status · ' : lang === 'tw' ? '狀態 · ' : '状态 · '}{activeTableLabel}
-                </div>
-                {/* Subject-first title — parallel to eligibleLayout's "现在可递件".
-                    Icon + big serif, urgency-colored (muted → ink → amber → green). */}
-                <div className="gc-serif" style={{
-                  fontSize: '22px',
-                  fontWeight: 700,
-                  color: accentColor,
-                  letterSpacing: '-0.01em',
-                  lineHeight: 1.1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginTop: '2px',
-                }}>
-                  <Clock size={18} strokeWidth={2.2} style={{ flexShrink: 0 }} />
-                  <span>{waitingTitle}</span>
-                </div>
-                {/* Contextual subline, also tier-varied */}
-                <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px', lineHeight: 1.4 }}>
-                  {waitingSub}
-                </div>
-                {/* Demoted distance caption — the actual number, small mono, subtle */}
-                {waitingDistance && (
-                  <div className="gc-mono" style={{
-                    fontSize: '10.5px',
-                    color: 'var(--gc-muted)',
-                    marginTop: '10px',
-                    paddingTop: '8px',
-                    borderTop: '1px solid var(--gc-rule-soft)',
-                    letterSpacing: '0.01em',
-                  }}>
-                    {lang === 'en' ? 'Distance · ' : lang === 'tw' ? '距離 · ' : '距离 · '}{waitingDistance}
+              (() => {
+                // NUMBER-FIRST: the time estimate is the card's hero; the status phrase
+                // is a small tier-colored badge. The old layout inverted this — 28px of
+                // ceremony ("你已在排期中") over 10px of the numbers people came for.
+                const today2 = new Date();
+                const paceCal = ps.days ? paceDaysToCalendar(userCase.category, country, ps.days) : null;
+                const etaDate = paceCal ? new Date(today2.getTime() + paceCal * 86400000) : null;
+                const yearsF = paceCal ? paceCal / 365.25 : null;
+                const heroText = paceCal === null ? (lang === 'en' ? 'TBD' : '待定')
+                  : yearsF >= 1.5
+                    ? (lang === 'en' ? `~${yearsF.toFixed(1)} yrs` : `约 ${yearsF.toFixed(1)} 年`)
+                    : (lang === 'en' ? `~${Math.max(Math.round(paceCal / 30.44), 1)} mo` : `约 ${Math.max(Math.round(paceCal / 30.44), 1)} 个月`);
+                const fmtYM = (d) => lang === 'en'
+                  ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+                  : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+                // Primary chart's monthly movement, framed as what it did to YOUR wait.
+                const mvP = filingAuthorized
+                  ? computeMovement(bulletinCurrent.filing[userCase.category]?.[country], bulletinPrevious.filing[userCase.category]?.[country])
+                  : computeMovement(bulletinCurrent.finalAction[userCase.category]?.[country], bulletinPrevious.finalAction[userCase.category]?.[country]);
+                const delta = mvP.type === 'advanced'
+                  ? { text: lang === 'en' ? `This month: wait shortened by ${mvP.days} days ↓` : lang === 'tw' ? `本月縮短了 ${mvP.days} 天 ↓` : `本月缩短了 ${mvP.days} 天 ↓`, color: 'var(--gc-green)' }
+                  : mvP.type === 'retrogressed'
+                    ? { text: lang === 'en' ? `This month: wait grew by ${mvP.days ?? '—'} days ↑` : lang === 'tw' ? `本月拉遠了 ${mvP.days ?? '—'} 天 ↑` : `本月拉远了 ${mvP.days ?? '—'} 天 ↑`, color: 'var(--gc-red)' }
+                    : mvP.type === 'resumed'
+                      ? { text: lang === 'en' ? 'This month: numbers resumed' : '本月恢复名额', color: 'var(--gc-green)' }
+                      : mvP.type === 'unavailable'
+                        ? { text: lang === 'en' ? 'This month: unavailable (U)' : lang === 'tw' ? '本月無名額（U）' : '本月无名额（U）', color: 'var(--gc-red)' }
+                        : { text: lang === 'en' ? 'This month: no movement' : lang === 'tw' ? '本月沒有變化' : '本月没有变化', color: 'var(--gc-muted)' };
+                // Wait-journey progress: share of the predicted total wait already served.
+                const pdD = parseDate(userCase.priorityDate);
+                let pct = null;
+                if (pdD && etaDate && etaDate > pdD) {
+                  const done = (today2 - pdD) / (etaDate - pdD);
+                  if (done > 0 && done < 1) pct = Math.round(done * 100);
+                }
+                return (
+                  <div style={{ padding: '12px 14px 12px' }}>
+                    <div className="flex items-center justify-between gap-2" style={{ marginBottom: '8px' }}>
+                      <span className="gc-eyebrow" style={{ color: 'var(--gc-muted)', minWidth: 0 }}>
+                        {lang === 'en' ? 'Status · ' : lang === 'tw' ? '狀態 · ' : '状态 · '}{activeTableLabel}
+                      </span>
+                      <span className="flex items-center gap-2 flex-shrink-0">
+                        <span className="gc-eyebrow" style={{
+                          fontSize: '9px', fontWeight: 700, color: accentColor,
+                          border: `1px solid ${accentColor}`, borderRadius: '2px',
+                          padding: '2px 6px', letterSpacing: '0.08em',
+                        }}>
+                          {waitingTitle}
+                        </span>
+                        <button type="button" onClick={() => setShowStatusShare(true)}
+                          title={lang === 'en' ? 'Share' : '分享'}
+                          style={{ border: '1px solid var(--gc-rule)', background: 'transparent', borderRadius: '2px', padding: '3px 5px', cursor: 'pointer', lineHeight: 0 }}>
+                          <Share2 size={11} style={{ color: 'var(--gc-muted)' }} />
+                        </button>
+                      </span>
+                    </div>
+                    {ps.status === 'unavailable' ? (
+                      <>
+                        <div className="gc-serif" style={{ fontSize: '30px', fontWeight: 700, color: accentColor, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                          {lang === 'en' ? 'TBD' : '待定'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px', lineHeight: 1.5 }}>{waitingSub}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="gc-serif" style={{ fontSize: '32px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                          {heroText}
+                        </div>
+                        <div className="gc-mono" style={{ fontSize: '11.5px', color: 'var(--gc-ink-soft)', marginTop: '7px', letterSpacing: '0.01em' }}>
+                          {etaDate ? (lang === 'en' ? `est. ${fmtYM(etaDate)}` : `预计 ${fmtYM(etaDate)}`) : ''}
+                          {ps.days !== null && (
+                            <>
+                              <span style={{ margin: '0 5px', color: 'var(--gc-rule)' }}>·</span>
+                              {filingAuthorized
+                                ? (lang === 'en' ? `${ps.days.toLocaleString('en-US')} days to filing` : `距可递件还差 ${ps.days.toLocaleString('en-US')} 天`)
+                                : (lang === 'en' ? `${ps.days.toLocaleString('en-US')} days to approval window` : `距获批口径还差 ${ps.days.toLocaleString('en-US')} 天`)}
+                            </>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: delta.color, marginTop: '8px' }}>
+                          {delta.text}
+                        </div>
+                        {pct !== null && (
+                          <div style={{ marginTop: '10px' }}>
+                            <div style={{ height: '6px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: accentColor === 'var(--gc-muted)' ? 'var(--gc-green)' : accentColor, borderRadius: '3px' }} />
+                            </div>
+                            <div className="flex items-center justify-between gc-mono" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginTop: '4px' }}>
+                              <span>{lang === 'en' ? 'PD ' : '优先日 '}{pdD ? fmtYM(pdD) : ''}</span>
+                              <span style={{ fontWeight: 700, color: 'var(--gc-ink-soft)' }}>
+                                {lang === 'en' ? `~${pct}% of the wait served` : `按当前速度已等完约 ${pct}%`}
+                              </span>
+                              <span>{lang === 'en' ? 'est. ' : '预计 '}{fmtYM(etaDate)}</span>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()
             ) : (
             <div style={{
               padding: '10px 14px',
@@ -3705,43 +3677,24 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 Placement: below the main title block, above monthly movement. */}
             {showDualStatus && (
               <div style={{
-                padding: '8px 14px 10px',
                 borderTop: '1px solid var(--gc-rule-soft)',
                 background: 'var(--gc-paper-soft)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '3px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
               }}>
-                {[{ label: 'B', subLabel: lang === 'en' ? 'FILE' : lang === 'tw' ? '遞件' : '递件', info: dualB, adopted: filingAuthorized },
-                  { label: 'A', subLabel: lang === 'en' ? 'FINAL' : lang === 'tw' ? '最終' : '最终', info: dualA, adopted: !filingAuthorized }]
-                  .map((row) => (
-                    <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', lineHeight: 1.4 }}>
-                      {/* Table code — single letter, serif, small */}
-                      <span className="gc-serif" style={{
-                        fontSize: '12px', fontWeight: 700,
-                        color: 'var(--gc-ink-soft)',
-                        minWidth: '10px', flexShrink: 0,
-                      }}>{row.label}</span>
-                      {/* Sub-label — all caps eyebrow-style */}
-                      <span className="gc-eyebrow" style={{
-                        fontSize: '8.5px',
-                        color: 'var(--gc-muted)',
-                        letterSpacing: '0.12em',
-                        minWidth: '32px', flexShrink: 0,
-                      }}>{row.subLabel}</span>
-                      {/* Status icon — green dot / clock */}
-                      <span style={{
-                        color: row.info.good === true ? 'var(--gc-green)' : row.info.good === false ? 'var(--gc-muted)' : 'var(--gc-muted)',
-                        flexShrink: 0,
-                        fontSize: '11px',
-                        lineHeight: 1,
-                      }}>{row.info.icon}</span>
-                      {/* Label text */}
-                      <span style={{
-                        color: 'var(--gc-ink)',
-                        fontWeight: row.info.good === true ? 600 : 500,
-                        flex: '1 1 auto', minWidth: 0,
-                      }} className="truncate">{row.info.label}</span>
+                {[{ code: 'B', title: lang === 'en' ? 'B · Filing' : lang === 'tw' ? 'B · 遞件' : 'B · 递件', info: dualB, adopted: filingAuthorized },
+                  { code: 'A', title: lang === 'en' ? 'A · Approval' : lang === 'tw' ? 'A · 獲批' : 'A · 获批', info: dualA, adopted: !filingAuthorized }]
+                  .map((blk, i) => (
+                    <div key={blk.code} style={{
+                      padding: '8px 14px 9px',
+                      borderLeft: i === 1 ? '1px solid var(--gc-rule-soft)' : 'none',
+                    }}>
+                      <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: blk.adopted ? 'var(--gc-green)' : 'var(--gc-muted)', letterSpacing: '0.1em', marginBottom: '2px' }}>
+                        {blk.title}{blk.adopted ? (lang === 'en' ? ' · ACTIVE' : ' · 采用') : ''}
+                      </div>
+                      <div className="gc-mono" style={{ fontSize: '13px', fontWeight: 700, color: blk.info.good ? 'var(--gc-green-ink)' : 'var(--gc-ink)', lineHeight: 1.3 }}>
+                        {blk.info.label}
+                      </div>
                     </div>
                 ))}
               </div>
@@ -3819,6 +3772,97 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           </div>
         );
       })()}
+
+      {/* HERO CARD — editorial document style */}
+      <div style={{
+        background: 'var(--gc-surface)',
+        border: '1px solid var(--gc-rule)',
+        borderRadius: '4px',
+        overflow: 'hidden',
+      }}>
+        {/* Hero row: category + PD + country pill (all one line) */}
+        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--gc-rule-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <div className="flex items-baseline gap-2 flex-wrap" style={{ minWidth: 0 }}>
+            {/* PD date lives in the case bar right above — repeating it here was noise */}
+            <span className="gc-serif" style={{ fontSize: '20px', fontWeight: 600, color: 'var(--gc-ink)', letterSpacing: '-0.01em', lineHeight: 1.1 }}>
+              {t[userCase.category.toLowerCase()]}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0" style={{
+            padding: '2px 7px',
+            background: 'var(--gc-paper-soft)',
+            border: '1px solid var(--gc-rule-soft)',
+            borderRadius: '2px',
+          }}>
+            <CountryFlag country={userCase.country} size={11} />
+            <span className="gc-mono" style={{ fontSize: '10px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '0.06em' }}>
+              {COUNTRY_CODE[userCase.country] || userCase.country.slice(0, 3).toUpperCase()}
+            </span>
+          </div>
+        </div>
+
+        {/* Tables A + B — a small data spread */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+          {/* Table A */}
+          <div style={{
+            padding: '8px 12px',
+            borderRight: '1px solid var(--gc-rule-soft)',
+            background: !filingAuthorized ? 'var(--gc-green-soft)' : 'transparent',
+            position: 'relative',
+          }}>
+            {!filingAuthorized && (
+              <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '2px', background: 'var(--gc-green)' }}></div>
+            )}
+            <div className="flex items-center justify-between" style={{ marginBottom: '3px' }}>
+              <span className="gc-eyebrow" style={{ fontSize: '9px' }}>
+                {lang === 'en' ? 'A · decides approval' : lang === 'tw' ? '表A · 能否獲批' : '表A · 能否获批'}
+              </span>
+              {!filingAuthorized && (
+                <span className="gc-eyebrow" style={{ color: 'var(--gc-green)', fontSize: '8px' }}>
+                  {lang === 'en' ? 'ACTIVE' : '采用'}
+                </span>
+              )}
+            </div>
+            <div className="gc-mono" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gc-ink)', marginBottom: '4px', lineHeight: 1.2 }}>
+              {formatDate(finalActionCutoff, lang)}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {!filingAuthorized
+                ? <StatusBadge status={finalActionStatus.status} />
+                : <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{plainStatusText(finalActionStatus.status)}</span>}
+            </div>
+          </div>
+
+          {/* Table B */}
+          <div style={{
+            padding: '8px 12px',
+            background: filingAuthorized ? 'var(--gc-green-soft)' : 'transparent',
+            position: 'relative',
+          }}>
+            {filingAuthorized && (
+              <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '2px', background: 'var(--gc-green)' }}></div>
+            )}
+            <div className="flex items-center justify-between" style={{ marginBottom: '3px' }}>
+              <span className="gc-eyebrow" style={{ fontSize: '9px' }}>
+                {lang === 'en' ? 'B · decides filing' : lang === 'tw' ? '表B · 能否遞件' : '表B · 能否递件'}
+              </span>
+              {filingAuthorized && (
+                <span className="gc-eyebrow" style={{ color: 'var(--gc-green)', fontSize: '8px' }}>
+                  {lang === 'en' ? 'ACTIVE' : '采用'}
+                </span>
+              )}
+            </div>
+            <div className="gc-mono" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gc-ink)', marginBottom: '4px', lineHeight: 1.2 }}>
+              {formatDate(filingCutoff, lang)}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {filingAuthorized
+                ? <StatusBadge status={filingStatus.status} />
+                : <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{plainStatusText(filingStatus.status)}</span>}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* I-485 Progress — collapsed by default; expanding reveals the full checklist
           with service-center speed selector and cascading step completion. */}
@@ -5019,6 +5063,57 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
               <span style={{ fontWeight: 700 }}>{closeTitle}</span>
               <span style={{ color: 'var(--gc-ink-soft)' }}>{lang === 'en' ? ' — ' : '——'}{closeDesc}</span>
             </p>
+          </div>
+        );
+      })()}
+
+      {/* Status share modal (#11) — a self-contained, screenshot-friendly card:
+          brand + month + case + hero estimate. No canvas export; the card IS the
+          shareable artifact, sized to screenshot cleanly. */}
+      {showStatusShare && (() => {
+        const ps2 = primaryStatus;
+        const paceCal = ps2.days ? paceDaysToCalendar(userCase.category, country, ps2.days) : null;
+        const etaDate = paceCal ? new Date(Date.now() + paceCal * 86400000) : null;
+        const yearsF = paceCal ? paceCal / 365.25 : null;
+        const heroText = paceCal === null ? (lang === 'en' ? 'TBD' : '待定')
+          : yearsF >= 1.5
+            ? (lang === 'en' ? `~${yearsF.toFixed(1)} yrs` : `约 ${yearsF.toFixed(1)} 年`)
+            : (lang === 'en' ? `~${Math.max(Math.round(paceCal / 30.44), 1)} mo` : `约 ${Math.max(Math.round(paceCal / 30.44), 1)} 个月`);
+        const fmtYM = (d) => lang === 'en'
+          ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+          : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(15,20,25,0.55)' }}
+               onClick={() => setShowStatusShare(false)}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderTop: '3px solid var(--gc-green)',
+              borderRadius: '6px', maxWidth: '340px', width: '100%', padding: '20px 18px 14px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            }}>
+              <div className="flex items-center justify-between" style={{ marginBottom: '12px' }}>
+                <span className="gc-serif" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+                  {lang === 'en' ? 'Green Card Tracker' : '绿卡晴雨表'}
+                </span>
+                <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{BULLETIN_CURRENT_MONTH[lang]}</span>
+              </div>
+              <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
+                {t[userCase.category.toLowerCase()]} · {countryLabel}
+              </div>
+              <div className="gc-serif" style={{ fontSize: '36px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '-0.02em', lineHeight: 1.05 }}>
+                {heroText}
+              </div>
+              <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', marginTop: '6px' }}>
+                {etaDate ? (lang === 'en' ? `est. ${fmtYM(etaDate)}` : `预计 ${fmtYM(etaDate)}`) : ''}
+                {ps2.days !== null && <span> · {lang === 'en' ? `${ps2.days.toLocaleString('en-US')} days to go` : `还差 ${ps2.days.toLocaleString('en-US')} 天`}</span>}
+              </div>
+              <div className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid var(--gc-rule-soft)', display: 'flex', justifyContent: 'space-between' }}>
+                <span>gc.jmjvc.us</span>
+                <span>{lang === 'en' ? 'monthly auto-update' : '每月自动更新'}</span>
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '10px', textAlign: 'center' }}>
+                {lang === 'en' ? 'Screenshot this card to share · tap outside to close' : '截图这张卡分享给同路人 · 点外部关闭'}
+              </div>
+            </div>
           </div>
         );
       })()}
