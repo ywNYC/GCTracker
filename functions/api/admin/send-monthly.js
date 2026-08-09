@@ -95,6 +95,7 @@ export async function onRequestPost(context) {
   // does not. The template filters to the subscriber's own category, so passing the
   // full list is fine. Optional: absence just means no warning block.
   let notices = null;
+  let noticeI18n = null;
   try {
     const r = await fetch(`${siteUrl}/bulletin.json`, { cf: { cacheTtl: 0 } });
     if (r.ok) {
@@ -102,6 +103,13 @@ export async function onRequestPost(context) {
       if (data?.current?.month === current.month && Array.isArray(data.current.notices)) {
         notices = data.current.notices;
       }
+    }
+  } catch {}
+  try {
+    const r2 = await fetch(`${siteUrl}/notice-translations.json`, { cf: { cacheTtl: 0 } });
+    if (r2.ok) {
+      const d2 = await r2.json();
+      noticeI18n = d2?.months?.[current.month] || null;
     }
   } catch {}
 
@@ -159,6 +167,7 @@ export async function onRequestPost(context) {
           update,
           uscisChart,
           notices,
+          noticeI18n,
           bulletinMonthLabel: monthLabel(current.month, record.language === 'en' ? 'en' : 'zh'),
           language: record.language,
           siteUrl,

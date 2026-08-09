@@ -168,6 +168,19 @@ Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19
 6. U 案子的月度邮件没有图表和 ETA（forecast 为 null 时整块跳过）——语义正确但可以
    考虑降级显示历史柱图。
 
+## 2026-08-09 第十轮：公告 notices 三语化（PR #27）
+
+- 新增 public/notice-translations.json：按 月份→节号 存 zh/tw AI 译文（独立文件，
+  scraper 不会冲掉）。繁体按台/港移民圈表达（身分調整、遞件、名額、鑑於）。
+- 前端 locNotice()：zh/tw 显示译文+「AI 译文 · 查看英文原文」逐条展开器，
+  英文用户看原文；总结小结的官方提醒标题同步本地化。
+- 邮件链路：send-monthly/preview 取译文传模板，zh 订阅者看译文
+  （附「AI 译文，以英文原文为准 · 原题」小注），en 原文不变。
+- **每月维护**：新公告抓取后 notices 需补译。建议在云端 routine 提示词里追加：
+  「抓到新月份后，将 current.notices 各节忠实翻译为简体与繁体（台港表达），
+  按现有格式写入 public/notice-translations.json 的对应月份并一并提交。」
+  未补译时前端自动回退英文原文，不会坏。
+
 ## 2026-08-08 第九轮：新增 EB-3 Other Workers（EW）类别（PR #24）
 
 网友提问驱动。scraper classifyRow 加 OTHER WORKER 行 → 回补 24 个月 history.json
