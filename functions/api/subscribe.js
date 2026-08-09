@@ -64,7 +64,7 @@ const json = (data, status = 200) =>
   });
 
 const isValidEmail = (email) =>
-  typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 // ---- Unsubscribe token ----
 // Lightweight HMAC so the unsubscribe link can't be guessed/forged for arbitrary emails.

@@ -264,7 +264,7 @@ const translations = {
     eligibleNow: 'You are already eligible to file',
     chartFooterNote: 'For May 2026, USCIS uses Final Action Dates for employment-based filings (Chart A) and Dates for Filing for family-based filings (Chart B). We automatically pick the right chart based on your category.',
     navOverview: 'Overview',
-    navAlerts: 'Alerts',
+    navAlerts: 'Subscribe',
     navTrends: 'Forecast',
   },
   zh: {
@@ -272,7 +272,7 @@ const translations = {
     appSubtitle: '看清进度,知道下一步该做什么',
     bulletinMonth: '公告月',
     navOverview: '总结',
-    navAlerts: '提醒',
+    navAlerts: '订阅',
     navTrends: '预测',
     navUpdate: '动态',
     navCompare: '如果',
@@ -535,7 +535,7 @@ const translations = {
     appSubtitle: '看清進度,知道下一步該做什麼',
     bulletinMonth: '公告月',
     navOverview: '總結',
-    navAlerts: '提醒',
+    navAlerts: '訂閱',
     navTrends: '預測',
     navUpdate: '動態',
     navCompare: '如果',
@@ -12766,6 +12766,13 @@ const SubscribeNudge = ({ userCase, hasOnboarded, theme = 'passport' }) => {
                   ? `確認郵件已發到 ${email.trim()}，點一下裡面的按鈕訂閱才生效。`
                   : `确认邮件已发到 ${email.trim()}，点一下里面的按钮订阅才生效。`}
             </div>
+            <div style={{ fontSize: '10.5px', lineHeight: 1.6, color: 'var(--gc-muted)', marginTop: '5px' }}>
+              {lang === 'en'
+                ? 'Not in your inbox? Check spam/junk — that\'s where it usually hides.'
+                : lang === 'tw'
+                  ? '收件匣沒有？多半在垃圾郵件匣裡，翻一下。'
+                  : '收件箱没有？多半在垃圾邮件里，翻一下。'}
+            </div>
             <button type="button" onClick={() => setShow(false)}
               style={{ marginTop: '8px', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
               {lang === 'en' ? 'Close' : lang === 'tw' ? '關閉' : '关闭'}
@@ -13318,6 +13325,18 @@ export default function App() {
     try { window.localStorage.setItem('gc_theme', theme); }
     catch (e) { /* noop */ }
   }, [theme]);
+  // Monocle's display fonts, injected as an async <link> the first time that theme is
+  // active. Deliberately NOT a CSS @import: fonts.googleapis.com is unreachable from
+  // mainland China and a blocked import stalls first paint until timeout.
+  useEffect(() => {
+    if (theme !== 'monocle') return;
+    if (document.getElementById('gc-monocle-fonts')) return;
+    const link = document.createElement('link');
+    link.id = 'gc-monocle-fonts';
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400;9..144,500;9..144,600;9..144,700&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap';
+    document.head.appendChild(link);
+  }, [theme]);
   // Footer theme dropdown open state
   const [showFooterThemePicker, setShowFooterThemePicker] = useState(false);
   const [showMonthBar, setShowMonthBar] = useState(false);
@@ -13336,7 +13355,7 @@ export default function App() {
     { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
     { id: 'compare', label: t.navCompare, icon: Target },
     { id: 'index', label: t.navIndex, icon: ClipboardList },
-    { id: 'alerts', label: t.navAlerts, icon: Bell },
+    { id: 'alerts', label: t.navAlerts, icon: Mail },
   ];
 
   // Split tabs into two rows for better mobile layout
@@ -13390,8 +13409,11 @@ export default function App() {
       )}
       <SubscribeNudge userCase={userCase} hasOnboarded={hasOnboarded} theme={theme} />
       <style>{`
-        /* Fonts for Monocle theme — self-hosted via Google Fonts CDN */
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400;9..144,500;9..144,600;9..144,700&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+        /* Monocle theme fonts load ASYNCHRONOUSLY via a JS-injected <link> (see the
+           theme effect) — never as a CSS @import. fonts.googleapis.com is blocked in
+           mainland China, and a blocked @import stalls rendering until timeout: the
+           site looked completely dead to mainland visitors. If the fonts fail to load,
+           monocle just falls back to system fonts. */
 
         * { box-sizing: border-box; }
         html, body, #root { max-width: 100vw; margin: 0; }
@@ -14317,6 +14339,9 @@ export default function App() {
                   const Icon = tb.icon;
                   const active = tab === tb.id;
                   const isAIHighlighted = tb.id === 'trends' && !active;
+                  // The subscribe tab is the site's one conversion action — it keeps a
+                  // green fill in both states so it reads as a button among tabs.
+                  const isSubscribeTab = tb.id === 'alerts';
                   // In English mode, stack icon above label (vertical) — English labels
                   // ("Overview", "Compare", "Forecast") are wider than 2-char Chinese
                   // labels and would truncate in horizontal layout at mobile widths.
@@ -14329,10 +14354,10 @@ export default function App() {
                         position: 'relative',
                         padding: stackVertical ? '6px 3px 5px' : '10px 4px 9px',
                         fontSize: '11px',
-                        fontWeight: active ? 700 : 500,
+                        fontWeight: active ? 700 : isSubscribeTab ? 600 : 500,
                         letterSpacing: '0.02em',
-                        color: active ? 'var(--gc-ink)' : 'var(--gc-muted)',
-                        background: active ? 'var(--gc-paper-soft)' : 'transparent',
+                        color: isSubscribeTab ? 'var(--gc-green-ink)' : active ? 'var(--gc-ink)' : 'var(--gc-muted)',
+                        background: isSubscribeTab ? 'var(--gc-green-soft)' : active ? 'var(--gc-paper-soft)' : 'transparent',
                         borderBottom: active ? '2px solid var(--gc-green)' : '2px solid transparent',
                         transition: 'all 120ms',
                       }}
