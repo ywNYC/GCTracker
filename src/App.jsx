@@ -5663,10 +5663,10 @@ const AboutTab = () => {
         </div>
         <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: '0 0 10px' }}>
           {lang === 'en'
-            ? 'U.S. home loans nationwide: primary & investment, new-immigrant programs (new green card / H-1B / ITIN), purchase & refinance. When your date arrives and it\'s time to settle in, happy to talk.'
+            ? 'U.S. home loans nationwide: primary & investment, purchase & refinance. When it\'s time to settle in, happy to talk.'
             : lang === 'tw'
-              ? '全美房屋貸款：自住與投資、新移民方案（新綠卡／H-1B／ITIN）、購房與重貸。排期到了要安家，歡迎聊聊。'
-              : '全美房屋贷款：自住与投资、新移民方案（新绿卡／H-1B／ITIN）、购房与重贷。排期到了要安家，欢迎聊聊。'}
+              ? '全美房屋貸款：自住與投資、購房與重貸。要安家置業，歡迎聊聊。'
+              : '全美房屋贷款：自住与投资、购房与重贷。要安家置业，欢迎聊聊。'}
         </p>
         <div className="flex" style={{ gap: '8px', flexWrap: 'wrap' }}>
           <span className="gc-mono" style={{ fontSize: '11px', border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)', borderRadius: '3px', padding: '6px 10px' }}>
