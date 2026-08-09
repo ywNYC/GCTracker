@@ -982,6 +982,10 @@ const BULLETIN_ARCHIVE = {
 // is unavailable; both are replaced at runtime by the real 26-month archive.
 // `let` because the newest available month is only known after history.json loads.
 let DEFAULT_VIEWING_MONTH = '2026-05';
+// The month the Time Machine is looking through, mirrored from App state each render.
+// Every pace/window helper caps its archive walk at this month, so a historical view
+// shows the numbers as they stood THEN — not today's pace under an old month's header.
+let VIEWING_MONTH_KEY = null;
 
 // Average monthly movement (days) — approximate, from Nov 2025 - Apr 2026 trend
 // ==============================================================
@@ -1140,7 +1144,8 @@ const getLongTermRate = (cat, country) => getRates(cat, country).long;
 // multi-year projection anyway — F4-China sat at 0 days for 6 of the last 12 months and
 // then jumped 243 in one.
 const observedPaceFromArchive = (cat, country, windowMonths = 12) => {
-  const keys = Object.keys(BULLETIN_ARCHIVE).sort();
+  let keys = Object.keys(BULLETIN_ARCHIVE).sort();
+  if (VIEWING_MONTH_KEY) keys = keys.filter((k) => k <= VIEWING_MONTH_KEY);
   if (keys.length < 2) return null;
   const win = keys.slice(-(windowMonths + 1));
   const valueAt = (k) => BULLETIN_ARCHIVE[k]?.data?.finalAction?.[cat]?.[country];
@@ -1160,7 +1165,8 @@ const observedPaceFromArchive = (cat, country, windowMonths = 12) => {
 // stall-then-jump rhythm. days === null when either end is C/U/missing (no cutoff to
 // diff) — callers must treat null as "no data", not zero.
 const monthlyMovementFromArchive = (cat, country, windowMonths = 12) => {
-  const keys = Object.keys(BULLETIN_ARCHIVE).sort();
+  let keys = Object.keys(BULLETIN_ARCHIVE).sort();
+  if (VIEWING_MONTH_KEY) keys = keys.filter((k) => k <= VIEWING_MONTH_KEY);
   if (keys.length < 2) return null;
   const win = keys.slice(-(windowMonths + 1));
   const valueAt = (k) => BULLETIN_ARCHIVE[k]?.data?.finalAction?.[cat]?.[country];
@@ -1916,7 +1922,9 @@ const CompactCaseBar = ({ userCase, setUserCase }) => {
                 color: userCase.petitionerStatus === 'LPR' ? 'var(--gc-green)' : 'var(--gc-ink-soft)',
                 flexShrink: 0,
               }}>
-                {userCase.petitionerStatus}
+                {lang === 'en'
+                  ? userCase.petitionerStatus
+                  : userCase.petitionerStatus === 'LPR' ? (lang === 'tw' ? '綠卡' : '绿卡') : '公民'}
               </span>
             </>
           )}
@@ -1926,22 +1934,22 @@ const CompactCaseBar = ({ userCase, setUserCase }) => {
         </div>
         <span className="gc-eyebrow" style={{
           fontSize: '9px',
-          color: expanded ? 'var(--gc-ink)' : 'var(--gc-green-ink)',
+          color: expanded ? 'var(--gc-ink)' : 'var(--gc-paper)',
           flexShrink: 0,
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
           letterSpacing: '0.08em',
           padding: '4px 8px',
-          border: `1px solid ${expanded ? 'var(--gc-rule)' : 'var(--gc-green-border)'}`,
-          background: expanded ? 'var(--gc-paper-soft)' : 'var(--gc-green-soft)',
+          border: `1px solid ${expanded ? 'var(--gc-rule)' : 'var(--gc-green)'}`,
+          background: expanded ? 'var(--gc-paper-soft)' : 'var(--gc-green)',
           borderRadius: '3px',
           fontWeight: 700,
           transition: 'all 140ms',
         }}>
           {expanded
             ? (lang === 'en' ? 'CLOSE' : lang === 'tw' ? '收起' : '收起')
-            : (lang === 'en' ? 'EDIT'  : lang === 'tw' ? '編輯'  : '编辑')}
+            : (lang === 'en' ? '✎ EDIT CASE'  : lang === 'tw' ? '✎ 編輯案子'  : '✎ 编辑案子')}
           <span style={{
             fontSize: '11px',
             transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -1955,6 +1963,9 @@ const CompactCaseBar = ({ userCase, setUserCase }) => {
       {/* EXPANDED body — segmented controls for editing */}
       {expanded && (
         <div style={{ padding: '8px 8px 8px' }}>
+          <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', margin: '2px 2px 7px', letterSpacing: '0.12em' }}>
+            {lang === 'en' ? 'EDIT · COUNTRY / CATEGORY / PRIORITY DATE' : lang === 'tw' ? '編輯 · 國籍／類別／優先日' : '编辑 · 国籍／类别／优先日'}
+          </div>
           {/* Country segmented — 5 tight buttons (flag + passport code) */}
           <div className="grid grid-cols-5" style={{
             border: '1px solid var(--gc-rule)',
@@ -3231,6 +3242,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
   const [showShareCard, setShowShareCard] = useState(false);
   const [showStatusShare, setShowStatusShare] = useState(false);
   const [showHeroMath, setShowHeroMath] = useState(false);
+  // Which chart the status card reads from: null → the adopted one. The B/A toggle
+  // lets a reader answer "and how long until APPROVAL?" without leaving the card.
+  const [heroChart, setHeroChart] = useState(null);
 
   const finalActionCutoff = bulletinCurrent.finalAction[userCase.category]?.[country];
   const filingCutoff = bulletinCurrent.filing[userCase.category]?.[country];
@@ -3360,10 +3374,13 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 
       {/* Countdown block — big-number distance to active cutoff (theme-aware) */}
       {(() => {
-        // Use primary status (filing if filingAuthorized, else finalAction)
-        const ps = primaryStatus;
-        if (ps.status === 'suspicious') return null; // suspicious PD has its own warning above
-        const activeTableLabel = filingAuthorized
+        // The card reads from the SELECTED chart (B/A toggle), defaulting to the
+        // adopted one. Every number downstream — hero, ETA, chain, progress — follows.
+        const heroSel = heroChart || (filingAuthorized ? 'B' : 'A');
+        const ps = heroSel === 'B' ? filingStatus : finalActionStatus;
+        const heroCutoff = heroSel === 'B' ? filingCutoff : finalActionCutoff;
+        if (primaryStatus.status === 'suspicious') return null; // suspicious PD has its own warning above
+        const activeTableLabel = heroSel === 'B'
           ? (lang === 'en' ? 'Filing · B' : lang === 'tw' ? '遞件表B' : '递件表B')
           : (lang === 'en' ? 'Final Action · A' : lang === 'tw' ? '排期表A' : '排期表A');
 
@@ -3418,7 +3435,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
         let waitingTitle = null;
         let waitingSub = null;
         let waitingDistance = null;
-        if (primaryCutoff === 'C' || ps.status === 'current' || ps.status === 'overdue') {
+        if (heroCutoff === 'C' || ps.status === 'current' || ps.status === 'overdue') {
           bigText = lang === 'en' ? 'Current' : lang === 'tw' ? '排期到' : '排期到';
           bigSubLabel = lang === 'en' ? 'You are eligible — file now' : lang === 'tw' ? '你已符合 — 現在可遞件' : '你已符合 — 现在可递件';
           accentColor = 'var(--gc-green)';
@@ -3565,7 +3582,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                   ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
                   : `${d.getFullYear()}年${d.getMonth() + 1}月`;
                 // Primary chart's monthly movement, framed as what it did to YOUR wait.
-                const mvP = filingAuthorized
+                const mvP = heroSel === 'B'
                   ? computeMovement(bulletinCurrent.filing[userCase.category]?.[country], bulletinPrevious.filing[userCase.category]?.[country])
                   : computeMovement(bulletinCurrent.finalAction[userCase.category]?.[country], bulletinPrevious.finalAction[userCase.category]?.[country]);
                 const delta = mvP.type === 'advanced'
@@ -3587,8 +3604,29 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 return (
                   <div style={{ padding: '12px 14px 12px' }}>
                     <div className="flex items-center justify-between gap-2" style={{ marginBottom: '8px' }}>
-                      <span className="gc-eyebrow" style={{ color: 'var(--gc-muted)', minWidth: 0 }}>
-                        {lang === 'en' ? 'Status · ' : lang === 'tw' ? '狀態 · ' : '状态 · '}{activeTableLabel}
+                      <span className="inline-flex items-center gap-2" style={{ minWidth: 0 }}>
+                        <span className="gc-eyebrow" style={{ color: 'var(--gc-muted)' }}>
+                          {lang === 'en' ? 'Status' : lang === 'tw' ? '狀態' : '状态'}
+                        </span>
+                        <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
+                          {[
+                            { code: 'B', label: lang === 'en' ? 'B · File' : lang === 'tw' ? 'B · 遞件' : 'B · 递件' },
+                            { code: 'A', label: lang === 'en' ? 'A · Approve' : lang === 'tw' ? 'A · 獲批' : 'A · 获批' },
+                          ].map((opt, oi) => (
+                            <button key={opt.code} type="button"
+                              onClick={() => setHeroChart(opt.code)}
+                              className="gc-mono"
+                              style={{
+                                fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.5,
+                                border: 'none', cursor: 'pointer', letterSpacing: '0.03em',
+                                borderLeft: oi === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                                background: heroSel === opt.code ? 'var(--gc-ink)' : 'transparent',
+                                color: heroSel === opt.code ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                              }}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </span>
                       </span>
                       <span className="flex items-center gap-2 flex-shrink-0">
                         <span className="gc-eyebrow" style={{
@@ -3622,9 +3660,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                           {ps.days !== null && (
                             <>
                               <span style={{ margin: '0 5px', color: 'var(--gc-rule)' }}>·</span>
-                              {filingAuthorized
+                              {heroSel === 'B'
                                 ? (lang === 'en' ? `${ps.days.toLocaleString('en-US')} days to filing` : `距可递件还差 ${ps.days.toLocaleString('en-US')} 天`)
-                                : (lang === 'en' ? `${ps.days.toLocaleString('en-US')} days to approval window` : `距获批口径还差 ${ps.days.toLocaleString('en-US')} 天`)}
+                                : (lang === 'en' ? `${ps.days.toLocaleString('en-US')} days to approval` : `距获批还差 ${ps.days.toLocaleString('en-US')} 天`)}
                             </>
                           )}
                         </div>
@@ -3645,8 +3683,8 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                           </div>
                         )}
                         {paceMo && showHeroMath && (() => {
-                          const cutoffP = filingAuthorized ? filingCutoff : finalActionCutoff;
-                          const cutoffLabel = filingAuthorized
+                          const cutoffP = heroCutoff;
+                          const cutoffLabel = heroSel === 'B'
                             ? (lang === 'en' ? 'Chart B cutoff' : lang === 'tw' ? '表B截止日' : '表B截止日')
                             : (lang === 'en' ? 'Chart A cutoff' : lang === 'tw' ? '表A截止日' : '表A截止日');
                           const months2 = Math.round(ps.days / paceMo);
@@ -3748,10 +3786,14 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                           : `预计 ${d2.getFullYear()}年${d2.getMonth() + 1}月`;
                       }
                     }
+                    const isSelStation = (heroChart || (filingAuthorized ? 'B' : 'A')) === blk.code;
                     return (
-                    <div key={blk.code} style={{
+                    <div key={blk.code} onClick={() => setHeroChart(blk.code)} style={{
                       padding: '8px 14px 9px',
                       borderLeft: i === 1 ? '1px solid var(--gc-rule-soft)' : 'none',
+                      background: isSelStation ? 'var(--gc-surface)' : 'transparent',
+                      boxShadow: isSelStation ? 'inset 0 2px 0 var(--gc-green)' : 'none',
+                      cursor: 'pointer',
                     }}>
                       <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: blk.adopted ? 'var(--gc-green)' : 'var(--gc-muted)', letterSpacing: '0.1em', marginBottom: '2px' }}>
                         {blk.title}{blk.adopted ? (lang === 'en' ? ' · ACTIVE' : ' · 采用') : ''}
@@ -5146,7 +5188,8 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           brand + month + case + hero estimate. No canvas export; the card IS the
           shareable artifact, sized to screenshot cleanly. */}
       {showStatusShare && (() => {
-        const ps2 = primaryStatus;
+        const heroSel2 = heroChart || (filingAuthorized ? 'B' : 'A');
+        const ps2 = heroSel2 === 'B' ? filingStatus : finalActionStatus;
         const paceCal = ps2.days ? paceDaysToCalendar(userCase.category, country, ps2.days) : null;
         const etaDate = paceCal ? new Date(Date.now() + paceCal * 86400000) : null;
         const yearsF = paceCal ? paceCal / 365.25 : null;
@@ -12219,6 +12262,7 @@ export default function App() {
   // Default: DEFAULT_VIEWING_MONTH ('2026-05'). Users can select past months from BULLETIN_ARCHIVE.
   const [viewingMonth, setViewingMonth] = useState(DEFAULT_VIEWING_MONTH);
   const isTimeMachineActive = viewingMonth !== DEFAULT_VIEWING_MONTH;
+  VIEWING_MONTH_KEY = viewingMonth; // render-time mirror for the module-level helpers
 
   // Bulletin tick: bumping this forces consumers to re-render when bulletinCurrent/Previous
   // contents change via Object.assign (mutation doesn't trigger React updates on its own).
@@ -12663,6 +12707,7 @@ export default function App() {
   }, [theme]);
   // Footer theme dropdown open state
   const [showFooterThemePicker, setShowFooterThemePicker] = useState(false);
+  const [showMonthBar, setShowMonthBar] = useState(false);
   // Reset button: two-stage confirmation. null = idle, number = timestamp of first click.
   // After second click within 5s, wipe all gc_* localStorage keys + reload.
   const [confirmReset, setConfirmReset] = useState(null);
@@ -13707,6 +13752,65 @@ export default function App() {
                 boxSizing: 'border-box',
                 width: '100%',
               }}>
+          {/* Bulletin-month selector, promoted from the tiny header dropdown: the Time
+              Machine is one of the site's best features and nobody found it up there. */}
+          <div style={{ position: 'relative', marginBottom: '8px' }}>
+            <button type="button" onClick={() => setShowMonthBar((v) => !v)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: '8px', padding: '7px 12px', background: 'var(--gc-surface)',
+                border: '1px solid var(--gc-rule)', borderRadius: '4px', cursor: 'pointer', textAlign: 'left',
+              }}>
+              <span className="inline-flex items-center" style={{ gap: '7px', minWidth: 0 }}>
+                <History size={12} style={{ color: 'var(--gc-muted)', flexShrink: 0 }} />
+                <span className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', flexShrink: 0 }}>
+                  {lang === 'en' ? 'BULLETIN' : lang === 'tw' ? '公告月份' : '公告月份'}
+                </span>
+                <span className="gc-mono" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+                  {BULLETIN_ARCHIVE[viewingMonth]?.label[lang === 'en' ? 'en' : lang === 'tw' ? 'tw' : 'zh'] || viewingMonth}
+                </span>
+                {viewingMonth === DEFAULT_VIEWING_MONTH && (
+                  <span className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-green)', border: '1px solid var(--gc-green-border)', borderRadius: '2px', padding: '1px 4px', flexShrink: 0 }}>
+                    {lang === 'en' ? 'LATEST' : '最新'}
+                  </span>
+                )}
+              </span>
+              <span className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-green-ink)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                {lang === 'en' ? 'PAST MONTHS' : lang === 'tw' ? '查看往期' : '查看往期'}
+                <span style={{ transform: showMonthBar ? 'rotate(180deg)' : 'none', transition: 'transform 140ms', display: 'inline-block' }}>⌄</span>
+              </span>
+            </button>
+            {showMonthBar && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowMonthBar(false)} />
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
+                  background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.15)', maxHeight: '280px', overflowY: 'auto',
+                }}>
+                  {Object.keys(BULLETIN_ARCHIVE).sort().reverse().map((k) => (
+                    <button key={k} type="button"
+                      onClick={() => { setViewingMonth(k); setShowMonthBar(false); }}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', border: 'none', cursor: 'pointer', textAlign: 'left',
+                        borderBottom: '1px solid var(--gc-rule-soft)',
+                        background: k === viewingMonth ? 'var(--gc-green-soft)' : 'transparent',
+                      }}>
+                      <span className="gc-mono" style={{ fontSize: '12px', fontWeight: k === viewingMonth ? 700 : 500, color: 'var(--gc-ink)' }}>
+                        {BULLETIN_ARCHIVE[k].label[lang === 'en' ? 'en' : lang === 'tw' ? 'tw' : 'zh']}
+                      </span>
+                      {k === DEFAULT_VIEWING_MONTH && (
+                        <span className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-green)' }}>
+                          {lang === 'en' ? 'LATEST' : '最新'}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           {(() => {
             // Overview now uses the same CompactCaseBar as other tabs (no more full sidebar).
             // This keeps the page narrow and matches user expectation from every other tab.
