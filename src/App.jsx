@@ -1667,6 +1667,113 @@ const LangSwitcher = () => {
 // ============================================================
 // Input Panel
 // ============================================================
+// CategoryDropdown — themed replacement for the native <select>. The OS draws a
+// native select's option sheet (white system UI on iOS) and CSS can't reach it,
+// so the picker is drawn in-page instead: grouped, scrollable, theme-tokened.
+// ============================================================
+const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
+  const { t, lang } = useLang();
+  const [open, setOpen] = useState(false);
+  // Panel position is FIXED (viewport coords from the trigger's rect): ancestors use
+  // overflow:hidden for expand animations, which clips an absolute panel.
+  const [rect, setRect] = useState(null);
+  const wrapRef = useRef(null);
+  const toggleOpen = () => {
+    if (!open && wrapRef.current) setRect(wrapRef.current.getBoundingClientRect());
+    setOpen((v) => !v);
+  };
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onScroll = () => setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [open]);
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
+  const spaceBelow = rect ? vh - rect.bottom - 16 : 320;
+  const panelMaxH = Math.max(200, Math.min(320, spaceBelow));
+  const openUp = rect ? spaceBelow < 200 && rect.top > 260 : false;
+
+  const groups = [
+    { key: 'eb', label: lang === 'en' ? 'EMPLOYMENT · EB' : lang === 'tw' ? '職業移民 · EB' : '职业移民 · EB', items: ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'EB5R', 'EB5H', 'EB5I'] },
+    { key: 'f', label: lang === 'en' ? 'FAMILY · F' : lang === 'tw' ? '親屬移民 · F' : '亲属移民 · F', items: ['F1', 'F2A', 'F2B', 'F3', 'F4'] },
+  ];
+  const descOf = (v) => (t[v.toLowerCase()] || v).replace(/^(EB[-]?\d[A-Z]?|F\d[A-Z]?|SR)\s*/i, '');
+  const curDesc = descOf(value);
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', minWidth: 0 }}>
+      <button type="button" onClick={toggleOpen}
+        className="flex items-center justify-between"
+        style={{
+          boxSizing: 'border-box', width: '100%', minWidth: 0, gap: '6px',
+          padding: '6px 7px', fontSize: '11px', fontWeight: 600, textAlign: 'left',
+          color: 'var(--gc-ink)', background: 'var(--gc-surface)',
+          border: open ? '1px solid var(--gc-green)' : '1px solid var(--gc-rule)',
+          borderRadius: '3px', cursor: 'pointer',
+          ...triggerStyle,
+        }}>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="gc-mono" style={{ fontWeight: 700 }}>{value}</span>
+          <span style={{ color: 'var(--gc-ink-soft)', fontWeight: 500 }}> {curDesc}</span>
+        </span>
+        <span style={{ flexShrink: 0, color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+      </button>
+      {open && rect && (
+        <div style={{
+          position: 'fixed', zIndex: 990,
+          top: openUp ? undefined : rect.bottom + 4,
+          bottom: openUp ? (vh - rect.top + 4) : undefined,
+          left: Math.max(8, Math.min(rect.left, vw - Math.min(vw * 0.78, 300) - 8)),
+          width: 'min(78vw, 300px)', maxHeight: `${panelMaxH}px`, overflowY: 'auto',
+          background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)',
+          borderTop: '2px solid var(--gc-green)', borderRadius: '4px',
+          boxShadow: '0 14px 40px rgba(0,0,0,0.18)',
+        }}>
+          {groups.map((g) => (
+            <div key={g.key}>
+              <div className="gc-eyebrow" style={{
+                position: 'sticky', top: 0, fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700,
+                color: 'var(--gc-green)', background: 'var(--gc-paper-soft)',
+                padding: '5px 10px 4px', borderBottom: '1px solid var(--gc-rule-soft)',
+              }}>{g.label}</div>
+              {g.items.map((v) => {
+                const sel = v === value;
+                return (
+                  <button key={v} type="button"
+                    onClick={() => { onChange(v); setOpen(false); }}
+                    className="flex items-center"
+                    style={{
+                      width: '100%', gap: '7px', padding: '7px 10px', border: 'none', textAlign: 'left',
+                      cursor: 'pointer', fontSize: '11.5px', lineHeight: 1.4,
+                      background: sel ? 'var(--gc-green-soft)' : 'transparent',
+                      color: 'var(--gc-ink)',
+                      borderLeft: sel ? '2px solid var(--gc-green)' : '2px solid transparent',
+                    }}>
+                    <span className="gc-mono" style={{ fontWeight: 700, flexShrink: 0, minWidth: '38px', color: sel ? 'var(--gc-green-ink)' : 'var(--gc-ink)' }}>{v}</span>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--gc-ink-soft)' }}>{descOf(v)}</span>
+                    {sel && <span style={{ marginLeft: 'auto', flexShrink: 0, color: 'var(--gc-green)', fontWeight: 700 }}>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
 const InputPanel = ({ userCase, setUserCase }) => {
   const { t, lang } = useLang();
   const categories = [
@@ -1757,35 +1864,14 @@ const InputPanel = ({ userCase, setUserCase }) => {
               <Briefcase size={10} style={{ color: 'var(--gc-muted-soft)' }} className="flex-shrink-0" />
               <span className="gc-label" style={{ fontSize: '9px' }}>{t.categoryLabel}</span>
             </div>
-            <select value={userCase.category} onChange={(e) => {
-                const newCat = e.target.value;
+            <CategoryDropdown value={userCase.category}
+              triggerStyle={{ padding: '9px 9px' }}
+              onChange={(newCat) => {
                 let newPetitioner = userCase.petitionerStatus;
                 if (newCat === 'F2A' || newCat === 'F2B') newPetitioner = 'LPR';
                 else if (newCat === 'F1' || newCat === 'F3' || newCat === 'F4') newPetitioner = 'USC';
                 setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner });
-              }}
-              style={{
-                boxSizing: 'border-box',
-                width: '100%',
-                maxWidth: '100%',
-                minWidth: 0,
-                padding: '9px 22px 9px 9px',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--gc-ink)',
-                background: 'var(--gc-surface)',
-                border: '1px solid var(--gc-rule)',
-                borderRadius: '3px',
-                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6f75' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 7px center'
-              }}>
-              {categories.map(c => {
-                const fullLabel = t[c.v.toLowerCase()] || c.v;
-                const shortDesc = fullLabel.replace(/^(EB[-]?\d[A-Z]?|F\d[A-Z]?)\s*/i, '');
-                return <option key={c.v} value={c.v}>{c.v} {shortDesc.length > 12 ? shortDesc.slice(0, 10) + '…' : shortDesc}</option>;
-              })}
-            </select>
+              }} />
           </div>
 
           {/* Priority Date */}
@@ -2096,35 +2182,13 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
             width: '100%',
           }}>
             {/* Category */}
-            <select value={userCase.category} onChange={(e) => {
-                const newCat = e.target.value;
+            <CategoryDropdown value={userCase.category}
+              onChange={(newCat) => {
                 let newPetitioner = userCase.petitionerStatus;
                 if (newCat === 'F2A' || newCat === 'F2B') newPetitioner = 'LPR';
                 else if (newCat === 'F1' || newCat === 'F3' || newCat === 'F4') newPetitioner = 'USC';
                 setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner });
-              }}
-              style={{
-                boxSizing: 'border-box',
-                width: '100%',
-                maxWidth: '100%',
-                minWidth: 0,
-                padding: '6px 18px 6px 7px',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--gc-ink)',
-                background: 'var(--gc-surface)',
-                border: '1px solid var(--gc-rule)',
-                borderRadius: '3px',
-                backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236b6f75' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 5px center',
-              }}>
-              {categories.map(c => {
-                const fullLabel = t[c.v.toLowerCase()] || c.v;
-                const shortDesc = fullLabel.replace(/^(EB[-]?\d[A-Z]?|F\d[A-Z]?)\s*/i, '');
-                return <option key={c.v} value={c.v}>{c.v} {shortDesc.length > 10 ? shortDesc.slice(0, 8) + '…' : shortDesc}</option>;
-              })}
-            </select>
+              }} />
 
             {/* Priority Date */}
             <input type="date" value={userCase.priorityDate}
