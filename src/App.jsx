@@ -1774,6 +1774,153 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
 };
 
 // ============================================================
+// DateDropdown — themed priority-date picker. The native date input opens the OS
+// wheel (system UI, unstylable); this draws the picker in-page instead: a year
+// strip you swipe, a 12-month grid, a day grid — one tap each, faster than three
+// wheels. Same fixed-position pattern as CategoryDropdown (ancestors clip absolute
+// panels with their overflow:hidden animations).
+// ============================================================
+const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
+  const { lang } = useLang();
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState(null);
+  const wrapRef = useRef(null);
+  const yearRowRef = useRef(null);
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '') || [null, '2020', '01', '01'];
+  const y = parseInt(parts[1], 10);
+  const m = parseInt(parts[2], 10);
+  const d = parseInt(parts[3], 10);
+
+  const toggleOpen = () => {
+    if (!open && wrapRef.current) setRect(wrapRef.current.getBoundingClientRect());
+    setOpen((v) => !v);
+  };
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onScroll = (e) => {
+      // The panel scrolls internally (year strip) — only close on outside scrolls.
+      if (wrapRef.current && wrapRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [open]);
+  // Center the selected year chip when the panel opens.
+  useEffect(() => {
+    if (open && yearRowRef.current) {
+      const sel = yearRowRef.current.querySelector('[data-sel="1"]');
+      if (sel && sel.scrollIntoView) sel.scrollIntoView({ inline: 'center', block: 'nearest' });
+    }
+  }, [open]);
+
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const daysInMonth = (yy, mm) => new Date(yy, mm, 0).getDate();
+  const setDate = (ny, nm, nd, closeAfter = false) => {
+    const nd2 = Math.min(nd, daysInMonth(ny, nm));
+    onChange(`${ny}-${pad2(nm)}-${pad2(nd2)}`);
+    if (closeAfter) setOpen(false);
+  };
+
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  for (let yy = 1995; yy <= thisYear; yy++) years.push(yy);
+  const dim = daysInMonth(y, m);
+  const days = [];
+  for (let dd = 1; dd <= dim; dd++) days.push(dd);
+
+  const fmt = lang === 'en'
+    ? new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    : `${y}年${m}月${d}日`;
+
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
+  const spaceBelow = rect ? vh - rect.bottom - 16 : 340;
+  const openUp = rect ? spaceBelow < 260 && rect.top > 320 : false;
+
+  const gridBtn = (sel) => ({
+    border: 'none', borderRadius: '3px', cursor: 'pointer', padding: '6px 0',
+    fontSize: '11px', fontWeight: sel ? 700 : 500, textAlign: 'center',
+    background: sel ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
+    color: sel ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
+  });
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', minWidth: 0 }}>
+      <button type="button" onClick={toggleOpen}
+        className="flex items-center justify-between gc-mono"
+        style={{
+          boxSizing: 'border-box', width: '100%', minWidth: 0, gap: '6px',
+          padding: '6px 7px', fontSize: '11px', fontWeight: 600, textAlign: 'left',
+          color: 'var(--gc-ink)', background: 'var(--gc-surface)',
+          border: open ? '1px solid var(--gc-green)' : '1px solid var(--gc-rule)',
+          borderRadius: '3px', cursor: 'pointer',
+          ...triggerStyle,
+        }}>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fmt}</span>
+        <span style={{ flexShrink: 0, color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+      </button>
+      {open && rect && (
+        <div style={{
+          position: 'fixed', zIndex: 990,
+          top: openUp ? undefined : rect.bottom + 4,
+          bottom: openUp ? (vh - rect.top + 4) : undefined,
+          left: Math.max(8, Math.min(rect.left, vw - Math.min(vw * 0.86, 320) - 8)),
+          width: 'min(86vw, 320px)',
+          background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)',
+          borderTop: '2px solid var(--gc-green)', borderRadius: '4px',
+          boxShadow: '0 14px 40px rgba(0,0,0,0.18)', padding: '10px',
+        }}>
+          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
+            {lang === 'en' ? 'YEAR' : '年'}
+          </div>
+          <div ref={yearRowRef} style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '4px', WebkitOverflowScrolling: 'touch' }}>
+            {years.map((yy) => (
+              <button key={yy} type="button" data-sel={yy === y ? '1' : '0'}
+                onClick={() => setDate(yy, m, d)}
+                className="gc-mono"
+                style={{ ...gridBtn(yy === y), flexShrink: 0, padding: '5px 9px' }}>
+                {yy}
+              </button>
+            ))}
+          </div>
+          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', margin: '7px 0 5px' }}>
+            {lang === 'en' ? 'MONTH' : '月'}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px' }}>
+            {[1,2,3,4,5,6,7,8,9,10,11,12].map((mm) => (
+              <button key={mm} type="button" onClick={() => setDate(y, mm, d)}
+                className="gc-mono" style={gridBtn(mm === m)}>
+                {mm}
+              </button>
+            ))}
+          </div>
+          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', margin: '7px 0 5px' }}>
+            {lang === 'en' ? 'DAY' : '日'}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+            {days.map((dd) => (
+              <button key={dd} type="button" onClick={() => setDate(y, m, dd, true)}
+                className="gc-mono" style={gridBtn(dd === d)}>
+                {dd}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
 const InputPanel = ({ userCase, setUserCase }) => {
   const { t, lang } = useLang();
   const categories = [
@@ -1880,25 +2027,9 @@ const InputPanel = ({ userCase, setUserCase }) => {
               <Calendar size={10} style={{ color: 'var(--gc-muted-soft)' }} className="flex-shrink-0" />
               <span className="gc-label" style={{ fontSize: '9px' }}>{t.priorityDateLabel}</span>
             </div>
-            <div style={{ position: 'relative', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
-              <input type="date" value={userCase.priorityDate}
-                onChange={(e) => setUserCase({ ...userCase, priorityDate: e.target.value })}
-                className="gc-mono cursor-pointer"
-                style={{
-                  boxSizing: 'border-box',
-                  width: '100%',
-                  maxWidth: '100%',
-                  minWidth: 0,
-                  padding: '9px 9px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: 'var(--gc-ink)',
-                  background: 'var(--gc-surface)',
-                  border: '1px solid var(--gc-rule)',
-                  borderRadius: '3px',
-                  display: 'block',
-                }} />
-            </div>
+            <DateDropdown value={userCase.priorityDate}
+              triggerStyle={{ padding: '9px 9px' }}
+              onChange={(pd) => setUserCase({ ...userCase, priorityDate: pd })} />
           </div>
 
           {/* In US toggle */}
@@ -2191,23 +2322,8 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
               }} />
 
             {/* Priority Date */}
-            <input type="date" value={userCase.priorityDate}
-              onChange={(e) => setUserCase({ ...userCase, priorityDate: e.target.value })}
-              className="gc-mono cursor-pointer"
-              style={{
-                boxSizing: 'border-box',
-                width: '100%',
-                maxWidth: '100%',
-                minWidth: 0,
-                padding: '6px 7px',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--gc-ink)',
-                background: 'var(--gc-surface)',
-                border: '1px solid var(--gc-rule)',
-                borderRadius: '3px',
-                display: 'block',
-              }} />
+            <DateDropdown value={userCase.priorityDate}
+              onChange={(pd) => setUserCase({ ...userCase, priorityDate: pd })} />
 
             {/* Petitioner — only shown for F categories */}
             {isF && (
