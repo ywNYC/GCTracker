@@ -1866,7 +1866,7 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
   const { t, lang } = useLang();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const categories = [
-    { v: 'EB1' }, { v: 'EB2' }, { v: 'EB3' },
+    { v: 'EB1' }, { v: 'EB2' }, { v: 'EB3' }, { v: 'EW' },
     { v: 'F1' }, { v: 'F2A' }, { v: 'F2B' }, { v: 'F3' }, { v: 'F4' },
   ];
   const countries = [
@@ -12066,6 +12066,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     { v: 'EB1', en: 'EB-1', zh: 'EB-1', tw: 'EB-1' },
     { v: 'EB2', en: 'EB-2', zh: 'EB-2', tw: 'EB-2' },
     { v: 'EB3', en: 'EB-3', zh: 'EB-3', tw: 'EB-3' },
+    { v: 'EW',  en: 'EB-3 Other', zh: 'EB-3非技术', tw: 'EB-3非技術' },
     { v: 'F1',  en: 'F1',   zh: 'F1',   tw: 'F1' },
     { v: 'F2A', en: 'F2A',  zh: 'F2A',  tw: 'F2A' },
     { v: 'F2B', en: 'F2B',  zh: 'F2B',  tw: 'F2B' },
