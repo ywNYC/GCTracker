@@ -1849,7 +1849,12 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
   const spaceBelow = rect ? vh - rect.bottom - 16 : 340;
-  const openUp = rect ? spaceBelow < 260 && rect.top > 320 : false;
+  const spaceAbove = rect ? rect.top - 16 : 340;
+  const openUp = rect ? (spaceBelow < 340 && spaceAbove > spaceBelow) : false;
+  // The panel must never extend past the screen edge (the onboarding modal puts the
+  // trigger near the bottom — an unbounded upward panel lost its year section off
+  // the top). Cap height to the chosen side's space and scroll internally.
+  const panelMaxH = Math.max(220, Math.min(440, openUp ? spaceAbove : spaceBelow));
 
   const gridBtn = (sel) => ({
     border: 'none', borderRadius: '3px', cursor: 'pointer', padding: '6px 0',
@@ -1879,7 +1884,8 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
           top: openUp ? undefined : rect.bottom + 4,
           bottom: openUp ? (vh - rect.top + 4) : undefined,
           left: Math.max(8, Math.min(rect.left, vw - Math.min(vw * 0.86, 320) - 8)),
-          width: 'min(86vw, 320px)',
+          width: 'min(86vw, 320px)', maxHeight: `${panelMaxH}px`,
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
           background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)',
           borderTop: '2px solid var(--gc-green)', borderRadius: '4px',
           boxShadow: '0 14px 40px rgba(0,0,0,0.18)', padding: '10px',
