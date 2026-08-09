@@ -168,6 +168,20 @@ Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19
 6. U 案子的月度邮件没有图表和 ETA（forecast 为 null 时整块跳过）——语义正确但可以
    考虑降级显示历史柱图。
 
+## 2026-08-08 第七轮：「如果」情景页 + 公告数据全量呈现（PR #22）
+
+- **对比 tab 重构为「如果」**：三场景——配偶出生地（交叉归属 INA §202(b)(2)，
+  结论句先行+共轴双时间线+规则卡）、类别转换（F2A→IR/F2B→F1 含 opt-out 提醒/
+  EB2⇄EB3 降级回流，8 CFR 204.5(e) 优先日保留）、自由对比（原组件保留）。
+  情景可存 localStorage（gc_scenarios）。
+- **公告 extras 全量上屏**（BULLETIN_EXTRAS 模块变量，来自 /bulletin.json）：
+  DV 六区 rank cutoff+国家例外+下月预告、F2A 免国别限额日（小结注入）、
+  官方 notices 全文列表、Vol/No 页脚、同期对照（去年同月实走天数）、
+  本月之最条、下期发布倒计时（12–22 号规律）、法定年度配额卡（INA §201–203）。
+- **搁置（Cloudflare bot 墙，curl 与 headless Chrome 均 403）**：USCIS 处理时长
+  API、季度积压 CSV、签发统计、NVC 时间——需浏览器指纹级方案（Playwright 真浏览器
+  或云 routine 内置浏览器）才能抓，另行立项。
+
 ## 2026-08-08 第六轮：连续迭代（PR #13–#21）
 
 用户逐屏反馈驱动的密集迭代，主线：
