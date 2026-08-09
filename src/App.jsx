@@ -5647,14 +5647,47 @@ const AboutTab = () => {
               : '所有截止日均来自官方签证公告（travel.state.gov）。等待预计是按真实历史速度的模型推算——排期可能加速、放缓或倒退。本站内容不构成法律意见，重大决定请咨询持牌移民律师。'}
         </p>
       </div>
+      <div style={{ ...card, borderLeft: '3px solid var(--gc-green)' }}>
+        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'From the builder · U.S. mortgage' : lang === 'tw' ? '站長服務 · 全美房屋貸款' : '站长服务 · 全美房屋贷款'}</div>
+        <div className="flex items-center" style={{ gap: '12px', marginBottom: '8px' }}>
+          <img src="/jack-avatar.png" alt="Jack" width="52" height="52"
+            style={{ width: '52px', height: '52px', borderRadius: '50%', border: '2px solid var(--gc-green-border)', flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <div className="gc-serif" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+              Jack ｜ 全美房贷 MLO
+            </div>
+            <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>
+              {lang === 'en' ? 'Licensed Mortgage Loan Officer · built this site' : lang === 'tw' ? '持牌 Mortgage Loan Officer · 本站作者' : '持牌 Mortgage Loan Officer · 本站作者'}
+            </div>
+          </div>
+        </div>
+        <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: '0 0 10px' }}>
+          {lang === 'en'
+            ? 'U.S. home loans nationwide: primary & investment, new-immigrant programs (new green card / H-1B / ITIN), purchase & refinance. When your date arrives and it\'s time to settle in, happy to talk.'
+            : lang === 'tw'
+              ? '全美房屋貸款：自住與投資、新移民方案（新綠卡／H-1B／ITIN）、購房與重貸。排期到了要安家，歡迎聊聊。'
+              : '全美房屋贷款：自住与投资、新移民方案（新绿卡／H-1B／ITIN）、购房与重贷。排期到了要安家，欢迎聊聊。'}
+        </p>
+        <div className="flex" style={{ gap: '8px', flexWrap: 'wrap' }}>
+          <span className="gc-mono" style={{ fontSize: '11px', border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)', borderRadius: '3px', padding: '6px 10px' }}>
+            小红书 Jack｜全美房贷 MLO · 号 49330048750
+          </span>
+          <span className="gc-mono" style={{ fontSize: '11px', border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)', borderRadius: '3px', padding: '6px 10px' }}>
+            微信 yiaccount
+          </span>
+        </div>
+        <p style={{ fontSize: '10px', color: 'var(--gc-muted)', margin: '8px 0 0' }}>
+          {lang === 'en' ? 'Mortgage services are independent of this site\'s bulletin data. Not financial advice.' : lang === 'tw' ? '貸款服務與本站排期資料相互獨立，不構成金融建議。' : '贷款服务与本站排期数据相互独立，不构成金融建议。'}
+        </p>
+      </div>
       <div style={{ ...card, borderStyle: 'dashed', background: 'var(--gc-paper-soft)' }}>
-        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'Partners · coming soon' : lang === 'tw' ? '合作欄位 · 敬請期待' : '合作栏位 · 敬请期待'}</div>
+        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'Partner slots · open' : lang === 'tw' ? '合作欄位 · 長期招募' : '合作栏位 · 长期招募'}</div>
         <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: 0 }}>
           {lang === 'en'
-            ? 'We plan to open a small number of partner slots for services our readers actually need — immigration attorneys (EB-4 / SIJ / EB-5), U.S. mortgage lending, and cross-border finance. Want to be among the first? Subscribe and reply to any of our emails to reach us.'
+            ? 'A small number of partner slots stay open for services our readers actually need — immigration attorneys (EB-4 / SIJ / EB-5 and family cases) and cross-border finance. To reach us, subscribe and reply to any of our emails.'
             : lang === 'tw'
-              ? '本站計劃開放少量合作欄位，只限讀者真正需要的服務：移民律師（EB-4／SIJ／EB-5）、美國房屋貸款、跨境金融。想成為首批合作方？訂閱後直接回覆任一封郵件即可聯繫到我們。'
-              : '本站计划开放少量合作栏位，只限读者真正需要的服务：移民律师（EB-4／SIJ／EB-5）、美国房屋贷款、跨境金融。想成为首批合作方？订阅后直接回复任一封邮件即可联系到我们。'}
+              ? '本站長期開放少量合作欄位，只限讀者真正需要的服務：移民律師（EB-4／SIJ／EB-5 及親屬移民）、跨境金融。洽談方式：訂閱後直接回覆任一封郵件。'
+              : '本站长期开放少量合作栏位，只限读者真正需要的服务：移民律师（EB-4／SIJ／EB-5 及亲属移民）、跨境金融。洽谈方式：订阅后直接回复任一封邮件。'}
         </p>
       </div>
       <div style={card}>
