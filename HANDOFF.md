@@ -308,6 +308,42 @@ notices（三语）+DV+配额+Vol/No 从动态页拆出，独立「公告」tab 
 
 ---
 
+## 第 12 轮（2026-08-09）：邮件 v3 + A/B 顺序逻辑 + 访问统计 + 订阅弹窗
+
+**邮件 v3**（feat/email-v3，已合并）：
+- `send-monthly` 加 `?only=<email>` 安全阀：测试发送只命中指定邮箱，群发保留给真实月度更新。
+- `_gcMath` 增 `adopted`（采用表自身 12 个月 pace 的 hero 数字）与 `stations`（A/B 各自
+  gap/ETA），并修了一个真 bug：eligible 案子的 `status.days` 是**超过**截止日的天数，
+  不是剩余差距，误当 gap 会给已能递件的人算出假等待。
+- 模板：采用表驱动的等待卡（约X年 + 乐观/保守 + 好消息delta + 怎么算的三行 + 进度条）、
+  A/B 双站块（「你看这张」标记 + 每表自己的 距X天·预计X）、公告无类别命中时兜底 D 节、
+  图表跟随采用表（眉标注明 递件/获批口径）、tw 订阅者整封简转繁（S2T 字符表 +
+  `toTraditional` 终段处理；公告的 tw 译文本来就是繁体，字表只收简体字所以不受影响）。
+
+**A 不早于 B（用户截图抓到的逻辑洞）**：获批（表A）不可能早于递件（表B），但分表外推
+在 A pace 快时会算出 A 先到。两侧同修：`_gcMath` 里 stations/adopted 的 A ETA 以 B 为
+下限并带 `clampedToB` 标记；App 侧 `paceDaysToCalendar` 内置 B 托底（`chartBFloorCal`
+从两表 cutoff 差反推 B gap，所有调用点自动继承），hero 依据行和 A 站块在被托底时
+显示「获批不会早于递件，已按表B托底」/「（不早于B）」。
+
+**访问统计（此前完全没有，站上无任何 beacon）**：
+- `/api/beacon`：无 cookie 无 IP，vid（localStorage）/sid（sessionStorage）自铸随机 id，
+  只计可见时间，`an:<日>:<sid>` 存 SUBSCRIBERS KV，TTL 90 天，同 session 覆盖写。
+- `/api/admin/analytics`（ADMIN_TOKEN）：按天聚合 sessions / unique / 平均·中位停留 /
+  语言 / 配案占比 / 订阅占比。
+- **遍历订阅者的地方现在要同时跳过 `rl:` 和 `an:` 前缀**（send-monthly、subscribers 已改）。
+
+**一键订阅弹窗** `SubscribeNudge`：已选案（hasOnboarded）+ 未订阅（无
+`gc_subscribedEmail`）+ 14 天内没关过 → 停留 40 秒弹底部卡片，预填当前案子，邮箱 +
+一键订阅，成功后引导去邮箱点确认。40s 是启发式，等 beacon 数据攒几周后按
+「中位停留的 ~60%」校准 `SUB_NUDGE_DELAY_MS`。注意：弹窗必须自带
+`className="visa-root" data-theme`（挂在主题根之外，不带就取不到 CSS 变量，背景全透明）。
+
+**遗留**：`scripts/lib/gcMath.mjs` 是 re-export，无需镜像改动。dist/ 这轮误提交了
+（无害，Cloudflare 从源码构建，但下轮记得清）。
+
+---
+
 ## 别重踩的坑
 
 - **推 `main` 即上线**（Cloudflare Pages 自动部署），推送前先问用户。改动走功能分支 + PR。
