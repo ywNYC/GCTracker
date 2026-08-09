@@ -3050,8 +3050,11 @@ const BulletinMovementChart = ({ cat, country }) => {
     <div style={{ padding: '10px 12px 9px', borderTop: '1px solid var(--gc-rule-soft)' }}>
       {/* Header: eyebrow + 12/24 window toggle */}
       <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
-        <span className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)' }}>
+        <span className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', minWidth: 0 }}>
           {lang === 'en' ? 'Bulletin movement · Chart A' : '排期推进 · 表 A'}
+          <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', marginLeft: '5px', color: 'var(--gc-muted-soft)' }}>
+            {lang === 'en' ? '— the pace behind the estimate above' : lang === 'tw' ? '—— 上方年數的速度來源' : '—— 上方年数的速度来源'}
+          </span>
         </span>
         <div className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
           {[12, 24].map((w, i) => (
@@ -3227,6 +3230,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
   // Share card modal state
   const [showShareCard, setShowShareCard] = useState(false);
   const [showStatusShare, setShowStatusShare] = useState(false);
+  const [showHeroMath, setShowHeroMath] = useState(false);
 
   const finalActionCutoff = bulletinCurrent.finalAction[userCase.category]?.[country];
   const filingCutoff = bulletinCurrent.filing[userCase.category]?.[country];
@@ -3545,6 +3549,11 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 // is a small tier-colored badge. The old layout inverted this — 28px of
                 // ceremony ("你已在排期中") over 10px of the numbers people came for.
                 const today2 = new Date();
+                // The pace itself, surfaced (not just consumed): the reasoning chain
+                // below shows the reader how the hero number is derived from it.
+                const hist12h = monthlyMovementFromArchive(userCase.category, country, 12);
+                const total12h = hist12h ? hist12h.reduce((sm, pp) => sm + (pp.days || 0), 0) : 0;
+                const paceMo = total12h > 0 ? total12h / 12 : null;
                 const paceCal = ps.days ? paceDaysToCalendar(userCase.category, country, ps.days) : null;
                 const etaDate = paceCal ? new Date(today2.getTime() + paceCal * 86400000) : null;
                 const yearsF = paceCal ? paceCal / 365.25 : null;
@@ -3619,6 +3628,47 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             </>
                           )}
                         </div>
+                        {/* Where the number comes from — declared up front, expandable proof */}
+                        {paceMo && (
+                          <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginTop: '5px', lineHeight: 1.5 }}>
+                            {lang === 'en'
+                              ? `Based on the actual 12-month pace (${Math.round(paceMo)} days/mo). `
+                              : lang === 'tw'
+                                ? `按近 12 個月實際均速（${Math.round(paceMo)} 天/月）估算。`
+                                : `按近 12 个月实际均速（${Math.round(paceMo)} 天/月）估算。`}
+                            <button type="button" onClick={() => setShowHeroMath((v) => !v)}
+                              style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600 }}>
+                              {showHeroMath
+                                ? (lang === 'en' ? 'hide the math' : lang === 'tw' ? '收起推導' : '收起推导')
+                                : (lang === 'en' ? 'how is this derived?' : lang === 'tw' ? '怎麼算的？' : '怎么算的？')}
+                            </button>
+                          </div>
+                        )}
+                        {paceMo && showHeroMath && (() => {
+                          const cutoffP = filingAuthorized ? filingCutoff : finalActionCutoff;
+                          const cutoffLabel = filingAuthorized
+                            ? (lang === 'en' ? 'Chart B cutoff' : lang === 'tw' ? '表B截止日' : '表B截止日')
+                            : (lang === 'en' ? 'Chart A cutoff' : lang === 'tw' ? '表A截止日' : '表A截止日');
+                          const months2 = Math.round(ps.days / paceMo);
+                          const steps = lang === 'en' ? [
+                            `1. Your PD ${userCase.priorityDate} − ${cutoffLabel} ${cutoffP} = ${ps.days.toLocaleString('en-US')} days of queue ahead`,
+                            `2. Chart A moved ${total12h} days in the last 12 months (the green line in the chart below) ≈ ${Math.round(paceMo)} days/mo — Chart B tracks it closely`,
+                            `3. ${ps.days.toLocaleString('en-US')} ÷ ${Math.round(paceMo)} ≈ ${months2} months ≈ ${heroText.replace('~', '')} → ${etaDate ? fmtYM(etaDate) : ''}`,
+                          ] : [
+                            `① 你的优先日 ${userCase.priorityDate} − ${cutoffLabel} ${cutoffP} ＝ 还差 ${ps.days.toLocaleString('en-US')} 天`,
+                            `② 近 12 个月表A实际前进 ${total12h} 天（下方图表的绿线）≈ ${Math.round(paceMo)} 天/月，表B与表A基本同步`,
+                            `③ ${ps.days.toLocaleString('en-US')} ÷ ${Math.round(paceMo)} ≈ ${months2} 个月 ≈ ${heroText.replace('约 ', '')} → ${etaDate ? fmtYM(etaDate) : ''}`,
+                          ];
+                          return (
+                            <div className="gc-mono" style={{
+                              fontSize: '10px', lineHeight: 1.8, color: 'var(--gc-ink-soft)',
+                              background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)',
+                              borderRadius: '3px', padding: '7px 10px', marginTop: '6px',
+                            }}>
+                              {steps.map((st, i2) => <div key={i2}>{st}</div>)}
+                            </div>
+                          );
+                        })()}
                         <div style={{ fontSize: '13px', fontWeight: 700, color: delta.color, marginTop: '8px' }}>
                           {delta.text}
                         </div>
@@ -3682,9 +3732,23 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
               }}>
-                {[{ code: 'B', title: lang === 'en' ? 'B · Filing' : lang === 'tw' ? 'B · 遞件' : 'B · 递件', info: dualB, adopted: filingAuthorized },
-                  { code: 'A', title: lang === 'en' ? 'A · Approval' : lang === 'tw' ? 'A · 獲批' : 'A · 获批', info: dualA, adopted: !filingAuthorized }]
-                  .map((blk, i) => (
+                {[{ code: 'B', title: lang === 'en' ? 'B · Filing' : lang === 'tw' ? 'B · 遞件' : 'B · 递件', info: dualB, adopted: filingAuthorized, st: filingStatus },
+                  { code: 'A', title: lang === 'en' ? 'A · Approval' : lang === 'tw' ? 'A · 獲批' : 'A · 获批', info: dualA, adopted: !filingAuthorized, st: finalActionStatus }]
+                  .map((blk, i) => {
+                    // Per-station ETA: same 12-month pace applied to each chart's own gap,
+                    // so the hero (B station) and the summary card (A station) both have a
+                    // visible anchor here — the wait reads as two stops on one line.
+                    let etaTxt = null;
+                    if (blk.st.status === 'notCurrent' && blk.st.days) {
+                      const cal = paceDaysToCalendar(userCase.category, country, blk.st.days);
+                      if (cal) {
+                        const d2 = new Date(Date.now() + cal * 86400000);
+                        etaTxt = lang === 'en'
+                          ? `est. ${d2.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}`
+                          : `预计 ${d2.getFullYear()}年${d2.getMonth() + 1}月`;
+                      }
+                    }
+                    return (
                     <div key={blk.code} style={{
                       padding: '8px 14px 9px',
                       borderLeft: i === 1 ? '1px solid var(--gc-rule-soft)' : 'none',
@@ -3695,8 +3759,14 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                       <div className="gc-mono" style={{ fontSize: '13px', fontWeight: 700, color: blk.info.good ? 'var(--gc-green-ink)' : 'var(--gc-ink)', lineHeight: 1.3 }}>
                         {blk.info.label}
                       </div>
+                      {etaTxt && (
+                        <div className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '1px' }}>
+                          {etaTxt}
+                        </div>
+                      )}
                     </div>
-                ))}
+                    );
+                  })}
               </div>
             )}
             {/* Bottom row: monthly movement (M/M) */}
@@ -4960,11 +5030,16 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
               ? target.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
               : `${target.getFullYear()}年${target.getMonth() + 1}月`;
           const rateText = `${Math.round(pace.rate)} ${lang === 'en' ? 'd/mo' : '天/月'}`;
+          const stationNote = filingAuthorized
+            ? (lang === 'en' ? ' (approval milestone — the status card above shows the earlier filing milestone)'
+               : lang === 'tw' ? '（獲批口徑；上方狀態卡的年數是更早的遞件口徑）'
+               : '（获批口径；上方状态卡的年数是更早的递件口径）')
+            : '';
           const sentence = lang === 'en'
-            ? `At the ${pace.basis} pace (${rateText}), Chart A reaches your priority date in ${etaText}${targetText ? ` — around ${targetText}` : ''}.`
+            ? `At the ${pace.basis} pace (${rateText}), Chart A reaches your priority date in ${etaText}${targetText ? ` — around ${targetText}` : ''}${stationNote}.`
             : lang === 'tw'
-              ? `按${pace.basis}（${rateText}），表A排到你的優先日預計還需${etaText}${targetText ? `，約在 ${targetText}` : ''}。`
-              : `按${pace.basis}（${rateText}），表A排到你的优先日预计还需${etaText}${targetText ? `，约在 ${targetText}` : ''}。`;
+              ? `按${pace.basis}（${rateText}），表A排到你的優先日預計還需${etaText}${targetText ? `，約在 ${targetText}` : ''}${stationNote}。`
+              : `按${pace.basis}（${rateText}），表A排到你的优先日预计还需${etaText}${targetText ? `，约在 ${targetText}` : ''}${stationNote}。`;
           const formula = lang === 'en'
             ? `${gapDays.toLocaleString('en-US')} days ÷ ${rateText} ≈ ${Math.round(months).toLocaleString('en-US')} mo${targetText ? ` → now + ${Math.round(months)} mo ≈ ${targetText}` : ''}`
             : lang === 'tw'
