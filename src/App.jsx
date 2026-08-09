@@ -1734,7 +1734,7 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
       </button>
       {open && rect && (
         <div style={{
-          position: 'fixed', zIndex: 990,
+          position: 'fixed', zIndex: 1200,
           top: openUp ? undefined : rect.bottom + 4,
           bottom: openUp ? (vh - rect.top + 4) : undefined,
           left: Math.max(8, Math.min(rect.left, vw - Math.min(vw * 0.78, 300) - 8)),
@@ -1875,7 +1875,7 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
       </button>
       {open && rect && (
         <div style={{
-          position: 'fixed', zIndex: 990,
+          position: 'fixed', zIndex: 1200,
           top: openUp ? undefined : rect.bottom + 4,
           bottom: openUp ? (vh - rect.top + 4) : undefined,
           left: Math.max(8, Math.min(rect.left, vw - Math.min(vw * 0.86, 320) - 8)),
@@ -12970,21 +12970,12 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               </div>
             </div>
 
-            {/* Priority Date */}
+            {/* Priority Date — same themed picker as the case bar, not the OS sheet */}
             <div>
               <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.pd}</div>
-              <input type="date" value={form.priorityDate}
-                onChange={(e) => setForm({ ...form, priorityDate: e.target.value })}
-                style={{
-                  width: '100%', padding: '8px 10px',
-                  background: 'var(--gc-paper-soft)',
-                  border: '1px solid var(--gc-rule)',
-                  borderRadius: 'var(--gc-radius-sm)',
-                  fontSize: '13px', color: 'var(--gc-ink)',
-                  fontFamily: 'var(--gc-font-mono, ui-monospace)',
-                  boxSizing: 'border-box',
-                }}
-              />
+              <DateDropdown value={form.priorityDate}
+                triggerStyle={{ padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)' }}
+                onChange={(pd) => setForm({ ...form, priorityDate: pd })} />
             </div>
 
             {/* In US toggle */}
