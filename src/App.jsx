@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, memo, createContext, useContext, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Globe, Calendar, MapPin, Briefcase, Home, TrendingUp, TrendingDown, Minus, AlertCircle, AlertTriangle, CheckCircle2, Clock, Info, FileText, Zap, Shield, Users, Target, Database, RefreshCw, ExternalLink, Sparkles, Eye, Bell, BarChart3, Mail, Download, History, HelpCircle, DollarSign, Scale, Plane, Activity, Ruler, Dot, ClipboardList, Share2 } from 'lucide-react';
 
 // ============================================================
@@ -1666,6 +1667,19 @@ const LangSwitcher = () => {
 
 // ============================================================
 // Input Panel
+// Dropdown panels render through a PORTAL to document.body: the onboarding modal
+// animates with transform and blurs with backdrop-filter, both of which hijack
+// position:fixed descendants (the containing block becomes the modal, not the
+// viewport) — panels ended up mispositioned and clipped. The portal escapes any
+// such ancestor; the panel carries its own visa-root/theme wrapper for CSS vars.
+const currentThemeAttr = () => {
+  try {
+    return document.querySelector('.visa-root[data-theme]')?.getAttribute('data-theme') || 'passport';
+  } catch {
+    return 'passport';
+  }
+};
+
 // ============================================================
 // CategoryDropdown — themed replacement for the native <select>. The OS draws a
 // native select's option sheet (white system UI on iOS) and CSS can't reach it,
@@ -1678,18 +1692,21 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
   // overflow:hidden for expand animations, which clips an absolute panel.
   const [rect, setRect] = useState(null);
   const wrapRef = useRef(null);
+  const panelRef = useRef(null);
   const toggleOpen = () => {
     if (!open && wrapRef.current) setRect(wrapRef.current.getBoundingClientRect());
     setOpen((v) => !v);
   };
   useEffect(() => {
     if (!open) return undefined;
+    const inSelf = (t) => (wrapRef.current && wrapRef.current.contains(t))
+      || (panelRef.current && panelRef.current.contains(t));
     const close = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      if (!inSelf(e.target)) setOpen(false);
     };
     const onScroll = (e) => {
       // The panel scrolls internally — only close when the PAGE scrolls.
-      if (wrapRef.current && wrapRef.current.contains(e.target)) return;
+      if (inSelf(e.target)) return;
       setOpen(false);
     };
     document.addEventListener('mousedown', close);
@@ -1732,8 +1749,8 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
         </span>
         <span style={{ flexShrink: 0, color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
       </button>
-      {open && rect && (
-        <div style={{
+      {open && rect && createPortal(
+        <div ref={panelRef} className="visa-root" data-theme={currentThemeAttr()} style={{
           position: 'fixed', zIndex: 1200,
           top: openUp ? undefined : rect.bottom + 4,
           bottom: openUp ? (vh - rect.top + 4) : undefined,
@@ -1772,7 +1789,8 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
               })}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1790,6 +1808,7 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
   const wrapRef = useRef(null);
+  const panelRef = useRef(null);
   const yearRowRef = useRef(null);
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '') || [null, '2020', '01', '01'];
   const y = parseInt(parts[1], 10);
@@ -1802,12 +1821,14 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
   };
   useEffect(() => {
     if (!open) return undefined;
+    const inSelf = (t) => (wrapRef.current && wrapRef.current.contains(t))
+      || (panelRef.current && panelRef.current.contains(t));
     const close = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      if (!inSelf(e.target)) setOpen(false);
     };
     const onScroll = (e) => {
       // The panel scrolls internally (year strip) — only close on outside scrolls.
-      if (wrapRef.current && wrapRef.current.contains(e.target)) return;
+      if (inSelf(e.target)) return;
       setOpen(false);
     };
     document.addEventListener('mousedown', close);
@@ -1878,8 +1899,8 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fmt}</span>
         <span style={{ flexShrink: 0, color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
       </button>
-      {open && rect && (
-        <div style={{
+      {open && rect && createPortal(
+        <div ref={panelRef} className="visa-root" data-theme={currentThemeAttr()} style={{
           position: 'fixed', zIndex: 1200,
           top: openUp ? undefined : rect.bottom + 4,
           bottom: openUp ? (vh - rect.top + 4) : undefined,
@@ -1925,7 +1946,8 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
