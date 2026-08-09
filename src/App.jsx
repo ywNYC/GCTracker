@@ -3379,6 +3379,16 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
         const heroSel = heroChart || (filingAuthorized ? 'B' : 'A');
         const ps = heroSel === 'B' ? filingStatus : finalActionStatus;
         const heroCutoff = heroSel === 'B' ? filingCutoff : finalActionCutoff;
+        const mvAх = computeMovement(bulletinCurrent.finalAction[userCase.category]?.[country], bulletinPrevious.finalAction[userCase.category]?.[country]);
+        const mvBх = computeMovement(bulletinCurrent.filing[userCase.category]?.[country], bulletinPrevious.filing[userCase.category]?.[country]);
+        const mvChipText = (m) => {
+          if (m.type === 'advanced') return { t: `+${m.days}${lang === 'en' ? 'd' : '天'}`, c: 'var(--gc-green)' };
+          if (m.type === 'retrogressed') return { t: `−${m.days ?? ''}${lang === 'en' ? 'd' : '天'}`, c: 'var(--gc-red)' };
+          if (m.type === 'current') return { t: 'C', c: 'var(--gc-green)' };
+          if (m.type === 'unavailable') return { t: m.still ? 'U' : '→U', c: 'var(--gc-red)' };
+          if (m.type === 'resumed') return { t: lang === 'en' ? 'resumed' : '恢复', c: 'var(--gc-green)' };
+          return { t: '—', c: 'var(--gc-muted)' };
+        };
         if (primaryStatus.status === 'suspicious') return null; // suspicious PD has its own warning above
         const activeTableLabel = heroSel === 'B'
           ? (lang === 'en' ? 'Filing · B' : lang === 'tw' ? '遞件表B' : '递件表B')
@@ -3405,7 +3415,8 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
             return { icon: '✓', label: lang === 'en' ? 'Reached' : lang === 'tw' ? '已過' : '已过', good: true };
           }
           if (status.status === 'eligible') {
-            return { icon: '✓', label: lang === 'en' ? `Past · ${fmtCutoffShort(cutoff)}` : `已过 · ${fmtCutoffShort(cutoff)}`, good: true };
+            // Date lives on the block's dedicated cutoff line now — no repeat here.
+            return { icon: '✓', label: lang === 'en' ? 'Past' : '已过', good: true };
           }
           if (status.status === 'notCurrent') {
             const days = status.days;
@@ -3511,6 +3522,29 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
             borderRadius: '4px',
             overflow: 'hidden',
           }}>
+            {/* Unified header — the category title lives here now; the separate
+                A/B cutoff card it used to crown has been absorbed below. */}
+            <div style={{ padding: '11px 14px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <span className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '-0.01em', minWidth: 0 }}>
+                {t[userCase.category.toLowerCase()]}
+              </span>
+              <span className="flex items-center gap-2 flex-shrink-0">
+                {waitingLayout && (
+                  <span className="gc-eyebrow" style={{
+                    fontSize: '9px', fontWeight: 700, color: accentColor,
+                    border: `1px solid ${accentColor}`, borderRadius: '2px',
+                    padding: '2px 6px', letterSpacing: '0.08em',
+                  }}>
+                    {waitingTitle}
+                  </span>
+                )}
+                <button type="button" onClick={() => setShowStatusShare(true)}
+                  title={lang === 'en' ? 'Share' : '分享'}
+                  style={{ border: '1px solid var(--gc-rule)', background: 'transparent', borderRadius: '2px', padding: '3px 5px', cursor: 'pointer', lineHeight: 0 }}>
+                  <Share2 size={11} style={{ color: 'var(--gc-muted)' }} />
+                </button>
+              </span>
+            </div>
             {/* Top row: either standard distance display OR "can file now" message for eligible users */}
             {eligibleLayout ? (
               <div style={{
@@ -3605,9 +3639,6 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                   <div style={{ padding: '12px 14px 12px' }}>
                     <div className="flex items-center justify-between gap-2" style={{ marginBottom: '8px' }}>
                       <span className="inline-flex items-center gap-2" style={{ minWidth: 0 }}>
-                        <span className="gc-eyebrow" style={{ color: 'var(--gc-muted)' }}>
-                          {lang === 'en' ? 'Status' : lang === 'tw' ? '狀態' : '状态'}
-                        </span>
                         <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
                           {[
                             { code: 'B', label: lang === 'en' ? 'B · File' : lang === 'tw' ? 'B · 遞件' : 'B · 递件' },
@@ -3627,20 +3658,6 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             </button>
                           ))}
                         </span>
-                      </span>
-                      <span className="flex items-center gap-2 flex-shrink-0">
-                        <span className="gc-eyebrow" style={{
-                          fontSize: '9px', fontWeight: 700, color: accentColor,
-                          border: `1px solid ${accentColor}`, borderRadius: '2px',
-                          padding: '2px 6px', letterSpacing: '0.08em',
-                        }}>
-                          {waitingTitle}
-                        </span>
-                        <button type="button" onClick={() => setShowStatusShare(true)}
-                          title={lang === 'en' ? 'Share' : '分享'}
-                          style={{ border: '1px solid var(--gc-rule)', background: 'transparent', borderRadius: '2px', padding: '3px 5px', cursor: 'pointer', lineHeight: 0 }}>
-                          <Share2 size={11} style={{ color: 'var(--gc-muted)' }} />
-                        </button>
                       </span>
                     </div>
                     {ps.status === 'unavailable' ? (
@@ -3778,8 +3795,8 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
               }}>
-                {[{ code: 'B', title: lang === 'en' ? 'B · Filing' : lang === 'tw' ? 'B · 遞件' : 'B · 递件', info: dualB, adopted: filingAuthorized, st: filingStatus },
-                  { code: 'A', title: lang === 'en' ? 'A · Approval' : lang === 'tw' ? 'A · 獲批' : 'A · 获批', info: dualA, adopted: !filingAuthorized, st: finalActionStatus }]
+                {[{ code: 'B', title: lang === 'en' ? 'B · can you file?' : lang === 'tw' ? 'B · 能否遞件' : 'B · 能否递件', info: dualB, adopted: filingAuthorized, st: filingStatus, cut: filingCutoff, mv: mvBх },
+                  { code: 'A', title: lang === 'en' ? 'A · can you be approved?' : lang === 'tw' ? 'A · 能否獲批' : 'A · 能否获批', info: dualA, adopted: !filingAuthorized, st: finalActionStatus, cut: finalActionCutoff, mv: mvAх }]
                   .map((blk, i) => {
                     // Per-station ETA: same 12-month pace applied to each chart's own gap,
                     // so the hero (B station) and the summary card (A station) both have a
@@ -3808,7 +3825,15 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                       </div>
                       <div className="gc-mono" style={{ fontSize: '13px', fontWeight: 700, color: blk.info.good ? 'var(--gc-green-ink)' : 'var(--gc-ink)', lineHeight: 1.3 }}>
                         {blk.info.label}
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: mvChipText(blk.mv).c, marginLeft: '6px' }}>
+                          {mvChipText(blk.mv).t}
+                        </span>
                       </div>
+                      {blk.cut && blk.cut !== 'C' && (
+                        <div className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '1px' }}>
+                          {lang === 'en' ? 'cutoff ' : '截止日 '}{blk.cut}
+                        </div>
+                      )}
                       {etaTxt && (
                         <div className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '1px' }}>
                           {etaTxt}
@@ -3819,170 +3844,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                   })}
               </div>
             )}
-            {/* Bottom row: monthly movement (M/M) */}
-            {(() => {
-              const currentFAD = bulletinCurrent.finalAction[userCase.category]?.[country];
-              const previousFAD = bulletinPrevious.finalAction[userCase.category]?.[country];
-              const currentFiling = bulletinCurrent.filing[userCase.category]?.[country];
-              const previousFiling = bulletinPrevious.filing[userCase.category]?.[country];
-              const mvA = computeMovement(currentFAD, previousFAD);
-              const mvB = computeMovement(currentFiling, previousFiling);
-              const mvColor = (type) => {
-                if (type === 'advanced') return 'var(--gc-green)';
-                if (type === 'retrogressed' || type === 'unavailable') return 'var(--gc-red)';
-                if (type === 'current' || type === 'resumed') return 'var(--gc-green)';
-                return 'var(--gc-muted)';
-              };
-              const mvText = (m) => {
-                if (m.type === 'advanced') return `+${m.days}${lang === 'en' ? 'd' : '天'}`;
-                if (m.type === 'retrogressed') return `−${m.days}${lang === 'en' ? 'd' : '天'}`;
-                if (m.type === 'current') return 'C';
-                if (m.type === 'unavailable') return m.still ? 'U' : `→U`;
-                if (m.type === 'resumed') return lang === 'en' ? 'resumed' : '恢复名额';
-                return '—';
-              };
-              return (
-                <div style={{
-                  padding: '9px 14px',
-                  borderTop: '1px solid var(--gc-rule-soft)',
-                  background: 'var(--gc-paper-soft)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  fontSize: '11px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
-                    <TrendingUp size={11} strokeWidth={2.2} style={{ color: 'var(--gc-muted)' }} />
-                    <span className="gc-eyebrow" style={{ fontSize: '9px', letterSpacing: '0.1em' }}>
-                      {lang === 'en' ? 'This month' : lang === 'tw' ? '本月變化' : '本月变化'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: 'var(--gc-muted)', fontSize: '10px', fontWeight: 600 }}>
-                      {lang === 'en' ? 'A' : 'A表'}
-                    </span>
-                    <span className="gc-mono" style={{
-                      fontWeight: 700,
-                      color: mvColor(mvA.type),
-                      padding: mvA.type === 'noChange' ? 0 : '1px 5px',
-                      background: mvA.type === 'advanced' ? 'var(--gc-green-soft)'
-                                : mvA.type === 'retrogressed' ? 'var(--gc-red-soft, rgba(138,24,24,0.08))'
-                                : 'transparent',
-                      borderRadius: '2px',
-                    }}>{mvText(mvA)}</span>
-                  </div>
-                  <span style={{ color: 'var(--gc-rule)' }}>·</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ color: 'var(--gc-muted)', fontSize: '10px', fontWeight: 600 }}>
-                      {lang === 'en' ? 'B' : 'B表'}
-                    </span>
-                    <span className="gc-mono" style={{
-                      fontWeight: 700,
-                      color: mvColor(mvB.type),
-                      padding: mvB.type === 'noChange' ? 0 : '1px 5px',
-                      background: mvB.type === 'advanced' ? 'var(--gc-green-soft)'
-                                : mvB.type === 'retrogressed' ? 'var(--gc-red-soft, rgba(138,24,24,0.08))'
-                                : 'transparent',
-                      borderRadius: '2px',
-                    }}>{mvText(mvB)}</span>
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         );
       })()}
-
-      {/* HERO CARD — editorial document style */}
-      <div style={{
-        background: 'var(--gc-surface)',
-        border: '1px solid var(--gc-rule)',
-        borderRadius: '4px',
-        overflow: 'hidden',
-      }}>
-        {/* Hero row: category + PD + country pill (all one line) */}
-        <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--gc-rule-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-          <div className="flex items-baseline gap-2 flex-wrap" style={{ minWidth: 0 }}>
-            {/* PD date lives in the case bar right above — repeating it here was noise */}
-            <span className="gc-serif" style={{ fontSize: '20px', fontWeight: 600, color: 'var(--gc-ink)', letterSpacing: '-0.01em', lineHeight: 1.1 }}>
-              {t[userCase.category.toLowerCase()]}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0" style={{
-            padding: '2px 7px',
-            background: 'var(--gc-paper-soft)',
-            border: '1px solid var(--gc-rule-soft)',
-            borderRadius: '2px',
-          }}>
-            <CountryFlag country={userCase.country} size={11} />
-            <span className="gc-mono" style={{ fontSize: '10px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '0.06em' }}>
-              {COUNTRY_CODE[userCase.country] || userCase.country.slice(0, 3).toUpperCase()}
-            </span>
-          </div>
-        </div>
-
-        {/* Tables A + B — a small data spread */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-          {/* Table A */}
-          <div style={{
-            padding: '8px 12px',
-            borderRight: '1px solid var(--gc-rule-soft)',
-            background: !filingAuthorized ? 'var(--gc-green-soft)' : 'transparent',
-            position: 'relative',
-          }}>
-            {!filingAuthorized && (
-              <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '2px', background: 'var(--gc-green)' }}></div>
-            )}
-            <div className="flex items-center justify-between" style={{ marginBottom: '3px' }}>
-              <span className="gc-eyebrow" style={{ fontSize: '9px' }}>
-                {lang === 'en' ? 'A · decides approval' : lang === 'tw' ? '表A · 能否獲批' : '表A · 能否获批'}
-              </span>
-              {!filingAuthorized && (
-                <span className="gc-eyebrow" style={{ color: 'var(--gc-green)', fontSize: '8px' }}>
-                  {lang === 'en' ? 'ACTIVE' : '采用'}
-                </span>
-              )}
-            </div>
-            <div className="gc-mono" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gc-ink)', marginBottom: '4px', lineHeight: 1.2 }}>
-              {formatDate(finalActionCutoff, lang)}
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {!filingAuthorized
-                ? <StatusBadge status={finalActionStatus.status} />
-                : <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{plainStatusText(finalActionStatus.status)}</span>}
-            </div>
-          </div>
-
-          {/* Table B */}
-          <div style={{
-            padding: '8px 12px',
-            background: filingAuthorized ? 'var(--gc-green-soft)' : 'transparent',
-            position: 'relative',
-          }}>
-            {filingAuthorized && (
-              <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '2px', background: 'var(--gc-green)' }}></div>
-            )}
-            <div className="flex items-center justify-between" style={{ marginBottom: '3px' }}>
-              <span className="gc-eyebrow" style={{ fontSize: '9px' }}>
-                {lang === 'en' ? 'B · decides filing' : lang === 'tw' ? '表B · 能否遞件' : '表B · 能否递件'}
-              </span>
-              {filingAuthorized && (
-                <span className="gc-eyebrow" style={{ color: 'var(--gc-green)', fontSize: '8px' }}>
-                  {lang === 'en' ? 'ACTIVE' : '采用'}
-                </span>
-              )}
-            </div>
-            <div className="gc-mono" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--gc-ink)', marginBottom: '4px', lineHeight: 1.2 }}>
-              {formatDate(filingCutoff, lang)}
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {filingAuthorized
-                ? <StatusBadge status={filingStatus.status} />
-                : <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{plainStatusText(filingStatus.status)}</span>}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* I-485 Progress — collapsed by default; expanding reveals the full checklist
           with service-center speed selector and cascading step completion. */}
