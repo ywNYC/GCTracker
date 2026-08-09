@@ -1065,10 +1065,6 @@ ${emailHead(subject)}
           </td>
         </tr>
 
-        ${noticesHtml ? `
-        <tr>
-          <td class="px" style="padding:14px 40px 0;">${noticesHtml}</td>
-        </tr>` : ''}
 
         ${(!isNowCurrent && adHero) ? `
         <tr>
@@ -1134,6 +1130,11 @@ ${emailHead(subject)}
               <tr><td style="padding:14px 14px 12px;">${figureHtml}</td></tr>
             </table>
           </td>
+        </tr>` : ''}
+
+        ${noticesHtml ? `
+        <tr>
+          <td class="px" style="padding:14px 40px 0;">${noticesHtml}</td>
         </tr>` : ''}
 
         <tr>
