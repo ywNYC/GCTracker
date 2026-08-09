@@ -3037,12 +3037,16 @@ const ShareCardModal = ({ userCase, greenCardInfo, lang, onClose }) => {
 // direct-labeled cumulative column in green. All marks use theme tokens; identity never
 // rides on color alone (the consulate theme's blue and green are the same navy by
 // design, so the divider + 「累计」 label do that work there).
-const BulletinMovementChart = ({ cat, country }) => {
+const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = null }) => {
   const { lang } = useLang();
   const [windowMonths, setWindowMonths] = useState(12);
   // Defaults to the ADOPTED chart — hero says "B · 约4.5年" while the chart opened
-  // on A, two different measures on one screen with no reason.
-  const [chartSel, setChartSel] = useState(FILING_AUTHORIZED[cat] ? 'B' : 'A');
+  // on A, two different measures on one screen with no reason. When the parent passes
+  // `chart`/`onChartChange`, this toggle and the case card's B/A toggle are ONE
+  // switch: flipping either flips both.
+  const [chartSelInternal, setChartSelInternal] = useState(FILING_AUTHORIZED[cat] ? 'B' : 'A');
+  const chartSel = chart || chartSelInternal;
+  const setChartSel = (c) => { setChartSelInternal(c); if (onChartChange) onChartChange(c); };
   const [sel, setSel] = useState(null); // null → latest month
 
   const points = monthlyMovementFromArchive(cat, country, windowMonths, chartSel === 'B' ? 'filing' : 'finalAction');
@@ -3134,7 +3138,8 @@ const BulletinMovementChart = ({ cat, country }) => {
         </span>
         <div className="inline-flex items-center" style={{ gap: '5px', flexShrink: 0 }}>
           <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
-            {['A', 'B'].map((c, i) => (
+            {/* B first, matching the case card's B·递件 / A·获批 order. */}
+            {['B', 'A'].map((c, i) => (
               <button key={c} type="button"
                 onClick={() => { setChartSel(c); setSel(null); }}
                 className="gc-mono"
@@ -3948,7 +3953,10 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           I-485 card's waiting preview; with I-485 hidden until filing opens, the
           chart earns a standalone home right under the case card. */}
       <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' }}>
-        <BulletinMovementChart cat={userCase.category} country={country} />
+        <BulletinMovementChart
+          cat={userCase.category} country={country}
+          chart={heroChart || (filingAuthorized ? 'B' : 'A')}
+          onChartChange={setHeroChart} />
       </div>
 
       {/* I-485 Progress — only once it's actionable: your date has arrived (or you
