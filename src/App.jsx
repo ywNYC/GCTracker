@@ -6311,6 +6311,8 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
         setEmailStatus('success');
         setIsSubscribed(true);
         setShowConfirmPrompt(true); // 双重确认漏斗的洞：明确告诉用户还差一步
+        // The nudge popup keys off this to never bother an existing subscriber.
+        try { window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase()); } catch {}
         setTimeout(() => setEmailStatus(''), 3000);
       } else {
         console.error('Subscription failed:', result.error || response.statusText);
@@ -12665,6 +12667,154 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
 // ============================================================
 // Main App
 // ============================================================
+// ============================================================
+// SubscribeNudge — one-tap subscribe prompt for engaged visitors.
+// Shows once per session, only when: the visitor has an actual case picked
+// (onboarded), isn't already subscribed, and hasn't dismissed it in the last
+// 14 days. The delay is a heuristic for now — the /api/beacon dwell data this
+// ships with is what will calibrate it (target: ~60% of median visit length).
+// ============================================================
+const SUB_NUDGE_DELAY_MS = 40000;
+
+const SubscribeNudge = ({ userCase, hasOnboarded, theme = 'passport' }) => {
+  const { lang } = useLang();
+  const [show, setShow] = useState(false);
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState(''); // '' | 'loading' | 'sent' | 'error' | 'invalid'
+
+  useEffect(() => {
+    if (!hasOnboarded) return undefined;
+    try {
+      if (window.localStorage.getItem('gc_subscribedEmail')) return undefined;
+      if (window.sessionStorage.getItem('gc_subNudgeShown')) return undefined;
+      const dismissedAt = parseInt(window.localStorage.getItem('gc_subNudgeDismissedAt') || '0', 10);
+      if (dismissedAt && Date.now() - dismissedAt < 14 * 86400000) return undefined;
+    } catch { return undefined; }
+    const timer = setTimeout(() => {
+      try { window.sessionStorage.setItem('gc_subNudgeShown', '1'); } catch { /* noop */ }
+      setShow(true);
+    }, SUB_NUDGE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [hasOnboarded]);
+
+  if (!show) return null;
+
+  const dismiss = () => {
+    setShow(false);
+    try { window.localStorage.setItem('gc_subNudgeDismissedAt', String(Date.now())); } catch { /* noop */ }
+  };
+
+  const subscribe = async () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStatus('invalid');
+      setTimeout(() => setStatus(''), 2500);
+      return;
+    }
+    setStatus('loading');
+    try {
+      const resp = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          userCase,
+          alerts: { whenCurrent: true, whenEligible: true, monthlyUpdates: true, retrogression: true },
+          language: lang,
+        }),
+      });
+      const result = await resp.json().catch(() => ({ success: false }));
+      if (resp.ok && result.success) {
+        setStatus('sent');
+        try { window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase()); } catch { /* noop */ }
+      } else {
+        setStatus('error');
+        setTimeout(() => setStatus(''), 3000);
+      }
+    } catch {
+      setStatus('error');
+      setTimeout(() => setStatus(''), 3000);
+    }
+  };
+
+  const pdLabel = lang === 'en' ? userCase.priorityDate
+    : `${userCase.priorityDate.slice(0, 4)}年${parseInt(userCase.priorityDate.slice(5, 7), 10)}月`;
+
+  return (
+    <div className="visa-root" data-theme={theme} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 900, padding: '0 12px 12px', pointerEvents: 'none', background: 'transparent' }}>
+      <div style={{
+        maxWidth: '420px', margin: '0 auto', pointerEvents: 'auto',
+        background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderTop: '3px solid var(--gc-green)',
+        borderRadius: '6px', padding: '14px 16px 12px', boxShadow: '0 12px 40px rgba(0,0,0,0.22)',
+      }}>
+        {status === 'sent' ? (
+          <>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '4px' }}>
+              {lang === 'en' ? 'One more step — confirm in your inbox' : lang === 'tw' ? '還差一步：去郵箱點確認' : '还差一步：去邮箱点确认'}
+            </div>
+            <div style={{ fontSize: '11.5px', lineHeight: 1.6, color: 'var(--gc-ink-soft)' }}>
+              {lang === 'en'
+                ? `We sent a confirmation email to ${email.trim()}. The subscription starts after you click it.`
+                : lang === 'tw'
+                  ? `確認郵件已發到 ${email.trim()}，點一下裡面的按鈕訂閱才生效。`
+                  : `确认邮件已发到 ${email.trim()}，点一下里面的按钮订阅才生效。`}
+            </div>
+            <button type="button" onClick={() => setShow(false)}
+              style={{ marginTop: '8px', border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+              {lang === 'en' ? 'Close' : lang === 'tw' ? '關閉' : '关闭'}
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '3px' }}>
+              {lang === 'en' ? 'Get an email the moment this case moves' : lang === 'tw' ? '這個案子的排期一動，就發郵件告訴你' : '这个案子的排期一动，就发邮件告诉你'}
+            </div>
+            <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '8px' }}>
+              {userCase.category} · {userCase.country} · {lang === 'en' ? 'PD ' : '优先日 '}{pdLabel}
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') subscribe(); }}
+                placeholder={lang === 'en' ? 'you@example.com' : 'you@example.com'}
+                style={{
+                  flex: 1, minWidth: 0, fontSize: '13px', padding: '8px 10px',
+                  border: status === 'invalid' || status === 'error' ? '1px solid var(--gc-red)' : '1px solid var(--gc-rule)',
+                  borderRadius: '4px', background: 'var(--gc-paper)', color: 'var(--gc-ink)',
+                }} />
+              <button type="button" onClick={subscribe} disabled={status === 'loading'}
+                style={{
+                  border: 'none', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap',
+                  background: 'var(--gc-green)', color: 'var(--gc-paper)', fontSize: '12px', fontWeight: 700, padding: '8px 14px',
+                  opacity: status === 'loading' ? 0.6 : 1,
+                }}>
+                {status === 'loading'
+                  ? (lang === 'en' ? '…' : '…')
+                  : (lang === 'en' ? 'Subscribe' : lang === 'tw' ? '一鍵訂閱' : '一键订阅')}
+              </button>
+            </div>
+            {(status === 'invalid' || status === 'error') && (
+              <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+                {status === 'invalid'
+                  ? (lang === 'en' ? 'That email doesn\'t look right' : lang === 'tw' ? '郵箱格式不對' : '邮箱格式不对')
+                  : (lang === 'en' ? 'Something went wrong — try again' : lang === 'tw' ? '出錯了，再試一次' : '出错了，再试一次')}
+              </div>
+            )}
+            <div className="flex items-center justify-between" style={{ marginTop: '7px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>
+                {lang === 'en' ? 'Monthly bulletin + movement alerts. Unsubscribe anytime.' : lang === 'tw' ? '每月公告＋異動提醒，隨時可退訂。' : '每月公告＋异动提醒，随时可退订。'}
+              </span>
+              <button type="button" onClick={dismiss}
+                style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px', whiteSpace: 'nowrap', marginLeft: '10px' }}>
+                {lang === 'en' ? 'Not now' : lang === 'tw' ? '以後再說' : '以后再说'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [lang, setLang] = useState(() => {
     if (typeof window === 'undefined') return 'zh';
@@ -13230,6 +13380,7 @@ export default function App() {
           onThemeChange={setTheme}
         />
       )}
+      <SubscribeNudge userCase={userCase} hasOnboarded={hasOnboarded} theme={theme} />
       <style>{`
         /* Fonts for Monocle theme — self-hosted via Google Fonts CDN */
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400;9..144,500;9..144,600;9..144,700&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');

@@ -47,6 +47,7 @@ export async function onRequestGet(context) {
         // bare number, not a subscriber record. Skip them by key rather than relying
         // on JSON.parse happening to throw.
         if (keyInfo.name.startsWith('rl:')) continue;
+        if (keyInfo.name.startsWith('an:')) continue; // analytics beacons
         const raw = await env.SUBSCRIBERS.get(keyInfo.name);
         if (!raw) continue;
         try {

@@ -13,6 +13,51 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Privacy-light dwell beacon (no cookies, no IP, random self-minted ids).
+      // Tracks visible time only; /api/beacon overwrites one KV record per session,
+      // so the last ping carries the session's cumulative total.
+      (function () {
+        try {
+          var mk = function () {
+            return (window.crypto && crypto.randomUUID)
+              ? crypto.randomUUID()
+              : 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+          };
+          var vid = localStorage.getItem('gc_vid');
+          if (!vid) { vid = mk(); localStorage.setItem('gc_vid', vid); }
+          var sid = sessionStorage.getItem('gc_sid');
+          if (!sid) { sid = mk(); sessionStorage.setItem('gc_sid', sid); }
+          var acc = 0;
+          var vstart = document.hidden ? null : Date.now();
+          var total = function () {
+            return acc + (vstart ? Date.now() - vstart : 0);
+          };
+          var send = function () {
+            var hasCase = false, subscribed = false, lang = '';
+            try {
+              hasCase = !!localStorage.getItem('gc_userCase');
+              subscribed = !!localStorage.getItem('gc_subscribedEmail');
+              lang = (localStorage.getItem('gc_lang') || '').replace(/[^a-z]/g, '');
+            } catch (e) {}
+            var payload = JSON.stringify({ vid: vid, sid: sid, dwellMs: total(), lang: lang, hasCase: hasCase, subscribed: subscribed });
+            if (navigator.sendBeacon) navigator.sendBeacon('/api/beacon', payload);
+          };
+          document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+              if (vstart) { acc += Date.now() - vstart; vstart = null; }
+              send();
+            } else if (!vstart) {
+              vstart = Date.now();
+            }
+          });
+          window.addEventListener('pagehide', send);
+          // iOS Safari can kill a tab without firing pagehide — an early ping makes
+          // sure the session is counted even then.
+          setTimeout(send, 10000);
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
