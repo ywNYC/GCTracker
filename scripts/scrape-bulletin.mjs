@@ -93,9 +93,15 @@ function classifyRow(rowLabel, section) {
     if (/^4TH\b/.test(t) || t.startsWith('FOURTH')) return 'EB4';
     // Non-minister religious workers — their own sunset-prone sub-category.
     if (t.startsWith('CERTAIN RELIGIOUS')) return 'SR';
-    // EB-5 Unreserved only; the Rural / High-Unemployment / Infrastructure
-    // set-asides are separate sub-pools and stay unparsed for now.
-    if (/^5TH\b/.test(t) && !t.includes('SET ASIDE') && !t.includes('SET-ASIDE')) return 'EB5';
+    // EB-5 set-asides: separate sub-pools with their own cutoffs. Label text
+    // varies across months ('5th Set Aside: Rural (20%)' etc.) — match by keyword.
+    if (/^5TH\b/.test(t) && (t.includes('SET ASIDE') || t.includes('SET-ASIDE'))) {
+      if (t.includes('RURAL')) return 'EB5R';
+      if (t.includes('HIGH UNEMPLOYMENT')) return 'EB5H';
+      if (t.includes('INFRASTRUCTURE')) return 'EB5I';
+      return null;
+    }
+    if (/^5TH\b/.test(t)) return 'EB5';
     return null;
   } else {
     if (t === 'F1' || t.startsWith('F1 ')) return 'F1';
@@ -571,7 +577,7 @@ async function main() {
 
   // Print summary for GitHub Actions log
   console.log('\n--- Summary ---');
-  for (const cat of ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4']) {
+  for (const cat of ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'EB5R', 'EB5H', 'EB5I', 'F1', 'F2A', 'F2B', 'F3', 'F4']) {
     const fa = parsed.finalAction[cat] || {};
     console.log(`${cat} Final Action: ROW=${fa.Other}  CN=${fa.China}  IN=${fa.India}  MX=${fa.Mexico}  PH=${fa.Philippines}`);
   }

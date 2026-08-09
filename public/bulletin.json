@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "2026-08-09T16:01:20.335Z",
+  "lastUpdated": "2026-08-09T16:59:55.285Z",
   "source": "github-actions-auto",
   "sourceUrl": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-august-2026.html",
   "current": {
     "month": "2026-08",
-    "scrapedAt": "2026-08-09T16:01:20.331Z",
+    "scrapedAt": "2026-08-09T16:59:55.274Z",
     "finalAction": {
       "EB1": {
         "Other": "C",
@@ -52,6 +52,27 @@
         "Other": "C",
         "China": "2016-12-01",
         "India": null,
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5R": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5H": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5I": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
         "Mexico": "C",
         "Philippines": "C"
       },
@@ -138,6 +159,27 @@
         "Other": "C",
         "China": "2017-03-01",
         "India": "2024-05-01",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5R": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5H": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5I": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
         "Mexico": "C",
         "Philippines": "C"
       },
@@ -348,6 +390,27 @@
         "India": null,
         "Mexico": "C",
         "Philippines": "C"
+      },
+      "EB5R": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5H": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5I": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
+        "Mexico": "C",
+        "Philippines": "C"
       }
     },
     "filing": {
@@ -425,6 +488,27 @@
         "Other": "C",
         "China": "2017-03-01",
         "India": "2024-05-01",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5R": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5H": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
+        "Mexico": "C",
+        "Philippines": "C"
+      },
+      "EB5I": {
+        "Other": "C",
+        "China": "C",
+        "India": "C",
         "Mexico": "C",
         "Philippines": "C"
       }

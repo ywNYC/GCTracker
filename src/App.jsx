@@ -150,7 +150,10 @@ const translations = {
     ew: 'EB-3 Other Workers',
     eb4: 'EB-4 Special Immigrants (incl. SIJ)',
     sr: 'EB-4 Religious Workers (SR)',
-    eb5: 'EB-5 Investors (Unreserved)',
+    eb5: 'EB-5 Investors (Unreserved / traditional)',
+    eb5r: 'EB-5 Rural Set-Aside (20%)',
+    eb5h: 'EB-5 High Unemployment (10%)',
+    eb5i: 'EB-5 Infrastructure (2%)',
     f1: 'F1 Unmarried Adult Children of Citizens',
     f2a: 'F2A Spouses & Children of LPRs',
     f2b: 'F2B Unmarried Adult Children of LPRs',
@@ -419,7 +422,10 @@ const translations = {
     ew: 'EB-3 非技术劳工',
     eb4: 'EB-4 特殊移民（含SIJ青少年）',
     sr: 'EB-4 宗教工作者（SR）',
-    eb5: 'EB-5 投资移民（未预留）',
+    eb5: 'EB-5 投资移民（未预留/传统）',
+    eb5r: 'EB-5 预留·乡村（20%）',
+    eb5h: 'EB-5 预留·高失业区（10%）',
+    eb5i: 'EB-5 预留·基建（2%）',
     f1: 'F1 公民成年未婚子女',
     f2a: 'F2A 绿卡持有人配偶与子女',
     f2b: 'F2B 绿卡持有人成年未婚子女',
@@ -685,7 +691,10 @@ const translations = {
     ew: 'EB-3 非技術勞工',
     eb4: 'EB-4 特殊移民（含SIJ青少年）',
     sr: 'EB-4 宗教工作者（SR）',
-    eb5: 'EB-5 投資移民（未預留）',
+    eb5: 'EB-5 投資移民（未預留/傳統）',
+    eb5r: 'EB-5 預留·鄉村（20%）',
+    eb5h: 'EB-5 預留·高失業區（10%）',
+    eb5i: 'EB-5 預留·基建（2%）',
     f1: 'F1 公民成年未婚子女',
     f2a: 'F2A 綠卡持有人配偶與子女',
     f2b: 'F2B 綠卡持有人成年未婚子女',
@@ -830,7 +839,7 @@ const bulletinAnchorDate = (day = 1) => {
 // USCIS announced for May 2026: EB uses Final Action Dates (Chart A),
 // Family categories continue to use Dates for Filing (Chart B)
 const FILING_AUTHORIZED = {
-  EB1: false, EB2: false, EB3: false, EW: false, EB4: false, SR: false, EB5: false,
+  EB1: false, EB2: false, EB3: false, EW: false, EB4: false, SR: false, EB5: false, EB5R: false, EB5H: false, EB5I: false,
   F1: true, F2A: true, F2B: true, F3: true, F4: true,
 };
 
@@ -1157,6 +1166,9 @@ const RATES_DB = {
   'EB4-Other': {long: 365, mid: 365, recent: 365},
   'SR-Other': {long: 365, mid: 365, recent: 365},
   'EB5-Other': {long: 365, mid: 365, recent: 365},
+  'EB5R-Other': {long: 365, mid: 365, recent: 365},
+  'EB5H-Other': {long: 365, mid: 365, recent: 365},
+  'EB5I-Other': {long: 365, mid: 365, recent: 365},
 };
 
 // Get 3-layer rates for a category+country
@@ -1661,6 +1673,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
     { v: 'EB1', label: t.eb1 }, { v: 'EB2', label: t.eb2 }, { v: 'EB3', label: t.eb3 },
     { v: 'EW', label: t.ew },
     { v: 'EB4', label: t.eb4 }, { v: 'SR', label: t.sr }, { v: 'EB5', label: t.eb5 },
+    { v: 'EB5R', label: t.eb5r }, { v: 'EB5H', label: t.eb5h }, { v: 'EB5I', label: t.eb5i },
     { v: 'F1', label: t.f1 }, { v: 'F2A', label: t.f2a }, { v: 'F2B', label: t.f2b },
     { v: 'F3', label: t.f3 }, { v: 'F4', label: t.f4 },
   ];
@@ -1930,7 +1943,7 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const categories = [
     { v: 'EB1' }, { v: 'EB2' }, { v: 'EB3' }, { v: 'EW' },
-    { v: 'EB4' }, { v: 'SR' }, { v: 'EB5' },
+    { v: 'EB4' }, { v: 'SR' }, { v: 'EB5' }, { v: 'EB5R' }, { v: 'EB5H' }, { v: 'EB5I' },
     { v: 'F1' }, { v: 'F2A' }, { v: 'F2B' }, { v: 'F3' }, { v: 'F4' },
   ];
   const countries = [
@@ -5135,6 +5148,17 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                   : `官方提醒（公告 ${hit.letter || '—'} 节）：「${locT.slice(0, 90)}」。`);
             }
           }
+          // EB-5 family: the deadlines that create real time pressure even while the
+          // set-aside pools print Current. Sources: RIA grandfather clause (file
+          // I-526E by 09/30/2026), EB-5 investment-amount inflation adjustment
+          // (expected ~01/2027), industry backlog expectations for the set-asides.
+          if (catTok.startsWith('EB5')) {
+            officialNotes.push(lang === 'en'
+              ? 'EB-5 key dates: I-526E filed before Sep 30, 2026 is protected by the grandfather clause even if the regional-center program lapses in 2027; investment minimums are expected to rise around Jan 2027 (TEA $800k → ~$900k); the Rural/High-Unemployment set-asides are Current for every country today, but the industry expects backlogs to form — earlier filings lock an earlier priority date.'
+              : lang === 'tw'
+                ? 'EB-5 關鍵日期：2026-09-30 前遞交 I-526E 受祖父條款保護（區域中心計畫即使 2027 年到期也須繼續審理）；2027 年 1 月前後投資額預計上調（TEA 80 萬→約 90 萬美元）；鄉村/高失業區預留類別目前對所有國家無排期，但業界普遍預期將出現積壓——越早遞件優先日越早。'
+                : 'EB-5 关键日期：2026-09-30 前递交 I-526E 受祖父条款保护（区域中心计划即使 2027 年到期也须继续审理）；2027 年 1 月前后投资额预计上调（TEA 80 万→约 90 万美元）；乡村/高失业区预留类别目前对所有国家无排期，但业内普遍预期将出现积压——越早递件优先日越早。');
+          }
           if (userCase.category === 'F2A' && BULLETIN_EXTRAS?.f2aExempt) {
             officialNotes.push(lang === 'en'
               ? `F2A note: priority dates before ${BULLETIN_EXTRAS.f2aExempt} are exempt from the per-country limit this month (bulletin section B note).`
@@ -5531,7 +5555,7 @@ const MonthlyUpdate = ({ userCase }) => {
   // a whole release showing "+30 days" under an August header because of exactly that.
   // The computation is 8 categories of date diffs; per-render cost is negligible.
   const changes = (() => {
-    const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+    const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'EB5R', 'EB5H', 'EB5I', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
     const catLabels = { EB1: t.eb1, EB2: t.eb2, EB3: t.eb3, EW: t.ew, F1: t.f1, F2A: t.f2a, F2B: t.f2b, F3: t.f3, F4: t.f4 };
     if (!hasPreviousData) {
       // Return category rows but with no movement deltas
@@ -6051,6 +6075,7 @@ const CompareByCountry = ({ userCase }) => {
     { v: 'EB1', label: t.eb1 }, { v: 'EB2', label: t.eb2 }, { v: 'EB3', label: t.eb3 },
     { v: 'EW', label: t.ew },
     { v: 'EB4', label: t.eb4 }, { v: 'SR', label: t.sr }, { v: 'EB5', label: t.eb5 },
+    { v: 'EB5R', label: t.eb5r }, { v: 'EB5H', label: t.eb5h }, { v: 'EB5I', label: t.eb5i },
     { v: 'F1', label: t.f1 }, { v: 'F2A', label: t.f2a }, { v: 'F2B', label: t.f2b },
     { v: 'F3', label: t.f3 }, { v: 'F4', label: t.f4 },
   ];
@@ -12319,6 +12344,9 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     { v: 'EB4', en: 'EB-4 / SIJ', zh: 'EB-4特殊移民', tw: 'EB-4特殊移民' },
     { v: 'SR',  en: 'EB-4 Religious', zh: 'EB-4宗教', tw: 'EB-4宗教' },
     { v: 'EB5', en: 'EB-5', zh: 'EB-5投资', tw: 'EB-5投資' },
+    { v: 'EB5R', en: 'EB-5 Rural', zh: 'EB-5乡村', tw: 'EB-5鄉村' },
+    { v: 'EB5H', en: 'EB-5 High-Unemp.', zh: 'EB-5高失业', tw: 'EB-5高失業' },
+    { v: 'EB5I', en: 'EB-5 Infra.', zh: 'EB-5基建', tw: 'EB-5基建' },
     { v: 'F1',  en: 'F1',   zh: 'F1',   tw: 'F1' },
     { v: 'F2A', en: 'F2A',  zh: 'F2A',  tw: 'F2A' },
     { v: 'F2B', en: 'F2B',  zh: 'F2B',  tw: 'F2B' },
@@ -13031,7 +13059,7 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('history-fetch-not-ok'))))
       .then((hist) => {
         if (cancelled || !hist || !Array.isArray(hist.months)) return;
-        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'EB5R', 'EB5H', 'EB5I', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
         const asc = hist.months
           .filter((m) => m && m.month && m.finalAction && cats.every((c) => m.finalAction[c]))
           .sort((a, b) => a.month.localeCompare(b.month));
@@ -13140,7 +13168,7 @@ export default function App() {
       .then((data) => {
         if (cancelled || !data || !data.current || !data.current.finalAction) return;
         // Sanity check — must have all 8 categories in finalAction
-        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
+        const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'EB5R', 'EB5H', 'EB5I', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
         const ok = cats.every((c) => data.current.finalAction[c]);
         if (!ok) {
           console.warn('[bulletin] Remote data missing categories, keeping hardcoded fallback');

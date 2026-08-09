@@ -7,7 +7,7 @@
 
 // Which chart each category ADOPTS for filing this month's I-485 (mirror of App.jsx).
 export const FILING_AUTHORIZED = {
-  EB1: false, EB2: false, EB3: false, EW: false, EB4: false, SR: false, EB5: false,
+  EB1: false, EB2: false, EB3: false, EW: false, EB4: false, SR: false, EB5: false, EB5R: false, EB5H: false, EB5I: false,
   F1: true, F2A: true, F2B: true, F3: true, F4: true,
 };
 
@@ -64,6 +64,9 @@ export const RATES_DB = {
   'EB4-Other': {long: 365, mid: 365, recent: 365},
   'SR-Other': {long: 365, mid: 365, recent: 365},
   'EB5-Other': {long: 365, mid: 365, recent: 365},
+  'EB5R-Other': {long: 365, mid: 365, recent: 365},
+  'EB5H-Other': {long: 365, mid: 365, recent: 365},
+  'EB5I-Other': {long: 365, mid: 365, recent: 365},
 };
 
 export const getRates = (cat, country) => {
