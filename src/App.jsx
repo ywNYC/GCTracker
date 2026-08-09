@@ -1257,16 +1257,20 @@ const chartBFloorCal = (cat, country, gapDaysA) => {
 const paceDaysToCalendar = (cat, country, gapDays, chart = 'finalAction') => {
   const raw = paceCalRaw(cat, country, gapDays, chart);
   if (chart !== 'finalAction' || !raw) return raw;
-  // Approval (chart A) can never land before filing (chart B): B's cutoff always sits
-  // ahead of A's, so a case crosses B first. Independent per-chart extrapolation can
-  // still put A earlier when A's recent pace beats B's — floor A's estimate to B's
-  // instead of showing the impossible ordering.
+  // FAMILY categories only: filing runs on chart B there, so approval (A) can never
+  // land before filing (B) and A's estimate is floored to B's — B is a real,
+  // steadily-moving gate for family cases, so the floor imports a credible number.
+  // EMPLOYMENT categories are exempt: filing runs on chart A, and chart B is a
+  // frozen intake lever whose extrapolation is garbage (EB5-China: B said 11.8y
+  // while A moves 30 days/mo — flooring A by that inflated a 5.2y wait to 11.8y).
+  if (!FILING_AUTHORIZED[cat]) return raw;
   const floor = chartBFloorCal(cat, country, gapDays);
   return floor !== null ? Math.max(raw, floor) : raw;
 };
 // Whether the floor actually changed the number — the UI shows a one-line explanation
 // only in that case.
 const paceEtaFlooredToB = (cat, country, gapDaysA) => {
+  if (!FILING_AUTHORIZED[cat]) return false;
   const raw = paceCalRaw(cat, country, gapDaysA, 'finalAction');
   if (!raw) return false;
   const floor = chartBFloorCal(cat, country, gapDaysA);
@@ -3709,8 +3713,17 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 const hist12h = monthlyMovementFromArchive(userCase.category, country, 12, heroChartKey);
                 const total12h = hist12h ? hist12h.reduce((sm, pp) => sm + (pp.days || 0), 0) : 0;
                 const paceMo = total12h > 0 ? total12h / 12 : null;
-                const paceCal = ps.days ? paceDaysToCalendar(userCase.category, country, ps.days, heroChartKey) : null;
+                let paceCal = ps.days ? paceDaysToCalendar(userCase.category, country, ps.days, heroChartKey) : null;
                 const aFloored = heroSel === 'A' && ps.days ? paceEtaFlooredToB(userCase.category, country, ps.days) : false;
+                // EB categories viewed on chart B: B is a frozen intake lever whose own
+                // extrapolation is garbage, but the bulletin invariant (B ≥ A) means B
+                // crosses a PD no later than A — cap B's estimate at A's.
+                let bCappedToA = false;
+                if (heroSel === 'B' && !filingAuthorized && paceCal
+                    && finalActionStatus?.status === 'notCurrent' && finalActionStatus.days) {
+                  const aCal = paceDaysToCalendar(userCase.category, country, finalActionStatus.days, 'finalAction');
+                  if (aCal && aCal < paceCal) { paceCal = aCal; bCappedToA = true; }
+                }
                 const etaDate = paceCal ? new Date(today2.getTime() + paceCal * 86400000) : null;
                 const yearsF = paceCal ? paceCal / 365.25 : null;
                 const heroText = paceCal === null ? (lang === 'en' ? 'TBD' : '待定')
@@ -3810,6 +3823,11 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                               : lang === 'tw'
                                 ? '獲批不會早於遞件，已按表B的預計託底。'
                                 : '获批不会早于递件，已按表B的预计托底。')}
+                            {bCappedToA && (lang === 'en'
+                              ? 'Chart B always sits at or ahead of Chart A, so this is capped at Chart A\'s estimate. '
+                              : lang === 'tw'
+                                ? '表B始終不落後於表A，預計按不晚於表A估算。'
+                                : '表B始终不落后于表A，预计按不晚于表A估算。')}
                             <button type="button" onClick={() => setShowHeroMath((v) => !v)}
                               style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600 }}>
                               {showHeroMath
@@ -3917,11 +3935,23 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                     // visible anchor here — the wait reads as two stops on one line.
                     let etaTxt = null;
                     if (blk.st.status === 'notCurrent' && blk.st.days) {
-                      const cal = paceDaysToCalendar(userCase.category, country, blk.st.days, blk.code === 'B' ? 'filing' : 'finalAction');
+                      let cal = paceDaysToCalendar(userCase.category, country, blk.st.days, blk.code === 'B' ? 'filing' : 'finalAction');
+                      let floorNote = '';
+                      if (cal && blk.code === 'A' && paceEtaFlooredToB(userCase.category, country, blk.st.days)) {
+                        floorNote = lang === 'en' ? ' (≥ B)' : lang === 'tw' ? '（不早於B）' : '（不早于B）';
+                      }
+                      // EB: B is a frozen intake lever — its own extrapolation can land
+                      // after A, which the bulletin invariant (B ≥ A) forbids. Cap at A.
+                      if (cal && blk.code === 'B' && !filingAuthorized
+                          && finalActionStatus?.status === 'notCurrent' && finalActionStatus.days) {
+                        const aCal = paceDaysToCalendar(userCase.category, country, finalActionStatus.days, 'finalAction');
+                        if (aCal && aCal < cal) {
+                          cal = aCal;
+                          floorNote = lang === 'en' ? ' (≤ A)' : lang === 'tw' ? '（不晚於A）' : '（不晚于A）';
+                        }
+                      }
                       if (cal) {
                         const d2 = new Date(Date.now() + cal * 86400000);
-                        const floored = blk.code === 'A' && paceEtaFlooredToB(userCase.category, country, blk.st.days);
-                        const floorNote = floored ? (lang === 'en' ? ' (≥ B)' : lang === 'tw' ? '（不早於B）' : '（不早于B）') : '';
                         etaTxt = lang === 'en'
                           ? `est. ${d2.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}${floorNote}`
                           : `预计 ${d2.getFullYear()}年${d2.getMonth() + 1}月${floorNote}`;

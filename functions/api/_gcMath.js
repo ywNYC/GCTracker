@@ -353,20 +353,31 @@ export function computeCaseUpdate({ cat, country, priorityDate, current, previou
     };
   })();
 
-  // Approval can never precede filing eligibility: chart B's cutoff always sits ahead
-  // of chart A's, so a case crosses B first and A after. Independent per-chart
-  // extrapolation can still land A earlier when A's recent pace beats B's — clamp A's
-  // ETA to B's and flag it so the UI can explain the floor instead of showing the
-  // impossible ordering.
+  // Ordering constraint between the two charts, resolved by WHICH CHART ACTUALLY
+  // GATES FILING for this category:
+  //
+  // Family (filing runs on chart B): approval (A) can never precede filing (B), so
+  // A's ETA is floored to B's. B's pace is a real, steadily-moving gate there, so
+  // the floor imports a credible number (F4-China: 6.8y → 7.2y).
+  //
+  // Employment (filing runs on chart A): BOTH milestones are governed by A, and
+  // chart B is a frozen intake lever that moves in rare jumps — extrapolating it
+  // yields garbage (EB5-China: B said 11.8y while A moves 30 days/mo). Flooring A
+  // by that number was wrong. Instead, the bulletin invariant (B always sits at or
+  // ahead of A, so B crosses a PD no later than A) caps B's DISPLAYED ETA at A's.
   if (typeof stations.A.etaMonths === 'number' && typeof stations.B.etaMonths === 'number'
       && stations.A.etaMonths < stations.B.etaMonths) {
-    stations.A.etaMonths = stations.B.etaMonths;
-    stations.A.clampedToB = true;
-  }
-  if (adopted.chart === 'A' && typeof adopted.etaMonths === 'number'
-      && typeof stations.B.etaMonths === 'number' && adopted.etaMonths < stations.B.etaMonths) {
-    adopted.etaMonths = stations.B.etaMonths;
-    adopted.clampedToB = true;
+    if (FILING_AUTHORIZED[cat]) {
+      stations.A.etaMonths = stations.B.etaMonths;
+      stations.A.clampedToB = true;
+      if (adopted.chart === 'A' && typeof adopted.etaMonths === 'number') {
+        adopted.etaMonths = stations.B.etaMonths;
+        adopted.clampedToB = true;
+      }
+    } else {
+      stations.B.etaMonths = stations.A.etaMonths;
+      stations.B.clampedToA = true;
+    }
   }
 
   return {

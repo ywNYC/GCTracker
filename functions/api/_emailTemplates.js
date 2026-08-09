@@ -918,7 +918,8 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
     if (!stn || typeof stn.gapDays !== 'number' || stn.gapDays <= 0) return '';
     const gapTxt = stn.gapDays.toLocaleString('en-US');
     const cal = (typeof stn.etaMonths === 'number' && isFinite(stn.etaMonths) && stn.etaMonths > 0) ? monthToCal(stn.etaMonths) : null;
-    const flooredNote = stn.clampedToB ? (lang === 'en' ? ' (not before Chart B)' : '（不早于表B）') : '';
+    const flooredNote = stn.clampedToB ? (lang === 'en' ? ' (not before Chart B)' : '（不早于表B）')
+      : stn.clampedToA ? (lang === 'en' ? ' (no later than Chart A)' : '（不晚于表A）') : '';
     return lang === 'en'
       ? `${gapTxt} days to your PD${cal ? ` · est. ${cal}${flooredNote}` : ''}`
       : `距你的优先日 ${gapTxt} 天${cal ? ` · 预计 ${cal}${flooredNote}` : ''}`;
