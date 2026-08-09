@@ -3663,7 +3663,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                   style={{ border: '1px solid var(--gc-rule)', background: 'transparent', borderRadius: '2px', padding: '3px 5px', cursor: 'pointer', lineHeight: 0 }}>
                   <Share2 size={11} style={{ color: 'var(--gc-muted)' }} />
                 </button>
-                <button type="button" onClick={() => setTab('alerts')}
+                <button type="button" onClick={() => window.dispatchEvent(new Event('gc-open-subscribe'))}
                   title={lang === 'en' ? 'Subscribe' : '订阅'}
                   style={{ border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)', borderRadius: '2px', padding: '3px 5px', cursor: 'pointer', lineHeight: 0 }}>
                   <Mail size={11} style={{ color: 'var(--gc-green)' }} />
@@ -12812,6 +12812,175 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
 // Main App
 // ============================================================
 // ============================================================
+// SubscribeModal — the entire subscribe flow in one dialog: email + email language
+// + the four alert switches + the go-confirm-your-inbox close. Opened from the nav's
+// 订阅 button and the case-card mail icon (via the 'gc-open-subscribe' event), so
+// nobody has to navigate to a separate page just to subscribe.
+// ============================================================
+const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
+  const { lang } = useLang();
+  const [email, setEmail] = useState('');
+  const [subLang, setSubLang] = useState(lang);
+  const [alerts, setAlerts] = useState({ whenCurrent: true, whenEligible: true, monthlyUpdates: true, retrogression: true });
+  const [status, setStatus] = useState(''); // '' | 'loading' | 'sent' | 'error' | 'invalid'
+  if (!show) return null;
+
+  const toggle = (k) => setAlerts((prev) => ({ ...prev, [k]: !prev[k] }));
+
+  const subscribe = async () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStatus('invalid');
+      setTimeout(() => setStatus(''), 2500);
+      return;
+    }
+    setStatus('loading');
+    try {
+      const resp = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          userCase,
+          alerts,
+          language: subLang,
+        }),
+      });
+      const result = await resp.json().catch(() => ({ success: false }));
+      if (resp.ok && result.success) {
+        setStatus('sent');
+        try {
+          window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase());
+          window.sessionStorage.setItem('gc_subNudgeShown', '1');
+        } catch { /* noop */ }
+      } else {
+        setStatus('error');
+        setTimeout(() => setStatus(''), 3000);
+      }
+    } catch {
+      setStatus('error');
+      setTimeout(() => setStatus(''), 3000);
+    }
+  };
+
+  const alertRows = [
+    { k: 'monthlyUpdates', zh: '每月公告更新', tw: '每月公告更新', en: 'Monthly bulletin updates' },
+    { k: 'retrogression', zh: '倒退 / 无名额警报', tw: '倒退 / 無名額警報', en: 'Retrogression alerts' },
+    { k: 'whenEligible', zh: '排到可递件时通知', tw: '排到可遞件時通知', en: 'When you can file' },
+    { k: 'whenCurrent', zh: '排到可获批时通知', tw: '排到可獲批時通知', en: 'When you can be approved' },
+  ];
+  const pdLabel = lang === 'en' ? userCase.priorityDate
+    : `${userCase.priorityDate.slice(0, 4)}年${parseInt(userCase.priorityDate.slice(5, 7), 10)}月`;
+
+  return (
+    <div className="visa-root" data-theme={theme}
+      style={{ position: 'fixed', inset: 0, zIndex: 950, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'rgba(15,20,25,0.5)' }}
+      onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        position: 'relative', width: '100%', maxWidth: '360px',
+        background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderTop: '3px solid var(--gc-green)',
+        borderRadius: '6px', padding: '16px 18px 14px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        maxHeight: 'calc(100vh - 80px)', overflowY: 'auto',
+      }}>
+        <button type="button" aria-label="close" onClick={onClose}
+          style={{ position: 'absolute', top: '4px', right: '4px', width: '36px', height: '36px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '18px', lineHeight: 1, color: 'var(--gc-muted)' }}>×</button>
+        {status === 'sent' ? (
+          <>
+            <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '8px', paddingRight: '28px' }}>
+              {lang === 'en' ? 'One more step' : lang === 'tw' ? '還差一步' : '还差一步'}
+            </div>
+            <div style={{ fontSize: '12.5px', lineHeight: 1.7, color: 'var(--gc-ink-soft)' }}>
+              {lang === 'en'
+                ? <>We emailed a confirmation link to <b>{email.trim()}</b>. The subscription only starts after you click it.</>
+                : lang === 'tw'
+                  ? <>確認郵件已發到 <b>{email.trim()}</b>，<b>點擊裡面的連結後訂閱才生效</b>。</>
+                  : <>确认邮件已发到 <b>{email.trim()}</b>，<b>点击里面的链接后订阅才生效</b>。</>}
+            </div>
+            <div style={{ fontSize: '11px', lineHeight: 1.65, color: 'var(--gc-muted)', marginTop: '8px', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px', padding: '7px 9px' }}>
+              {lang === 'en'
+                ? 'Not in your inbox? Check the spam/junk folder — and add the sender to contacts so future updates land properly.'
+                : lang === 'tw'
+                  ? '收件匣沒有？翻一下垃圾郵件匣，並把發件人加入通訊錄，之後的月度更新才不會被攔。'
+                  : '收件箱没有？翻一下垃圾邮件，并把发件人加入通讯录，之后的月度更新才不会被拦。'}
+            </div>
+            <button type="button" onClick={onClose}
+              style={{ width: '100%', marginTop: '12px', padding: '9px', fontSize: '12.5px', fontWeight: 700, background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              {lang === 'en' ? 'Got it' : lang === 'tw' ? '知道了，這就去點' : '知道了，这就去点'}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '2px', paddingRight: '28px' }}>
+              {lang === 'en' ? 'Track this case by email' : lang === 'tw' ? '訂閱這個案子的排期' : '订阅这个案子的排期'}
+            </div>
+            <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '10px' }}>
+              {userCase.category} · {userCase.country} · {lang === 'en' ? 'PD ' : '优先日 '}{pdLabel}
+            </div>
+            <input
+              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') subscribe(); }}
+              placeholder="you@example.com"
+              style={{
+                width: '100%', fontSize: '13px', padding: '9px 10px', boxSizing: 'border-box',
+                border: status === 'invalid' || status === 'error' ? '1px solid var(--gc-red)' : '1px solid var(--gc-rule)',
+                borderRadius: '4px', background: 'var(--gc-paper)', color: 'var(--gc-ink)',
+              }} />
+            {(status === 'invalid' || status === 'error') && (
+              <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+                {status === 'invalid'
+                  ? (lang === 'en' ? 'That email doesn\'t look right' : lang === 'tw' ? '郵箱格式不對' : '邮箱格式不对')
+                  : (lang === 'en' ? 'Something went wrong — try again' : lang === 'tw' ? '出錯了，再試一次' : '出错了，再试一次')}
+              </div>
+            )}
+            <div className="flex items-center" style={{ gap: '6px', margin: '10px 0 2px' }}>
+              <span style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>{lang === 'en' ? 'Email language' : lang === 'tw' ? '郵件語言' : '邮件语言'}</span>
+              <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
+                {[{ v: 'zh', label: '简体' }, { v: 'tw', label: '繁體' }, { v: 'en', label: 'EN' }].map((opt, oi) => (
+                  <button key={opt.v} type="button" onClick={() => setSubLang(opt.v)}
+                    style={{
+                      fontSize: '10px', fontWeight: 700, padding: '3px 9px', border: 'none', cursor: 'pointer',
+                      borderLeft: oi === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                      background: subLang === opt.v ? 'var(--gc-green)' : 'var(--gc-surface)',
+                      color: subLang === opt.v ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                    }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </span>
+            </div>
+            <div style={{ margin: '8px 0 2px' }}>
+              {alertRows.map((row) => (
+                <label key={row.k} className="flex items-center" style={{ gap: '8px', padding: '5px 0', cursor: 'pointer', fontSize: '12px', color: 'var(--gc-ink-soft)' }}>
+                  <input type="checkbox" checked={!!alerts[row.k]} onChange={() => toggle(row.k)}
+                    style={{ accentColor: 'var(--gc-green)', width: '15px', height: '15px', flexShrink: 0 }} />
+                  {lang === 'en' ? row.en : lang === 'tw' ? row.tw : row.zh}
+                </label>
+              ))}
+            </div>
+            <button type="button" onClick={subscribe} disabled={status === 'loading'}
+              style={{
+                width: '100%', marginTop: '8px', padding: '10px', fontSize: '13px', fontWeight: 700,
+                background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none', borderRadius: '4px',
+                cursor: 'pointer', opacity: status === 'loading' ? 0.6 : 1,
+              }}>
+              {status === 'loading' ? '…' : (lang === 'en' ? 'Subscribe' : lang === 'tw' ? '一鍵訂閱' : '一键订阅')}
+            </button>
+            <div className="flex items-center justify-between" style={{ marginTop: '8px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>
+                {lang === 'en' ? 'Unsubscribe anytime.' : lang === 'tw' ? '隨時可退訂。' : '随时可退订。'}
+              </span>
+              <button type="button" onClick={() => { onClose(); window.dispatchEvent(new Event('gc-goto-alerts')); }}
+                style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                {lang === 'en' ? 'More reminder settings →' : lang === 'tw' ? '更多提醒設定 →' : '更多提醒设置 →'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
 // InlineSubscribeCTA — one-row subscribe entry embedded where intent peaks (under
 // the hero number, at the end of the monthly recap). Hidden entirely once the
 // visitor subscribed; touching it marks the session so the timed popup stays quiet.
@@ -13583,6 +13752,19 @@ export default function App() {
     link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400;9..144,500;9..144,600;9..144,700&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap';
     document.head.appendChild(link);
   }, [theme]);
+  // Subscribe modal — opened by the nav's 订阅 button and the case card's mail
+  // icon (custom event, so deep components don't need a prop drill).
+  const [showSubModal, setShowSubModal] = useState(false);
+  useEffect(() => {
+    const open = () => setShowSubModal(true);
+    const gotoAlerts = () => setTab('alerts');
+    window.addEventListener('gc-open-subscribe', open);
+    window.addEventListener('gc-goto-alerts', gotoAlerts);
+    return () => {
+      window.removeEventListener('gc-open-subscribe', open);
+      window.removeEventListener('gc-goto-alerts', gotoAlerts);
+    };
+  }, []);
   // Footer theme dropdown open state
   const [showFooterThemePicker, setShowFooterThemePicker] = useState(false);
   const [showMonthBar, setShowMonthBar] = useState(false);
@@ -13654,6 +13836,7 @@ export default function App() {
         />
       )}
       <SubscribeNudge userCase={userCase} hasOnboarded={hasOnboarded} theme={theme} />
+      <SubscribeModal show={showSubModal} onClose={() => setShowSubModal(false)} userCase={userCase} theme={theme} />
       <style>{`
         /* Monocle theme fonts load ASYNCHRONOUSLY via a JS-injected <link> (see the
            theme effect) — never as a CSS @import. fonts.googleapis.com is blocked in
@@ -14594,7 +14777,7 @@ export default function App() {
                   // Stacking frees the full tab width for the label.
                   const stackVertical = lang === 'en';
                   return (
-                    <button key={tb.id} onClick={() => handleTabChange(tb.id)}
+                    <button key={tb.id} onClick={() => (tb.id === 'alerts' ? setShowSubModal(true) : handleTabChange(tb.id))}
                       style={{
                         flex: '1 1 0%', minWidth: 0, boxSizing: 'border-box',
                         position: 'relative',
