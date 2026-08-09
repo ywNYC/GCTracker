@@ -5298,8 +5298,6 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
               <span style={{ fontWeight: 700 }}>{closeTitle}</span>
               <span style={{ color: 'var(--gc-ink-soft)' }}>{lang === 'en' ? ' — ' : '——'}{closeDesc}</span>
             </p>
-            <InlineSubscribeCTA userCase={userCase}
-              label={lang === 'en' ? 'Next month\'s recap, straight to your inbox' : lang === 'tw' ? '下個月的這份小結，直接發到你信箱' : '下个月的这份小结，直接发到你邮箱'} />
           </div>
         );
       })()}
