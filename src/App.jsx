@@ -5242,12 +5242,137 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 // ============================================================
 // Monthly Update
 // ============================================================
+// ============================================================
+// BulletinTab — the bulletin itself as a first-class page: official notices
+// (trilingual), DV cutoffs, statutory quotas, edition metadata.
+// ============================================================
+const BulletinTab = () => {
+  const { lang } = useLang();
+  const [openNotice, setOpenNotice] = useState(null);
+  return (
+    <div className="space-y-2">
+      <div style={{ padding: '4px 0 0' }}>
+        <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>{lang === 'en' ? 'BULLETIN' : '公告'}</div>
+        <h2 className="gc-serif" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 2px' }}>
+          {lang === 'en' ? 'This month\'s Visa Bulletin' : lang === 'tw' ? '本期簽證公告' : '本期签证公告'}
+        </h2>
+        <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: 0 }}>
+          {BULLETIN_CURRENT_MONTH[lang]}
+          {BULLETIN_EXTRAS?.meta?.volume ? ` · Vol. ${BULLETIN_EXTRAS.meta.volume} No. ${BULLETIN_EXTRAS.meta.number}` : ''}
+          {BULLETIN_EXTRAS?.meta?.printedDate ? ` · ${BULLETIN_EXTRAS.meta.printedDate}` : ''}
+        </p>
+      </div>
+      {/* B3: the bulletin's own lettered notices, verbatim */}
+      {BULLETIN_NOTICES.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+            {lang === 'en' ? 'Official notices (from the bulletin)' : lang === 'tw' ? '公告原文提醒（官方）' : '公告原文提醒（官方）'}
+          </div>
+          {BULLETIN_NOTICES.map((nz, ni) => {
+            const loc = locNotice(nz, lang);
+            const isOpen = openNotice === ni;
+            return (
+            <div key={ni} style={{ borderLeft: '2px solid var(--gc-amber-border)', padding: '6px 10px', marginBottom: '6px', background: 'var(--gc-paper-soft)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+                {nz.letter ? `${nz.letter} · ` : ''}{loc.title}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.65, marginTop: '2px' }}>
+                {loc.translated ? loc.text : `${(loc.text || '').slice(0, 220)}${(loc.text || '').length > 220 ? '…' : ''}`}
+              </div>
+              {loc.translated && (
+                <div style={{ marginTop: '3px' }}>
+                  <button type="button" onClick={() => setOpenNotice(isOpen ? null : ni)}
+                    style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '9.5px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                    {isOpen
+                      ? (lang === 'tw' ? '收起英文原文' : '收起英文原文')
+                      : (lang === 'tw' ? 'AI 譯文 · 查看英文原文' : 'AI 译文 · 查看英文原文')}
+                  </button>
+                  {isOpen && (
+                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.6, marginTop: '3px', fontStyle: 'italic' }}>
+                      {nz.title}{nz.text ? ` — ${nz.text}` : ''}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            );
+          })}
+        </div>
+      )}
+
+
+
+      {/* B1: DV lottery rank cutoffs — scraped since day one, displayed at last */}
+      {BULLETIN_EXTRAS?.dv && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+            {lang === 'en' ? 'DV lottery rank cutoffs' : lang === 'tw' ? 'DV 抽籤排名截止' : 'DV 抽签排名截止'}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '6px' }}>
+            {lang === 'en'
+              ? 'Case numbers BELOW the cutoff may proceed. Numbers are ranks, not dates.'
+              : '案件编号低于截止数即可推进；这些是抽签排名数字，不是日期。'}
+          </div>
+          {Object.entries({ africa: lang === 'en' ? 'Africa' : '非洲', asia: lang === 'en' ? 'Asia' : '亚洲', europe: lang === 'en' ? 'Europe' : '欧洲', northAmerica: lang === 'en' ? 'N. America' : '北美', oceania: lang === 'en' ? 'Oceania' : '大洋洲', southAmerica: lang === 'en' ? 'S. America' : '南美/加勒比' }).map(([k, label]) => {
+            const cur = BULLETIN_EXTRAS.dv?.[k];
+            const nxt = BULLETIN_EXTRAS.dvNext?.regions?.[k];
+            if (!cur) return null;
+            const fmtDv = (v) => (v === 'C' ? (lang === 'en' ? 'Current' : '无限制') : (typeof v === 'number' ? v.toLocaleString('en-US') : v));
+            return (
+              <div key={k} className="flex items-center justify-between" style={{ fontSize: '11.5px', padding: '3px 0', borderTop: '1px solid var(--gc-rule-soft)' }}>
+                <span style={{ color: 'var(--gc-ink-soft)' }}>{label}
+                  {cur.exceptions && Object.keys(cur.exceptions).length > 0 && (
+                    <span style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginLeft: '5px' }}>
+                      {Object.entries(cur.exceptions).map(([cc, vv]) => `${cc} ${fmtDv(vv)}`).join(' · ')}
+                    </span>
+                  )}
+                </span>
+                <span className="gc-mono" style={{ fontWeight: 700, color: 'var(--gc-ink)' }}>
+                  {fmtDv(cur.cutoff)}
+                  {nxt && <span style={{ color: 'var(--gc-muted)', fontWeight: 400 }}> → {fmtDv(nxt.cutoff)}</span>}
+                </span>
+              </div>
+            );
+          })}
+          {BULLETIN_EXTRAS?.dvNext?.monthName && (
+            <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '4px' }}>
+              {lang === 'en' ? `→ = advance notification for ${BULLETIN_EXTRAS.dvNext.monthName}` : `→ 为下月（${BULLETIN_EXTRAS.dvNext.monthName}）预告`}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* B12: statutory annual limits — INA §201/202/203 constants, cited */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+          {lang === 'en' ? 'Why the backlog: statutory annual limits' : lang === 'tw' ? '為什麼積壓：法定年度配額' : '为什么积压：法定年度配额'}
+        </div>
+        {[
+          ['F1', '23,400'], ['F2A/F2B', '114,200'], ['F3', '23,400'], ['F4', '65,000'],
+          ['EB-1', '≈40,040'], ['EB-2', '≈40,040'], ['EB-3', '≈40,040'], ['EB-4/EB-5', lang === 'en' ? '≈9,940 each' : '各 ≈9,940'],
+        ].map(([k, v]) => (
+          <div key={k} className="flex items-center justify-between" style={{ fontSize: '11.5px', padding: '2px 0' }}>
+            <span style={{ color: 'var(--gc-ink-soft)' }}>{k}</span>
+            <span className="gc-mono" style={{ fontWeight: 600, color: 'var(--gc-ink)' }}>{v}{lang === 'en' ? '/yr' : ' 张/年'}</span>
+          </div>
+        ))}
+        <div style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '5px', lineHeight: 1.6 }}>
+          {lang === 'en'
+            ? 'Plus a 7% per-country ceiling — that ceiling, not processing speed, is why China/India queues are long. Source: INA §201–203.'
+            : lang === 'tw'
+              ? '另有單一國家 7% 上限——中國/印度的長隊來自這個上限，而非審理速度。來源：INA §201–203。'
+              : '另有单一国家 7% 上限——中国/印度的长队来自这个上限，而非审理速度。来源：INA §201–203。'}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const MonthlyUpdate = ({ userCase }) => {
   const { t, lang } = useLang();
   const userCountry = resolveCountry(userCase.country);
   // Which chart the whole page reads: A (finalAction) or B (filing).
   const [updChart, setUpdChart] = useState('A');
-  const [openNotice, setOpenNotice] = useState(null);
   const chartKey = updChart === 'B' ? 'filing' : 'finalAction';
   const showsTwoColumns = userCase.country === 'China' || userCase.country === 'India'; // These have separate cutoffs from ROW
 
@@ -5403,45 +5528,6 @@ const MonthlyUpdate = ({ userCase }) => {
           </div>
         );
       })()}
-      {/* B3: the bulletin's own lettered notices, verbatim */}
-      {BULLETIN_NOTICES.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-            {lang === 'en' ? 'Official notices (from the bulletin)' : lang === 'tw' ? '公告原文提醒（官方）' : '公告原文提醒（官方）'}
-          </div>
-          {BULLETIN_NOTICES.map((nz, ni) => {
-            const loc = locNotice(nz, lang);
-            const isOpen = openNotice === ni;
-            return (
-            <div key={ni} style={{ borderLeft: '2px solid var(--gc-amber-border)', padding: '6px 10px', marginBottom: '6px', background: 'var(--gc-paper-soft)' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)' }}>
-                {nz.letter ? `${nz.letter} · ` : ''}{loc.title}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.65, marginTop: '2px' }}>
-                {loc.translated ? loc.text : `${(loc.text || '').slice(0, 220)}${(loc.text || '').length > 220 ? '…' : ''}`}
-              </div>
-              {loc.translated && (
-                <div style={{ marginTop: '3px' }}>
-                  <button type="button" onClick={() => setOpenNotice(isOpen ? null : ni)}
-                    style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '9.5px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
-                    {isOpen
-                      ? (lang === 'tw' ? '收起英文原文' : '收起英文原文')
-                      : (lang === 'tw' ? 'AI 譯文 · 查看英文原文' : 'AI 译文 · 查看英文原文')}
-                  </button>
-                  {isOpen && (
-                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.6, marginTop: '3px', fontStyle: 'italic' }}>
-                      {nz.title}{nz.text ? ` — ${nz.text}` : ''}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            );
-          })}
-        </div>
-      )}
-
-
       <div>
         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{t.categoryChanges}</div>
         <div className="space-y-1">
@@ -5492,68 +5578,7 @@ const MonthlyUpdate = ({ userCase }) => {
         </div>
       </div>
     
-      {/* B1: DV lottery rank cutoffs — scraped since day one, displayed at last */}
-      {BULLETIN_EXTRAS?.dv && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-            {lang === 'en' ? 'DV lottery rank cutoffs' : lang === 'tw' ? 'DV 抽籤排名截止' : 'DV 抽签排名截止'}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '6px' }}>
-            {lang === 'en'
-              ? 'Case numbers BELOW the cutoff may proceed. Numbers are ranks, not dates.'
-              : '案件编号低于截止数即可推进；这些是抽签排名数字，不是日期。'}
-          </div>
-          {Object.entries({ africa: lang === 'en' ? 'Africa' : '非洲', asia: lang === 'en' ? 'Asia' : '亚洲', europe: lang === 'en' ? 'Europe' : '欧洲', northAmerica: lang === 'en' ? 'N. America' : '北美', oceania: lang === 'en' ? 'Oceania' : '大洋洲', southAmerica: lang === 'en' ? 'S. America' : '南美/加勒比' }).map(([k, label]) => {
-            const cur = BULLETIN_EXTRAS.dv?.[k];
-            const nxt = BULLETIN_EXTRAS.dvNext?.regions?.[k];
-            if (!cur) return null;
-            const fmtDv = (v) => (v === 'C' ? (lang === 'en' ? 'Current' : '无限制') : (typeof v === 'number' ? v.toLocaleString('en-US') : v));
-            return (
-              <div key={k} className="flex items-center justify-between" style={{ fontSize: '11.5px', padding: '3px 0', borderTop: '1px solid var(--gc-rule-soft)' }}>
-                <span style={{ color: 'var(--gc-ink-soft)' }}>{label}
-                  {cur.exceptions && Object.keys(cur.exceptions).length > 0 && (
-                    <span style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginLeft: '5px' }}>
-                      {Object.entries(cur.exceptions).map(([cc, vv]) => `${cc} ${fmtDv(vv)}`).join(' · ')}
-                    </span>
-                  )}
-                </span>
-                <span className="gc-mono" style={{ fontWeight: 700, color: 'var(--gc-ink)' }}>
-                  {fmtDv(cur.cutoff)}
-                  {nxt && <span style={{ color: 'var(--gc-muted)', fontWeight: 400 }}> → {fmtDv(nxt.cutoff)}</span>}
-                </span>
-              </div>
-            );
-          })}
-          {BULLETIN_EXTRAS?.dvNext?.monthName && (
-            <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '4px' }}>
-              {lang === 'en' ? `→ = advance notification for ${BULLETIN_EXTRAS.dvNext.monthName}` : `→ 为下月（${BULLETIN_EXTRAS.dvNext.monthName}）预告`}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* B12: statutory annual limits — INA §201/202/203 constants, cited */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-          {lang === 'en' ? 'Why the backlog: statutory annual limits' : lang === 'tw' ? '為什麼積壓：法定年度配額' : '为什么积压：法定年度配额'}
-        </div>
-        {[
-          ['F1', '23,400'], ['F2A/F2B', '114,200'], ['F3', '23,400'], ['F4', '65,000'],
-          ['EB-1', '≈40,040'], ['EB-2', '≈40,040'], ['EB-3', '≈40,040'], ['EB-4/EB-5', lang === 'en' ? '≈9,940 each' : '各 ≈9,940'],
-        ].map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between" style={{ fontSize: '11.5px', padding: '2px 0' }}>
-            <span style={{ color: 'var(--gc-ink-soft)' }}>{k}</span>
-            <span className="gc-mono" style={{ fontWeight: 600, color: 'var(--gc-ink)' }}>{v}{lang === 'en' ? '/yr' : ' 张/年'}</span>
-          </div>
-        ))}
-        <div style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '5px', lineHeight: 1.6 }}>
-          {lang === 'en'
-            ? 'Plus a 7% per-country ceiling — that ceiling, not processing speed, is why China/India queues are long. Source: INA §201–203.'
-            : lang === 'tw'
-              ? '另有單一國家 7% 上限——中國/印度的長隊來自這個上限，而非審理速度。來源：INA §201–203。'
-              : '另有单一国家 7% 上限——中国/印度的长队来自这个上限，而非审理速度。来源：INA §201–203。'}
-        </div>
-      </div>
     </div>
 
   );
@@ -12574,7 +12599,7 @@ export default function App() {
   const [tab, setTab] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search).get('tab');
-      if (['overview', 'trends', 'update', 'compare', 'index', 'alerts'].includes(p)) return p;
+      if (['overview', 'trends', 'update', 'bulletin', 'compare', 'index', 'alerts'].includes(p)) return p;
     } catch (e) { /* noop */ }
     return 'overview';
   });
@@ -13066,6 +13091,7 @@ export default function App() {
     // ForecastHub 代码保留，恢复时解开此行。
     // { id: 'trends', label: t.navTrends, icon: BarChart3 },
     { id: 'update', label: t.navUpdate, icon: TrendingUp },
+    { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
     { id: 'compare', label: t.navCompare, icon: Target },
     { id: 'index', label: t.navIndex, icon: ClipboardList },
     { id: 'alerts', label: t.navAlerts, icon: Bell },
@@ -14130,6 +14156,7 @@ export default function App() {
               {tab === 'forecast' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
               {tab === 'i485' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
+              {tab === 'bulletin' && <BulletinTab />}
               {tab === 'compare' && <CompareHub userCase={userCase} />}
               {tab === 'index' && <TheIndex userCase={userCase} setTab={handleTabChange} setUserCase={setUserCase} previousTab={previousTab} onSetupCase={() => { setOnboardingInitialMode('form'); setHasOnboarded(false); }} />}
               {tab === 'help' && <HelpCenter />}
