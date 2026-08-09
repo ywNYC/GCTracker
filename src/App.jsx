@@ -1799,24 +1799,30 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
 // ============================================================
 // DateDropdown — themed priority-date picker. The native date input opens the OS
 // wheel (system UI, unstylable); this draws the picker in-page instead: a year
-// strip you swipe, a 12-month grid, a day grid — one tap each, faster than three
-// wheels. Same fixed-position pattern as CategoryDropdown (ancestors clip absolute
+// stepper (tap the year for a full tappable grid — no scrolling), a 12-month grid,
+// a day grid. Same fixed-position pattern as CategoryDropdown (ancestors clip absolute
 // panels with their overflow:hidden animations).
 // ============================================================
 const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
   const { lang } = useLang();
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
+  // 'ymd' = steppers + month/day grids; 'years' = full tappable year grid. NO
+  // horizontal scrolling anywhere — a scrolled-away year is an unfindable year
+  // (first-time users on iOS could not reach their year in the old swipe strip).
+  const [view, setView] = useState('ymd');
   const wrapRef = useRef(null);
   const panelRef = useRef(null);
-  const yearRowRef = useRef(null);
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '') || [null, '2020', '01', '01'];
   const y = parseInt(parts[1], 10);
   const m = parseInt(parts[2], 10);
   const d = parseInt(parts[3], 10);
 
   const toggleOpen = () => {
-    if (!open && wrapRef.current) setRect(wrapRef.current.getBoundingClientRect());
+    if (!open && wrapRef.current) {
+      setRect(wrapRef.current.getBoundingClientRect());
+      setView('ymd');
+    }
     setOpen((v) => !v);
   };
   useEffect(() => {
@@ -1840,14 +1846,6 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
       window.removeEventListener('scroll', onScroll, true);
     };
   }, [open]);
-  // Center the selected year chip when the panel opens.
-  useEffect(() => {
-    if (open && yearRowRef.current) {
-      const sel = yearRowRef.current.querySelector('[data-sel="1"]');
-      if (sel && sel.scrollIntoView) sel.scrollIntoView({ inline: 'center', block: 'nearest' });
-    }
-  }, [open]);
-
   const pad2 = (n) => String(n).padStart(2, '0');
   const daysInMonth = (yy, mm) => new Date(yy, mm, 0).getDate();
   const setDate = (ny, nm, nd, closeAfter = false) => {
@@ -1911,18 +1909,44 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
           borderTop: '2px solid var(--gc-green)', borderRadius: '4px',
           boxShadow: '0 14px 40px rgba(0,0,0,0.18)', padding: '10px',
         }}>
+          {view === 'years' ? (
+            <>
+              <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
+                {lang === 'en' ? 'PICK A YEAR' : lang === 'tw' ? '選擇年份' : '选择年份'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
+                {years.map((yy) => (
+                  <button key={yy} type="button"
+                    onClick={() => { setDate(yy, m, d); setView('ymd'); }}
+                    className="gc-mono" style={gridBtn(yy === y)}>
+                    {yy}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+          <>
           <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
             {lang === 'en' ? 'YEAR' : '年'}
           </div>
-          <div ref={yearRowRef} style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '4px', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
-            {years.map((yy) => (
-              <button key={yy} type="button" data-sel={yy === y ? '1' : '0'}
-                onClick={() => setDate(yy, m, d)}
-                className="gc-mono"
-                style={{ ...gridBtn(yy === y), flexShrink: 0, padding: '5px 9px' }}>
-                {yy}
-              </button>
-            ))}
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button type="button" onClick={() => y > 1995 && setDate(y - 1, m, d)}
+              className="gc-mono" style={{ ...gridBtn(false), width: '44px', opacity: y <= 1995 ? 0.35 : 1 }}>
+              ‹
+            </button>
+            <button type="button" onClick={() => setView('years')}
+              className="gc-mono"
+              style={{
+                flex: 1, border: '1px solid var(--gc-green)', borderRadius: '3px', cursor: 'pointer',
+                padding: '6px 0', fontSize: '12px', fontWeight: 700, textAlign: 'center',
+                background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)',
+              }}>
+              {y} ▾
+            </button>
+            <button type="button" onClick={() => y < thisYear && setDate(y + 1, m, d)}
+              className="gc-mono" style={{ ...gridBtn(false), width: '44px', opacity: y >= thisYear ? 0.35 : 1 }}>
+              ›
+            </button>
           </div>
           <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', margin: '7px 0 5px' }}>
             {lang === 'en' ? 'MONTH' : '月'}
@@ -1946,6 +1970,8 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
               </button>
             ))}
           </div>
+          </>
+          )}
         </div>,
         document.body
       )}
