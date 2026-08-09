@@ -5341,9 +5341,21 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 // BulletinTab — the bulletin itself as a first-class page: official notices
 // (trilingual), DV cutoffs, statutory quotas, edition metadata.
 // ============================================================
-const BulletinTab = () => {
+const BulletinTab = ({ userCase = null }) => {
   const { lang } = useLang();
   const [openNotice, setOpenNotice] = useState(null);
+  // Category-relevant notices float to the top so the reader doesn't wade through
+  // every section to find theirs; everything else stays below, unchanged.
+  const catTok = userCase?.category || '';
+  const catRe = !catTok ? null
+    : catTok === 'EW' ? /other worker/i
+    : catTok === 'SR' ? /religious/i
+    : catTok.startsWith('EB') ? new RegExp(`EB-?${catTok.slice(2)}\\b|\\b${catTok.slice(0, 2)}${catTok.slice(2)}\\b`, 'i')
+    : new RegExp(`\\b${catTok}\\b`, 'i');
+  const noticeHit = (nz) => !!(catRe && nz && (catRe.test(nz.title || '') || catRe.test(nz.text || '')));
+  const indexed = BULLETIN_NOTICES.map((nz, ni) => ({ nz, ni }));
+  const mineNotices = indexed.filter(({ nz }) => noticeHit(nz));
+  const otherNotices = mineNotices.length ? indexed.filter(({ nz }) => !noticeHit(nz)) : indexed;
   return (
     <div className="space-y-2">
       <div style={{ padding: '4px 0 0' }}>
@@ -5357,13 +5369,51 @@ const BulletinTab = () => {
           {BULLETIN_EXTRAS?.meta?.printedDate ? ` · ${BULLETIN_EXTRAS.meta.printedDate}` : ''}
         </p>
       </div>
-      {/* B3: the bulletin's own lettered notices, verbatim */}
-      {BULLETIN_NOTICES.length > 0 && (
+      {/* B3: the bulletin's own lettered notices, verbatim — the user's category first */}
+      {mineNotices.length > 0 && (
+        <div className="bg-white rounded-2xl p-3 shadow-sm mt-2" style={{ border: '1px solid var(--gc-green-border)' }}>
+          <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--gc-green)' }}>
+            {lang === 'en' ? `About your category · ${catTok}` : lang === 'tw' ? `與你的類別相關 · ${catTok}` : `与你的类别相关 · ${catTok}`}
+          </div>
+          {mineNotices.map(({ nz, ni }) => {
+            const loc = locNotice(nz, lang);
+            const isOpen = openNotice === ni;
+            return (
+            <div key={ni} style={{ borderLeft: '2px solid var(--gc-green)', padding: '6px 10px', marginBottom: '6px', background: 'var(--gc-green-soft)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+                {nz.letter ? `${nz.letter} · ` : ''}{loc.title}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.65, marginTop: '2px' }}>
+                {loc.translated ? loc.text : `${(loc.text || '').slice(0, 220)}${(loc.text || '').length > 220 ? '…' : ''}`}
+              </div>
+              {loc.translated && (
+                <div style={{ marginTop: '3px' }}>
+                  <button type="button" onClick={() => setOpenNotice(isOpen ? null : ni)}
+                    style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '9.5px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                    {isOpen
+                      ? (lang === 'tw' ? '收起英文原文' : '收起英文原文')
+                      : (lang === 'tw' ? 'AI 譯文 · 查看英文原文' : 'AI 译文 · 查看英文原文')}
+                  </button>
+                  {isOpen && (
+                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.6, marginTop: '3px', fontStyle: 'italic' }}>
+                      {nz.title}{nz.text ? ` — ${nz.text}` : ''}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            );
+          })}
+        </div>
+      )}
+      {otherNotices.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-            {lang === 'en' ? 'Official notices (from the bulletin)' : lang === 'tw' ? '公告原文提醒（官方）' : '公告原文提醒（官方）'}
+            {mineNotices.length
+              ? (lang === 'en' ? 'Other notices' : lang === 'tw' ? '其餘公告' : '其余公告')
+              : (lang === 'en' ? 'Official notices (from the bulletin)' : lang === 'tw' ? '公告原文提醒（官方）' : '公告原文提醒（官方）')}
           </div>
-          {BULLETIN_NOTICES.map((nz, ni) => {
+          {otherNotices.map(({ nz, ni }) => {
             const loc = locNotice(nz, lang);
             const isOpen = openNotice === ni;
             return (
@@ -14480,7 +14530,7 @@ export default function App() {
               {tab === 'forecast' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
               {tab === 'i485' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
-              {tab === 'bulletin' && <BulletinTab />}
+              {tab === 'bulletin' && <BulletinTab userCase={userCase} />}
               {tab === 'compare' && <CompareHub userCase={userCase} />}
               {tab === 'index' && <TheIndex userCase={userCase} setTab={handleTabChange} setUserCase={setUserCase} previousTab={previousTab} onSetupCase={() => { setOnboardingInitialMode('form'); setHasOnboarded(false); }} />}
               {tab === 'help' && <HelpCenter />}
