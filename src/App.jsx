@@ -1164,12 +1164,14 @@ const observedPaceFromArchive = (cat, country, windowMonths = 12) => {
 // projection anchor), this keeps every month separate so a chart can show the real
 // stall-then-jump rhythm. days === null when either end is C/U/missing (no cutoff to
 // diff) — callers must treat null as "no data", not zero.
-const monthlyMovementFromArchive = (cat, country, windowMonths = 12) => {
+// `chart`: 'finalAction' | 'filing'. Chart B moves on its own rhythm (F4-China 12mo:
+// A +609 vs B +537) — estimating a B gap with A's pace was a real logical hole.
+const monthlyMovementFromArchive = (cat, country, windowMonths = 12, chart = 'finalAction') => {
   let keys = Object.keys(BULLETIN_ARCHIVE).sort();
   if (VIEWING_MONTH_KEY) keys = keys.filter((k) => k <= VIEWING_MONTH_KEY);
   if (keys.length < 2) return null;
   const win = keys.slice(-(windowMonths + 1));
-  const valueAt = (k) => BULLETIN_ARCHIVE[k]?.data?.finalAction?.[cat]?.[country];
+  const valueAt = (k) => BULLETIN_ARCHIVE[k]?.data?.[chart]?.[cat]?.[country];
   const out = [];
   for (let i = 1; i < win.length; i++) {
     const a = valueAt(win[i - 1]);
@@ -1194,9 +1196,9 @@ const monthlyMovementFromArchive = (cat, country, windowMonths = 12) => {
 // Chart A pace is the only observed pace we track; applying it to a Chart B gap is an
 // approximation (the two charts move roughly together). No usable pace → degrade to
 // the old 1:1 reading rather than invent a number.
-const paceDaysToCalendar = (cat, country, gapDays) => {
+const paceDaysToCalendar = (cat, country, gapDays, chart = 'finalAction') => {
   if (!gapDays || gapDays <= 0) return 0;
-  const hist = monthlyMovementFromArchive(cat, country, 12);
+  const hist = monthlyMovementFromArchive(cat, country, 12, chart);
   const total = hist ? hist.reduce((s, p) => s + (p.days || 0), 0) : 0;
   if (total <= 0) return gapDays;
   return Math.round((gapDays / (total / 12)) * 30.44);
@@ -3064,7 +3066,7 @@ const BulletinMovementChart = ({ cat, country }) => {
         <span className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', minWidth: 0 }}>
           {lang === 'en' ? 'Bulletin movement · Chart A' : '排期推进 · 表 A'}
           <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', marginLeft: '5px', color: 'var(--gc-muted-soft)' }}>
-            {lang === 'en' ? '— the pace behind the estimate above' : lang === 'tw' ? '—— 上方年數的速度來源' : '—— 上方年数的速度来源'}
+            {lang === 'en' ? '— Chart A pace (approval milestone)' : lang === 'tw' ? '—— 獲批口徑（表A）的速度' : '—— 获批口径（表A）的速度'}
           </span>
         </span>
         <div className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -3602,10 +3604,11 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 const today2 = new Date();
                 // The pace itself, surfaced (not just consumed): the reasoning chain
                 // below shows the reader how the hero number is derived from it.
-                const hist12h = monthlyMovementFromArchive(userCase.category, country, 12);
+                const heroChartKey = heroSel === 'B' ? 'filing' : 'finalAction';
+                const hist12h = monthlyMovementFromArchive(userCase.category, country, 12, heroChartKey);
                 const total12h = hist12h ? hist12h.reduce((sm, pp) => sm + (pp.days || 0), 0) : 0;
                 const paceMo = total12h > 0 ? total12h / 12 : null;
-                const paceCal = ps.days ? paceDaysToCalendar(userCase.category, country, ps.days) : null;
+                const paceCal = ps.days ? paceDaysToCalendar(userCase.category, country, ps.days, heroChartKey) : null;
                 const etaDate = paceCal ? new Date(today2.getTime() + paceCal * 86400000) : null;
                 const yearsF = paceCal ? paceCal / 365.25 : null;
                 const heroText = paceCal === null ? (lang === 'en' ? 'TBD' : '待定')
@@ -3697,8 +3700,8 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             {lang === 'en'
                               ? `Assumes the last 12 months' real pace holds (${Math.round(paceMo)} days forward per month). `
                               : lang === 'tw'
-                                ? `依據：過去 12 個月排期實際平均每月前進 ${Math.round(paceMo)} 天。`
-                                : `依据：过去 12 个月排期实际平均每月前进 ${Math.round(paceMo)} 天。`}
+                                ? `依據：過去 12 個月表${heroSel}實際平均每月前進 ${Math.round(paceMo)} 天。`
+                                : `依据：过去 12 个月表${heroSel}实际平均每月前进 ${Math.round(paceMo)} 天。`}
                             <button type="button" onClick={() => setShowHeroMath((v) => !v)}
                               style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600 }}>
                               {showHeroMath
@@ -3713,13 +3716,16 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             ? (lang === 'en' ? 'Chart B cutoff' : lang === 'tw' ? '表B截止日' : '表B截止日')
                             : (lang === 'en' ? 'Chart A cutoff' : lang === 'tw' ? '表A截止日' : '表A截止日');
                           const months2 = Math.round(ps.days / paceMo);
+                          const chartRef = heroSel === 'A'
+                            ? (lang === 'en' ? ' (the green line in the chart below)' : '（下方图表的绿线）')
+                            : '';
                           const steps = lang === 'en' ? [
                             `1. Your PD ${userCase.priorityDate} − ${cutoffLabel} ${cutoffP} = ${ps.days.toLocaleString('en-US')} days of queue ahead`,
-                            `2. Chart A moved ${total12h} days in the last 12 months (the green line in the chart below) ≈ ${Math.round(paceMo)} days/mo — Chart B tracks it closely`,
+                            `2. Chart ${heroSel} moved ${total12h} days in the last 12 months${chartRef} ≈ ${Math.round(paceMo)} days/mo`,
                             `3. ${ps.days.toLocaleString('en-US')} ÷ ${Math.round(paceMo)} ≈ ${months2} months ≈ ${heroText.replace('~', '')} → ${etaDate ? fmtYM(etaDate) : ''}`,
                           ] : [
                             `① 你的优先日 ${userCase.priorityDate} − ${cutoffLabel} ${cutoffP} ＝ 还差 ${ps.days.toLocaleString('en-US')} 天`,
-                            `② 近 12 个月表A实际前进 ${total12h} 天（下方图表的绿线）≈ ${Math.round(paceMo)} 天/月，表B与表A基本同步`,
+                            `② 近 12 个月表${heroSel}实际前进 ${total12h} 天${chartRef} ≈ ${Math.round(paceMo)} 天/月`,
                             `③ ${ps.days.toLocaleString('en-US')} ÷ ${Math.round(paceMo)} ≈ ${months2} 个月 ≈ ${heroText.replace('约 ', '')} → ${etaDate ? fmtYM(etaDate) : ''}`,
                           ];
                           return (
@@ -3803,7 +3809,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                     // visible anchor here — the wait reads as two stops on one line.
                     let etaTxt = null;
                     if (blk.st.status === 'notCurrent' && blk.st.days) {
-                      const cal = paceDaysToCalendar(userCase.category, country, blk.st.days);
+                      const cal = paceDaysToCalendar(userCase.category, country, blk.st.days, blk.code === 'B' ? 'filing' : 'finalAction');
                       if (cal) {
                         const d2 = new Date(Date.now() + cal * 86400000);
                         etaTxt = lang === 'en'
@@ -3887,7 +3893,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           if (primaryStatus.status === 'current' || primaryStatus.status === 'eligible' || primaryStatus.status === 'overdue' || primaryCutoff === 'C') {
             return today;
           }
-          const daysAway = paceDaysToCalendar(userCase.category, country, primaryStatus.days || 0);
+          const daysAway = paceDaysToCalendar(userCase.category, country, primaryStatus.days || 0, filingAuthorized ? 'filing' : 'finalAction');
           return new Date(today.getTime() + daysAway * 24 * 60 * 60 * 1000);
         })();
         const isFilingProjected = !(primaryStatus.status === 'current' || primaryStatus.status === 'eligible' || primaryStatus.status === 'overdue' || primaryCutoff === 'C');
@@ -3941,7 +3947,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                       || finalActionStatus.status === 'overdue';
         const aCurrentDate = aCurrent
           ? today
-          : new Date(today.getTime() + paceDaysToCalendar(userCase.category, country, finalActionStatus.days || 0) * 24 * 60 * 60 * 1000);
+          : new Date(today.getTime() + paceDaysToCalendar(userCase.category, country, finalActionStatus.days || 0, 'finalAction') * 24 * 60 * 60 * 1000);
         // After A becomes current, USCIS typically issues approval within ~30–90 days.
         const postACurrentMin = 30;
         const postACurrentMax = 90;
@@ -5062,7 +5068,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
       {showStatusShare && (() => {
         const heroSel2 = heroChart || (filingAuthorized ? 'B' : 'A');
         const ps2 = heroSel2 === 'B' ? filingStatus : finalActionStatus;
-        const paceCal = ps2.days ? paceDaysToCalendar(userCase.category, country, ps2.days) : null;
+        const paceCal = ps2.days ? paceDaysToCalendar(userCase.category, country, ps2.days, heroSel2 === 'B' ? 'filing' : 'finalAction') : null;
         const etaDate = paceCal ? new Date(Date.now() + paceCal * 86400000) : null;
         const yearsF = paceCal ? paceCal / 365.25 : null;
         const heroText = paceCal === null ? (lang === 'en' ? 'TBD' : '待定')
