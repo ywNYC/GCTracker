@@ -2071,7 +2071,7 @@ const CompactCaseBar = ({ userCase, setUserCase }) => {
                     color: userCase.petitionerStatus === 'USC' ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
                     transition: 'all 120ms',
                   }}>
-                  USC
+                  {lang === 'en' ? 'USC' : '公民'}
                 </button>
                 <button onClick={() => setUserCase({ ...userCase, petitionerStatus: 'LPR' })}
                   style={{
@@ -2084,7 +2084,7 @@ const CompactCaseBar = ({ userCase, setUserCase }) => {
                     color: userCase.petitionerStatus === 'LPR' ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
                     transition: 'all 120ms',
                   }}>
-                  LPR
+                  {lang === 'en' ? 'LPR' : lang === 'tw' ? '綠卡' : '绿卡'}
                 </button>
               </div>
             )}
@@ -3586,14 +3586,14 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                   ? computeMovement(bulletinCurrent.filing[userCase.category]?.[country], bulletinPrevious.filing[userCase.category]?.[country])
                   : computeMovement(bulletinCurrent.finalAction[userCase.category]?.[country], bulletinPrevious.finalAction[userCase.category]?.[country]);
                 const delta = mvP.type === 'advanced'
-                  ? { text: lang === 'en' ? `This month: wait shortened by ${mvP.days} days ↓` : lang === 'tw' ? `本月縮短了 ${mvP.days} 天 ↓` : `本月缩短了 ${mvP.days} 天 ↓`, color: 'var(--gc-green)' }
+                  ? { text: lang === 'en' ? `Good news — this month's bulletin cut your wait by ${mvP.days} days ↓` : lang === 'tw' ? `好消息：這個月的公告幫你縮短了 ${mvP.days} 天 ↓` : `好消息：这个月的公告帮你缩短了 ${mvP.days} 天 ↓`, color: 'var(--gc-green)' }
                   : mvP.type === 'retrogressed'
-                    ? { text: lang === 'en' ? `This month: wait grew by ${mvP.days ?? '—'} days ↑` : lang === 'tw' ? `本月拉遠了 ${mvP.days ?? '—'} 天 ↑` : `本月拉远了 ${mvP.days ?? '—'} 天 ↑`, color: 'var(--gc-red)' }
+                    ? { text: lang === 'en' ? `Heads up — this month pushed your wait back by ${mvP.days ?? '—'} days ↑` : lang === 'tw' ? `注意：這個月排期倒退，等待拉長了 ${mvP.days ?? '—'} 天 ↑` : `注意：这个月排期倒退，等待拉长了 ${mvP.days ?? '—'} 天 ↑`, color: 'var(--gc-red)' }
                     : mvP.type === 'resumed'
-                      ? { text: lang === 'en' ? 'This month: numbers resumed' : '本月恢复名额', color: 'var(--gc-green)' }
+                      ? { text: lang === 'en' ? 'Numbers resumed this month' : '本月恢复名额了', color: 'var(--gc-green)' }
                       : mvP.type === 'unavailable'
-                        ? { text: lang === 'en' ? 'This month: unavailable (U)' : lang === 'tw' ? '本月無名額（U）' : '本月无名额（U）', color: 'var(--gc-red)' }
-                        : { text: lang === 'en' ? 'This month: no movement' : lang === 'tw' ? '本月沒有變化' : '本月没有变化', color: 'var(--gc-muted)' };
+                        ? { text: lang === 'en' ? 'No visas issued this month (U)' : lang === 'tw' ? '本月不發名額（U）' : '本月不发名额（U）', color: 'var(--gc-red)' }
+                        : { text: lang === 'en' ? 'This month\'s bulletin didn\'t move — check back next month' : lang === 'tw' ? '這個月排期沒動，下月再看' : '这个月排期没动，下月再看', color: 'var(--gc-muted)' };
                 // Wait-journey progress: share of the predicted total wait already served.
                 const pdD = parseDate(userCase.priorityDate);
                 let pct = null;
@@ -3620,7 +3620,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                                 fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.5,
                                 border: 'none', cursor: 'pointer', letterSpacing: '0.03em',
                                 borderLeft: oi === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                                background: heroSel === opt.code ? 'var(--gc-ink)' : 'transparent',
+                                background: heroSel === opt.code ? 'var(--gc-green)' : 'var(--gc-surface)',
                                 color: heroSel === opt.code ? 'var(--gc-paper)' : 'var(--gc-muted)',
                               }}>
                               {opt.label}
@@ -3652,28 +3652,36 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                       </>
                     ) : (
                       <>
+                        {/* What the number IS, said before the number */}
+                        <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
+                          {heroSel === 'B'
+                            ? (lang === 'en' ? 'TIME UNTIL YOU CAN FILE' : lang === 'tw' ? '距離可以遞件，還需要' : '距离可以递件，还需要')
+                            : (lang === 'en' ? 'TIME UNTIL APPROVAL WINDOW' : lang === 'tw' ? '距離可以獲批，還需要' : '距离可以获批，还需要')}
+                        </div>
                         <div className="gc-serif" style={{ fontSize: '32px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '-0.02em', lineHeight: 1 }}>
                           {heroText}
                         </div>
-                        <div className="gc-mono" style={{ fontSize: '11.5px', color: 'var(--gc-ink-soft)', marginTop: '7px', letterSpacing: '0.01em' }}>
-                          {etaDate ? (lang === 'en' ? `est. ${fmtYM(etaDate)}` : `预计 ${fmtYM(etaDate)}`) : ''}
-                          {ps.days !== null && (
-                            <>
-                              <span style={{ margin: '0 5px', color: 'var(--gc-rule)' }}>·</span>
-                              {heroSel === 'B'
-                                ? (lang === 'en' ? `${ps.days.toLocaleString('en-US')} days to filing` : `距可递件还差 ${ps.days.toLocaleString('en-US')} 天`)
-                                : (lang === 'en' ? `${ps.days.toLocaleString('en-US')} days to approval` : `距获批还差 ${ps.days.toLocaleString('en-US')} 天`)}
-                            </>
-                          )}
+                        <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', marginTop: '7px', lineHeight: 1.55 }}>
+                          {etaDate && ps.days !== null && (heroSel === 'B'
+                            ? (lang === 'en'
+                                ? `At the current pace you could file around ${fmtYM(etaDate)} — the cutoff still has ${ps.days.toLocaleString('en-US')} days to cover.`
+                                : lang === 'tw'
+                                  ? `照這個速度，大約 ${fmtYM(etaDate)} 前後就能遞件——排期還要再走 ${ps.days.toLocaleString('en-US')} 天。`
+                                  : `照这个速度，大约 ${fmtYM(etaDate)} 前后就能递件——排期还要再走 ${ps.days.toLocaleString('en-US')} 天。`)
+                            : (lang === 'en'
+                                ? `At the current pace, approval opens around ${fmtYM(etaDate)} — the cutoff still has ${ps.days.toLocaleString('en-US')} days to cover.`
+                                : lang === 'tw'
+                                  ? `照這個速度，大約 ${fmtYM(etaDate)} 前後可獲批——排期還要再走 ${ps.days.toLocaleString('en-US')} 天。`
+                                  : `照这个速度，大约 ${fmtYM(etaDate)} 前后可获批——排期还要再走 ${ps.days.toLocaleString('en-US')} 天。`))}
                         </div>
                         {/* Where the number comes from — declared up front, expandable proof */}
                         {paceMo && (
                           <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginTop: '5px', lineHeight: 1.5 }}>
                             {lang === 'en'
-                              ? `Based on the actual 12-month pace (${Math.round(paceMo)} days/mo). `
+                              ? `Assumes the last 12 months' real pace holds (${Math.round(paceMo)} days forward per month). `
                               : lang === 'tw'
-                                ? `按近 12 個月實際均速（${Math.round(paceMo)} 天/月）估算。`
-                                : `按近 12 个月实际均速（${Math.round(paceMo)} 天/月）估算。`}
+                                ? `依據：過去 12 個月排期實際平均每月前進 ${Math.round(paceMo)} 天。`
+                                : `依据：过去 12 个月排期实际平均每月前进 ${Math.round(paceMo)} 天。`}
                             <button type="button" onClick={() => setShowHeroMath((v) => !v)}
                               style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600 }}>
                               {showHeroMath
@@ -3718,7 +3726,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             <div className="flex items-center justify-between gc-mono" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginTop: '4px' }}>
                               <span>{lang === 'en' ? 'PD ' : '优先日 '}{pdD ? fmtYM(pdD) : ''}</span>
                               <span style={{ fontWeight: 700, color: 'var(--gc-ink-soft)' }}>
-                                {lang === 'en' ? `~${pct}% of the wait served` : `按当前速度已等完约 ${pct}%`}
+                                {lang === 'en' ? `you're ~${pct}% of the way there` : lang === 'tw' ? `你已走完約 ${pct}% 的等待` : `你已走完约 ${pct}% 的等待`}
                               </span>
                               <span>{lang === 'en' ? 'est. ' : '预计 '}{fmtYM(etaDate)}</span>
                             </div>
@@ -3791,7 +3799,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                     <div key={blk.code} onClick={() => setHeroChart(blk.code)} style={{
                       padding: '8px 14px 9px',
                       borderLeft: i === 1 ? '1px solid var(--gc-rule-soft)' : 'none',
-                      background: isSelStation ? 'var(--gc-surface)' : 'transparent',
+                      background: isSelStation ? 'var(--gc-green-soft)' : 'transparent',
                       boxShadow: isSelStation ? 'inset 0 2px 0 var(--gc-green)' : 'none',
                       cursor: 'pointer',
                     }}>
@@ -5512,12 +5520,13 @@ const Forecast = ({ userCase }) => {
             {/* Long-term ETA, demoted to a reference card and tokenized (was violet). */}
             <div style={{ background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius)', padding: '14px' }}>
               <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '4px' }}>{t.probMonths}</div>
+              {/* ONE range, not a bare conservative point — a lone "9.4 年" next to the
+                  summary card's linear "3.9 年" read as the site contradicting itself. */}
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-black" style={{ color: 'var(--gc-ink)' }}>
-                  {durationParts(forecast.monthsToCurrent).value}
-                </span>
-                <span className="text-sm font-semibold" style={{ color: 'var(--gc-ink-soft)' }}>
-                  {durationParts(forecast.monthsToCurrent).unit}
+                  {forecast.hasRange
+                    ? `${fmtDuration(forecast.monthsFast)} – ${fmtDuration(forecast.monthsSlow)}`
+                    : fmtDuration(forecast.monthsToCurrent)}
                 </span>
               </div>
               <div className="mt-2 text-[11px]" style={{ color: 'var(--gc-ink-soft)' }}>
@@ -5554,9 +5563,6 @@ const Forecast = ({ userCase }) => {
                     </div>
                     <div className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--gc-ink-soft)' }}>
                       {paceBasis === 'recent' ? t.paceExplainRecent : t.paceExplainConservative}
-                    </div>
-                    <div className="mt-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--gc-ink-soft)' }}>
-                      {t.paceRangeLabel}: <span className="font-bold">{fmtDuration(forecast.monthsFast)} – {fmtDuration(forecast.monthsSlow)}</span>
                     </div>
                     <div className="mt-1 text-[10px] leading-relaxed" style={{ color: 'var(--gc-muted)' }}>{t.paceRangeNote}</div>
                   </div>
