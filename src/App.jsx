@@ -6213,6 +6213,7 @@ const CompareByCountry = ({ userCase }) => {
 // ============================================================
 const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, greenCardInfo = { approvalDate: null, isConditional: false } }) => {
   const [showCaseEdit, setShowCaseEdit] = useState(false);
+  const [showConfirmPrompt, setShowConfirmPrompt] = useState(false);
   const { t, lang } = useLang();
   const [alerts, setAlerts] = useState({
     whenCurrent: false,
@@ -6267,6 +6268,7 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
       if (response.ok && result.success) {
         setEmailStatus('success');
         setIsSubscribed(true);
+        setShowConfirmPrompt(true); // 双重确认漏斗的洞：明确告诉用户还差一步
         setTimeout(() => setEmailStatus(''), 3000);
       } else {
         console.error('Subscription failed:', result.error || response.statusText);
@@ -6642,6 +6644,46 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
       </div>
 
     
+      {/* Post-subscribe prompt — subscription is NOT live until the confirmation
+          link is clicked; two of the first four real signups stalled exactly here. */}
+      {showConfirmPrompt && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(15,20,25,0.55)' }}
+             onClick={() => setShowConfirmPrompt(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderTop: '3px solid var(--gc-green)',
+            borderRadius: '6px', maxWidth: '340px', width: '100%', padding: '20px 18px 16px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)', textAlign: 'center',
+          }}>
+            <Mail size={28} strokeWidth={1.8} style={{ color: 'var(--gc-green)', margin: '0 auto 10px' }} />
+            <div className="gc-serif" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>
+              {lang === 'en' ? 'One more step' : lang === 'tw' ? '還差一步' : '还差一步'}
+            </div>
+            <div style={{ fontSize: '13px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', textAlign: 'left' }}>
+              {lang === 'en'
+                ? <>A confirmation email was sent to <b>{email}</b>. Your subscription is NOT active until you click the link inside.</>
+                : lang === 'tw'
+                  ? <>確認郵件已發送到 <b>{email}</b>。<b>點擊郵件裡的確認連結後，訂閱才會生效。</b></>
+                  : <>确认邮件已发送到 <b>{email}</b>。<b>点开邮件里的确认链接后，订阅才会生效。</b></>}
+            </div>
+            <div style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--gc-muted)', marginTop: '8px', textAlign: 'left', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px', padding: '8px 10px' }}>
+              {lang === 'en'
+                ? 'Can\'t find it? Check your spam/junk folder and add the sender to your contacts.'
+                : lang === 'tw'
+                  ? '沒看到？請檢查垃圾郵件匣，並把發件人加入通訊錄，以免之後的月度更新被攔截。'
+                  : '没看到？请检查垃圾邮件，并把发件人加入通讯录，以免之后的月度更新被拦截。'}
+            </div>
+            <button type="button" onClick={() => setShowConfirmPrompt(false)}
+              style={{
+                width: '100%', marginTop: '12px', padding: '10px', fontSize: '13px', fontWeight: 700,
+                background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none',
+                borderRadius: '4px', cursor: 'pointer',
+              }}>
+              {lang === 'en' ? 'Got it — off to my inbox' : lang === 'tw' ? '知道了，這就去點' : '知道了，这就去点'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Case-edit modal — the old Edit button dumped users back on the Overview tab;
           now the same segmented editor opens in place, pre-expanded. */}
       {showCaseEdit && (
