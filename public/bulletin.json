@@ -1,10 +1,10 @@
 {
-  "lastUpdated": "2026-08-07T11:09:29.625Z",
+  "lastUpdated": "2026-08-09T03:48:56.800Z",
   "source": "github-actions-auto",
   "sourceUrl": "https://adoption.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-august-2026.html",
   "current": {
     "month": "2026-08",
-    "scrapedAt": "2026-08-07T11:09:29.613Z",
+    "scrapedAt": "2026-08-09T03:48:56.797Z",
     "finalAction": {
       "EB1": {
         "Other": "C",
@@ -26,6 +26,13 @@
         "India": "2014-01-01",
         "Mexico": "2024-09-01",
         "Philippines": "2023-08-01"
+      },
+      "EW": {
+        "Other": "2022-04-01",
+        "China": "2019-05-01",
+        "India": "2014-01-01",
+        "Mexico": "2022-04-01",
+        "Philippines": "2021-12-01"
       },
       "F1": {
         "Other": "2018-12-15",
@@ -84,6 +91,13 @@
         "India": "2015-01-15",
         "Mexico": "C",
         "Philippines": "2024-01-01"
+      },
+      "EW": {
+        "Other": "2022-08-01",
+        "China": "2019-10-01",
+        "India": "2015-01-15",
+        "Mexico": "2022-08-01",
+        "Philippines": "2022-08-01"
       },
       "F1": {
         "Other": "2019-06-15",

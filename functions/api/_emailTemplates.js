@@ -47,6 +47,7 @@ const formatCategory = (cat) => {
     'EB1': 'EB-1',
     'EB2': 'EB-2',
     'EB3': 'EB-3',
+    'EW': 'EB-3 Other Workers',
     'EB4': 'EB-4',
     'EB5': 'EB-5',
     'F1': 'F1',
