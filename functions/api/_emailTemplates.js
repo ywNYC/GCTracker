@@ -6,6 +6,12 @@
 
 // ---- Helpers ----
 
+// Simplified→Traditional character map covering this template's copy. Applied as a
+// final pass over subject/html/text when language==='tw'; tw notice translations are
+// already traditional and pass through untouched (map keys are simplified-only).
+const S2T = {'签':'簽','证':'證','进':'進','这':'這','个':'個','于':'於','后':'後','还':'還','递':'遞','优':'優','类':'類','别':'別','预':'預','计':'計','从':'從','时':'時','间':'間','变':'變','无':'無','动':'動','说':'說','条':'條','与':'與','获':'獲','历':'歷','现':'現','线':'線','图':'圖','数':'數','据':'據','来':'來','实':'實','际':'際','过':'過','单':'單','为':'為','转':'轉','较':'較','远':'遠','运':'運','适':'適','选':'選','邮':'郵','里':'裡','错':'錯','长':'長','门':'門','问':'問','阅':'閱','队':'隊','阶':'階','随':'隨','难':'難','页':'頁','项':'項','须':'須','题':'題','额':'額','验':'驗','点':'點','热':'熱','状':'狀','监':'監','确':'確','码':'碼','稳':'穩','简':'簡','纪':'紀','约':'約','级':'級','纳':'納','组':'組','细':'細','终':'終','经':'經','结':'結','给':'給','统':'統','继':'繼','续':'續','维':'維','绿':'綠','缓':'緩','编':'編','缩':'縮','网':'網','义':'義','职':'職','联':'聯','脑':'腦','范':'範','处':'處','号':'號','补':'補','规':'規','视':'視','览':'覽','觉':'覺','观':'觀','订':'訂','认':'認','讨':'討','让':'讓','议':'議','记':'記','许':'許','论':'論','设':'設','访':'訪','评':'評','识':'識','诉':'訴','词':'詞','译':'譯','试':'試','话':'話','询':'詢','该':'該','详':'詳','语':'語','误':'誤','请':'請','读':'讀','调':'調','谢':'謝','负':'負','败':'敗','货':'貨','质':'質','贴':'貼','费':'費','资':'資','赖':'賴','赶':'趕','输':'輸','办':'辦','务':'務','劳':'勞','势':'勢','区':'區','医':'醫','升':'升','卫':'衛','厂':'廠','厅':'廳','压':'壓','县':'縣','发':'發','只':'只','吗':'嗎','启':'啟','员':'員','周':'週','咨':'諮','响':'響','国':'國','圆':'圓','团':'團','园':'園','围':'圍','坏':'壞','块':'塊','声':'聲','复':'復','够':'夠','头':'頭','夹':'夾','奖':'獎','妈':'媽','宝':'寶','审':'審','宽':'寬','寻':'尋','对':'對','导':'導','届':'屆','属':'屬','岁':'歲','岛':'島','币':'幣','师':'師','帮':'幫','干':'幹','并':'並','广':'廣','庆':'慶','应':'應','废':'廢','开':'開','异':'異','弃':'棄','张':'張','弹':'彈','当':'當','录':'錄','彻':'徹','径':'徑','忆':'憶','态':'態','总':'總','恶':'惡','惊':'驚','惯':'慣','愿':'願','战':'戰','户':'戶','执':'執','扩':'擴','扬':'揚','抢':'搶','护':'護','报':'報','担':'擔','拟':'擬','拥':'擁','择':'擇','挂':'掛','挡':'擋','挥':'揮','损':'損','换':'換','摆':'擺','敌':'敵','断':'斷','旧':'舊','显':'顯','暂':'暫','术':'術','权':'權','构':'構','标':'標','栏':'欄','树':'樹','样':'樣','档':'檔','桥':'橋','检':'檢','楼':'樓','极':'極','汇':'匯','汉':'漢','沟':'溝','没':'沒','泽':'澤','洁':'潔','测':'測','济':'濟','浅':'淺','涨':'漲','渐':'漸','温':'溫','湾':'灣','满':'滿','滚':'滾','滞':'滯','灯':'燈','灵':'靈','灾':'災','烦':'煩','爱':'愛','牵':'牽','独':'獨','环':'環','玛':'瑪','础':'礎','离':'離','种':'種','积':'積','称':'稱','稣':'穌','穷':'窮','竞':'競','笔':'筆','紧':'緊','纯':'純','删':'刪','则':'則','刚':'剛','创':'創','剧':'劇','写':'寫','军':'軍','农':'農','冲':'衝','决':'決','况':'況','冻':'凍','净':'淨','准':'準','减':'減','几':'幾','击':'擊','凤':'鳳','凭':'憑','儿':'兒','亿':'億','仅':'僅','们':'們','价':'價','众':'眾','伙':'夥','会':'會','伟':'偉','传':'傳','伤':'傷','伦':'倫','体':'體','余':'餘','债':'債','倾':'傾','兰':'蘭','关':'關','兴':'興','养':'養','内':'內','册':'冊','骗':'騙','丢':'丟','两':'兩','严':'嚴','丧':'喪','丰':'豐','临':'臨','丽':'麗','举':'舉','么':'麼','乌':'烏','乐':'樂','习':'習','乡':'鄉','书':'書','买':'買','乱':'亂','争':'爭','亏':'虧','云':'雲','亚':'亞','产':'產','亲':'親','轨':'軌','迟':'遲','连':'連','速':'速','退':'退','逐':'逐','移':'移','程':'程','稍':'稍','份':'份','低':'低','估':'估','依':'依','保':'保','信':'信','修':'修','假':'假','做':'做','停':'停','偏':'偏','偶':'偶','储':'儲','光':'光','免':'免','入':'入','全':'全','公':'公','共':'共','其':'其','典':'典','兼':'兼','再':'再','写':'寫','冠':'冠','准':'準','凑':'湊','出':'出','击':'擊','分':'分','切':'切','列':'列','初':'初','判':'判','利':'利','到':'到','前':'前','剩':'剩','割':'割','力':'力','加':'加','劣':'劣','动':'動','助':'助','努':'努','勇':'勇','包':'包','化':'化','匀':'勻','半':'半','协':'協','占':'占','卡':'卡','危':'危','即':'即','原':'原','去':'去','县':'縣','参':'參','双':'雙','收':'收','改':'改','放':'放','政':'政','故':'故','敏':'敏','救':'救','教':'教','散':'散','整':'整','文':'文','斯':'斯','新':'新','方':'方','旅':'旅','日':'日','早':'早','明':'明','昨':'昨','是':'是','晚':'晚','景':'景','晴':'晴','智':'智','曲':'曲','更':'更','曾':'曾','最':'最','月':'月','有':'有','期':'期','木':'木','未':'未','末':'末','本':'本','朱':'朱','材':'材','村':'村','束':'束','步':'步','段':'段','每':'每','比':'比','毕':'畢','水':'水','求':'求','江':'江','池':'池','决':'決','法':'法','注':'注','洋':'洋','洞':'洞','活':'活','流':'流','浪':'浪','海':'海','消':'消','深':'深','清':'清','港':'港','游':'遊','源':'源','溢':'溢','演':'演','点':'點','然':'然','照':'照','熟':'熟','片':'片','版':'版','牌':'牌','物':'物','特':'特','状':'狀','率':'率','王':'王','班':'班','球':'球','理':'理','生':'生','用':'用','由':'由','电':'電','界':'界','留':'留','略':'略','番':'番','疑':'疑','病':'病','登':'登','百':'百','的':'的','皮':'皮','益':'益','盛':'盛','目':'目','直':'直','相':'相','省':'省','看':'看','真':'真','眼':'眼','着':'著','知':'知','短':'短','石':'石','破':'破','示':'示','礼':'禮','社':'社','祝':'祝','神':'神','票':'票','福':'福','秀':'秀','私':'私','秋':'秋','科':'科','秒':'秒','秘':'祕','究':'究','空':'空','突':'突','窗':'窗','立':'立','站':'站','端':'端','符':'符','第':'第','等':'等','策':'策','答':'答','篇':'篇','米':'米','精':'精','素':'素','索':'索','紫':'紫','累':'累','红':'紅','纷':'紛','绍':'紹','绕':'繞','络':'絡','绝':'絕','绩':'績','置':'置','美':'美','群':'群','考':'考','者':'者','而':'而','耐':'耐','聊':'聊','聚':'聚','肉':'肉','肯':'肯','育':'育','背':'背','能':'能','脚':'腳','腾':'騰','自':'自','至':'至','致':'致','舍':'捨','良':'良','色':'色','艺':'藝','节':'節','花':'花','若':'若','英':'英','荐':'薦','荣':'榮','药':'藥','莫':'莫','菜':'菜','营':'營','落':'落','著':'著','蓝':'藍','虑':'慮','虽':'雖','蚀':'蝕','行':'行','街':'街','衡':'衡','衣':'衣','装':'裝','西':'西','要':'要','见':'見','角':'角','解':'解','触':'觸','言':'言','警':'警','贝':'貝','贡':'貢','败':'敗','账':'帳','贯':'貫','购':'購','贵':'貴','赞':'讚','走':'走','起':'起','超':'超','越':'越','跃':'躍','距':'距','跟':'跟','路':'路','跳':'跳','身':'身','躲':'躲','车':'車','软':'軟','轻':'輕','载':'載','辑':'輯','辞':'辭','辖':'轄','边':'邊','达':'達','迁':'遷','迎':'迎','近':'近','返':'返','违':'違','迷':'迷','追':'追','逻':'邏','部':'部','都':'都','酬':'酬','采':'採','释':'釋','重':'重','量':'量','金':'金','针':'針','钟':'鐘','钱':'錢','铁':'鐵','银':'銀','销':'銷','锁':'鎖','镜':'鏡','闭':'閉','闲':'閒','阵':'陣','陆':'陸','除':'除','险':'險','隐':'隱','雅':'雅','集':'集','雨':'雨','零':'零','雾':'霧','需':'需','静':'靜','非':'非','面':'面','音':'音','顺':'順','顾':'顧','频':'頻','颗':'顆','风':'風','飞':'飛','食':'食','餐':'餐','馆':'館','首':'首','香':'香','马':'馬','驱':'驅','骂':'罵','高':'高','鲜':'鮮','鸟':'鳥','麻':'麻','黄':'黃','黑':'黑','默':'默','鼓':'鼓','龄':'齡'};
+const toTraditional = (str) => str.replace(/[\u4e00-\u9fff]/g, (c) => S2T[c] || c);
+
 const escapeHtml = (str) => {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -319,6 +325,9 @@ ${emailHead(subject)}
 </body>
 </html>`;
 
+  if (language === 'tw') {
+    return { subject: toTraditional(subject), html: toTraditional(html), text: toTraditional(text) };
+  }
   return { subject, html, text };
 };
 
@@ -503,7 +512,7 @@ const countryFlagHtml = (country, k = 1) => {
 // They used to be two separate panels with different windows (24 vs 12 months), which
 // hid the fact that they are two views of the same data. Email constraints as ever:
 // tables + background colors only, the "line" is a row of joined column caps.
-const renderBulletinFigure = (cutPoints, series, lang) => {
+const renderBulletinFigure = (cutPoints, series, lang, chartCode = 'A') => {
   if (!Array.isArray(series) || series.length < 2) return '';
 
   const days = (s) => (typeof s.days === 'number' ? Math.round(s.days) : 0);
@@ -652,7 +661,7 @@ const renderBulletinFigure = (cutPoints, series, lang) => {
     : `近 ${n} 个月逐月变化。`);
 
   return `
-    <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? 'Bulletin chart · Chart A' : '排期图表 · 表 A'}</div>
+    <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#6b6a64; text-transform:uppercase; margin-bottom:10px;">${lang === 'en' ? `Bulletin chart · Chart ${chartCode}` : `排期图表 · 表 ${chartCode}`}<span style="letter-spacing:0.02em; text-transform:none; color:#8a8980;">${lang === 'en' ? (chartCode === 'B' ? ' — filing milestone' : ' — approval milestone') : (chartCode === 'B' ? ' · 递件口径' : ' · 获批口径')}</span></div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;">${trendRows}
       <tr>${upBarRow}</tr>
       ${hasNeg ? `<tr>${downBarRow}</tr>` : ''}
@@ -783,7 +792,13 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   ].filter(Boolean).join(' · ') || headline;
   // 12-month series on purpose: twelve ~34px columns carry one aligned row of value
   // labels; the 24-month rhythm lives in the cutoff trend chart above.
-  const figureHtml = renderBulletinFigure(update.cutoffHistory, fc?.series, lang);
+  const ad = update.adopted || null;
+  const figureHtml = renderBulletinFigure(
+    ad?.cutoffHistory || update.cutoffHistory,
+    ad?.series || fc?.series,
+    lang,
+    ad?.chart || 'A'
+  );
 
   // How far the cutoff still has to travel to reach this subscriber's priority date.
   const gapDays = !isNowCurrent && fa.status?.days ? fa.status.days : null;
@@ -800,13 +815,19 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   const catRe = catToken.startsWith('EB')
     ? new RegExp(`EB-?${catToken.slice(2)}\\b`, 'i')
     : new RegExp(`\\b${catToken}\\b`, 'i');
-  const relevantNotices = (Array.isArray(notices) ? notices : [])
+  let relevantNotices = (Array.isArray(notices) ? notices : [])
     .filter((n) => n && (catRe.test(n.title || '') || catRe.test(n.text || '')))
     .slice(0, 2);
+  // No category-specific notice → fall back to section D (the general availability
+  // note), so every email carries the State Department's own framing of the month.
+  if (relevantNotices.length === 0 && Array.isArray(notices)) {
+    const d = notices.find((n) => n && n.letter === 'D');
+    if (d) relevantNotices = [d];
+  }
   const noticesHtml = relevantNotices.map((n) => {
     // Chinese-language subscribers get the AI translation (marked as such, original
     // authoritative); English subscribers get the original verbatim.
-    const tr = lang === 'zh' ? noticeI18n?.[n.letter]?.zh : null;
+    const tr = lang === 'zh' ? noticeI18n?.[n.letter]?.[language === 'tw' ? 'tw' : 'zh'] : null;
     const title = tr?.title || n.title || '';
     const body = tr ? (tr.text || '') : (n.text || '').slice(0, 320) + ((n.text || '').length > 320 ? '…' : '');
     return `
@@ -826,20 +847,97 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   // whole email speaks one color language (blue = forward, rust = backward).
   const moveColor = (movement) => (movement.type === 'retrogressed' || movement.type === 'unavailable') ? RETROGRESS_COLOR
     : movement.type === 'none' ? '#8a8980' : ADVANCE_COLOR;
+
+  // ---- Adopted-chart wait math (mirrors the homepage hero card) ----
+  // `ad` is the chart this subscriber actually lives by: B (filing) for family
+  // categories, A (approval) for employment. All hero numbers derive from it so the
+  // email never mixes chart-A pace into a chart-B gap.
+  const adGap = ad && typeof ad.gapDays === 'number' && ad.gapDays > 0 ? ad.gapDays : null;
+  const adPace = ad && typeof ad.paceMo === 'number' && ad.paceMo > 0 ? ad.paceMo : null;
+  const adEtaMo = ad && typeof ad.etaMonths === 'number' && isFinite(ad.etaMonths) && ad.etaMonths > 0 ? ad.etaMonths : null;
+  const adChartName = ad ? (lang === 'en' ? `Chart ${ad.chart}` : `表${ad.chart}`) : '';
+  const adMilestone = ad?.chart === 'B'
+    ? (lang === 'en' ? 'until you can file' : '距离可以递件，还需要')
+    : (lang === 'en' ? 'until final approval' : '距离可以获批，还需要');
+  const adHero = adEtaMo === null ? ''
+    : adEtaMo < 12
+      ? (lang === 'en' ? `~${Math.round(adEtaMo)} months` : `约 ${Math.round(adEtaMo)} 个月`)
+      : (lang === 'en' ? `~${(adEtaMo / 12).toFixed(1)} years` : `约 ${(adEtaMo / 12).toFixed(1)} 年`);
+  const adCal = adEtaMo !== null ? monthToCal(adEtaMo) : null;
+  // Optimistic end = this month's actual pace on the adopted chart; conservative end
+  // = the trailing 12-month average. Same range logic the site's summary card uses.
+  let adCalFast = null, adCalSlow = null;
+  if (adEtaMo !== null && adGap && ad?.movement?.type === 'advanced' && ad.movement.days > 0) {
+    const mFast = adGap / ad.movement.days;
+    if (Math.round(mFast) !== Math.round(adEtaMo)) {
+      adCalFast = monthToCal(Math.min(mFast, adEtaMo));
+      adCalSlow = monthToCal(Math.max(mFast, adEtaMo));
+    }
+  }
+  const adMoveTxt = ad?.movement ? movementCopy(ad.movement, lang) : '';
+  const adDeltaGood = ad?.movement?.type === 'advanced' || ad?.movement?.type === 'resumed';
+  const adDeltaLine = !adMoveTxt || !ad ? '' : (lang === 'en'
+    ? `${adDeltaGood ? 'Good news: ' : ad.movement.type === 'none' ? '' : 'Heads up: '}${adChartName} ${adMoveTxt} this month`
+    : `${adDeltaGood ? '好消息：' : ad.movement.type === 'none' ? '' : '注意：'}本月${adChartName}${adMoveTxt}`);
+  const adDeltaColor = ad?.movement ? moveColor(ad.movement) : '#8a8980';
+  // Reasoning chain — the same arithmetic the site's 怎么算的 expander shows. Line 3
+  // keeps the RAW quotient so the division always checks out; when the approval ETA
+  // was floored to the filing ETA (A can't land before B), a fourth line says so.
+  const adPaceTxt = adPace !== null ? String(Math.round(adPace * 10) / 10) : '';
+  const adRawMo = (adGap && adPace) ? Math.round(adGap / adPace) : null;
+  const adChain = (adGap && adPace && adEtaMo !== null) ? (lang === 'en' ? [
+    `Your priority date is ${adGap.toLocaleString('en-US')} days behind the current ${adChartName} cutoff`,
+    `${adChartName} has averaged ${adPaceTxt} days of advance per month over the last 12 months`,
+    `${adGap.toLocaleString('en-US')} ÷ ${adPaceTxt} ≈ ${adRawMo} months`,
+    ...(ad.clampedToB ? ['Approval (Chart A) can\'t come before filing (Chart B), so the estimate is floored to Chart B\'s date'] : []),
+  ] : [
+    `你的优先日距${adChartName}当前截止日还差 ${adGap.toLocaleString('en-US')} 天`,
+    `${adChartName}近 12 个月平均每月前进 ${adPaceTxt} 天`,
+    `${adGap.toLocaleString('en-US')} ÷ ${adPaceTxt} ≈ ${adRawMo} 个月${ad.clampedToB ? '' : `，即${adHero}`}`,
+    ...(ad.clampedToB ? ['获批（表A）不会早于递件（表B），故预计以表B的日期为下限'] : []),
+  ]) : null;
+  // How far along the whole journey is: time since PD over (time since PD + remaining).
+  let adPct = null;
+  if (adEtaMo !== null && userCase?.priorityDate) {
+    const pdMs = Date.parse(userCase.priorityDate);
+    if (isFinite(pdMs)) {
+      const elapsed = Date.now() - pdMs;
+      if (elapsed > 0) {
+        adPct = Math.min(99, Math.max(1, Math.round(100 * elapsed / (elapsed + adEtaMo * 30.44 * 86400000))));
+      }
+    }
+  }
+
+  // Per-chart station lines (距X天 · 预计X) from the per-chart pace pipeline, so the
+  // B row is paced by B history and the A row by A history.
+  const st = update.stations || null;
+  const stationSub = (stn) => {
+    if (!stn || typeof stn.gapDays !== 'number' || stn.gapDays <= 0) return '';
+    const gapTxt = stn.gapDays.toLocaleString('en-US');
+    const cal = (typeof stn.etaMonths === 'number' && isFinite(stn.etaMonths) && stn.etaMonths > 0) ? monthToCal(stn.etaMonths) : null;
+    const flooredNote = stn.clampedToB ? (lang === 'en' ? ' (not before Chart B)' : '（不早于表B）') : '';
+    return lang === 'en'
+      ? `${gapTxt} days to your PD${cal ? ` · est. ${cal}${flooredNote}` : ''}`
+      : `距你的优先日 ${gapTxt} 天${cal ? ` · 预计 ${cal}${flooredNote}` : ''}`;
+  };
   const rows = [
     {
-      label: lang === 'en' ? 'Chart A · Final Action Dates' : '表 A · Final Action Dates',
+      label: lang === 'en' ? 'Chart A · Final Action (approval)' : '表 A · 能否获批（Final Action）',
       prev: formatDateForLang(fa.previous, lang),
       cur: formatDateForLang(fa.current, lang),
       move: movementCopy(fa.movement, lang),
       moveColor: moveColor(fa.movement),
+      sub: stationSub(st?.A),
+      adopted: ad?.chart === 'A',
     },
     {
-      label: lang === 'en' ? 'Chart B · Dates for Filing' : '表 B · Dates for Filing',
+      label: lang === 'en' ? 'Chart B · Dates for Filing (filing)' : '表 B · 能否递件（Dates for Filing）',
       prev: formatDateForLang(fil.previous, lang),
       cur: formatDateForLang(fil.current, lang),
       move: movementCopy(fil.movement, lang),
       moveColor: moveColor(fil.movement),
+      sub: stationSub(st?.B),
+      adopted: ad?.chart === 'B',
     },
   ];
 
@@ -867,11 +965,14 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
     `${lang === 'en' ? 'Priority Date' : '优先日'}: ${priorityDate}`,
     '',
     lang === 'en' ? 'THIS MONTH' : '本月变化',
-    ...rows.map((r) => `${r.label}: ${r.prev} -> ${r.cur} (${r.move})`),
+    ...rows.map((r) => `${r.label}${r.adopted ? (lang === 'en' ? ' [YOUR CHART]' : '【你看这张】') : ''}: ${r.prev} -> ${r.cur} (${r.move})${r.sub ? `\n  ${r.sub}` : ''}`),
     '',
     chartNote,
     '',
-    rangeHeadline ? `${lang === 'en' ? 'ESTIMATED WAIT' : '预计还要等'}: ${rangeHeadlineCal || rangeHeadline}` : '',
+    adHero
+      ? `${adMilestone}: ${adHero}${adCal ? ` (${adCal})` : ''}`
+      : rangeHeadline ? `${lang === 'en' ? 'ESTIMATED WAIT' : '预计还要等'}: ${rangeHeadlineCal || rangeHeadline}` : '',
+    ...(adChain ? adChain.map((l, i) => `${i + 1}. ${l}`) : []),
     durLine,
     etaLine,
     gapLine,
@@ -895,16 +996,19 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   const rowsHtml = rows.map((r) => `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #e4e1d6;">
       <tr>
-        <td colspan="2" style="padding:10px 0 2px; font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.1em; color:#6b6a64; text-transform:uppercase;">${escapeHtml(r.label)}</td>
+        <td colspan="2" style="padding:10px 0 2px; font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.1em; color:#6b6a64; text-transform:uppercase;">${escapeHtml(r.label)}${r.adopted ? `&nbsp;&nbsp;<span style="display:inline-block; background:#1a1a1a; color:#fdfcf8; font-size:8px; letter-spacing:0.08em; padding:1px 5px 2px; vertical-align:1px;">${lang === 'en' ? 'YOUR CHART' : '你看这张'}</span>` : ''}</td>
       </tr>
       <tr>
-        <td style="padding:0 0 10px; font-family:'Courier New',monospace; font-size:13px; color:#1a1a1a; white-space:nowrap;">${
+        <td style="padding:0 0 ${r.sub ? '2px' : '10px'}; font-family:'Courier New',monospace; font-size:13px; color:#1a1a1a; white-space:nowrap;">${
           r.prev === r.cur
             ? `<b>${r.cur}</b>`
             : `<span style="color:#8a8980; text-decoration:line-through;">${r.prev}</span><span style="color:#8a8980;">&nbsp;→&nbsp;</span><b>${r.cur}</b>`
         }</td>
-        <td align="right" style="padding:0 0 10px 16px; font-size:12px; color:${r.moveColor}; white-space:nowrap;">${escapeHtml(r.move)}</td>
+        <td align="right" style="padding:0 0 ${r.sub ? '2px' : '10px'} 16px; font-size:12px; color:${r.moveColor}; white-space:nowrap;">${escapeHtml(r.move)}</td>
       </tr>
+      ${r.sub ? `<tr>
+        <td colspan="2" style="padding:0 0 10px; font-size:11px; color:#8a8980; white-space:nowrap;">${escapeHtml(r.sub)}</td>
+      </tr>` : ''}
     </table>`).join('');
 
   const html = `<!DOCTYPE html>
@@ -966,7 +1070,44 @@ ${emailHead(subject)}
           <td class="px" style="padding:14px 40px 0;">${noticesHtml}</td>
         </tr>` : ''}
 
-        ${etaLine ? `
+        ${(!isNowCurrent && adHero) ? `
+        <tr>
+          <td class="px" style="padding:16px 40px 0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e9efe6; border-left:2px solid ${CUMULATIVE_COLOR};">
+              <tr>
+                <td style="padding:16px 18px;">
+                  <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#4e6b58; text-transform:uppercase; margin-bottom:6px;">${escapeHtml(adMilestone)}</div>
+                  <div style="font-family:Georgia,serif; font-size:32px; line-height:1.15; color:#1a1a1a; margin-bottom:6px;">${escapeHtml(adHero)}</div>
+                  ${adCal ? `<div style="font-size:12px; line-height:1.6; color:#2a2a2a; white-space:nowrap;">${lang === 'en' ? `At ${escapeHtml(adChartName)}'s real 12-month pace · est. ${escapeHtml(adCal)}` : `按${escapeHtml(adChartName)}近 12 个月实际速度推算 · 预计 ${escapeHtml(adCal)}`}</div>` : ''}
+                  ${(adCalFast && adCalSlow) ? `<div style="font-size:12px; line-height:1.6; color:#2a2a2a; white-space:nowrap;">${lang === 'en' ? `Optimistic ~${escapeHtml(adCalFast)} · conservative ~${escapeHtml(adCalSlow)}` : `乐观约 ${escapeHtml(adCalFast)} · 保守约 ${escapeHtml(adCalSlow)}`}</div>` : ''}
+                  ${adDeltaLine ? `<div style="font-size:12px; line-height:1.6; color:${adDeltaColor}; font-weight:600; margin-top:8px;">${escapeHtml(adDeltaLine)}</div>` : ''}
+                  ${adChain ? `
+                  <div style="border-top:1px solid #d3ddd0; margin-top:10px; padding-top:9px;">
+                    <div style="font-family:'Courier New',monospace; font-size:9px; letter-spacing:0.12em; color:#4e6b58; text-transform:uppercase; margin-bottom:5px;">${lang === 'en' ? 'How this is computed' : '怎么算的'}</div>
+                    ${adChain.map((line, i) => `<div style="font-size:11px; line-height:1.7; color:#4a4a45;"><span style="font-family:'Courier New',monospace; color:#8a8980;">${i + 1}.</span> ${escapeHtml(line)}</div>`).join('')}
+                  </div>` : ''}
+                  ${adPct !== null ? `
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
+                    <tr>
+                      <td style="font-size:9px; font-family:'Courier New',monospace; color:#8a8980; padding-bottom:4px;">${lang === 'en' ? 'PD' : '优先日'} ${priorityDate}</td>
+                      <td align="right" style="font-size:9px; font-family:'Courier New',monospace; color:#8a8980; padding-bottom:4px;">${adCal ? `${lang === 'en' ? 'est.' : '预计'} ${escapeHtml(adCal)}` : ''}</td>
+                    </tr>
+                  </table>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td width="${adPct}%" height="8" style="background:${CUMULATIVE_COLOR}; font-size:0; line-height:0;">&nbsp;</td>
+                      <td height="8" style="background:#d3ddd0; font-size:0; line-height:0;">&nbsp;</td>
+                    </tr>
+                  </table>
+                  <div style="font-size:10px; color:#4e6b58; margin-top:4px;">${lang === 'en' ? `~${adPct}% of the estimated journey behind you` : `按这个预计，你已走完约 ${adPct}%`}</div>` : ''}
+                  <div style="font-size:11px; line-height:1.6; color:#8a8980; margin-top:10px;">${lang === 'en'
+                    ? 'A model estimate from historical pace, not a guarantee — the bulletin can speed up, slow down, or retrogress.'
+                    : '基于历史速度的模型估算，不是承诺——排期可能加速、放缓，也可能倒退。'}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>` : etaLine ? `
         <tr>
           <td class="px" style="padding:16px 40px 0;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e9efe6; border-left:2px solid ${CUMULATIVE_COLOR};">
@@ -1023,6 +1164,9 @@ ${emailHead(subject)}
 </body>
 </html>`;
 
+  if (language === 'tw') {
+    return { subject: toTraditional(subject), html: toTraditional(html), text: toTraditional(text) };
+  }
   return { subject, html, text };
 };
 

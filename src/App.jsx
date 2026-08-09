@@ -1220,12 +1220,44 @@ const monthlyMovementFromArchive = (cat, country, windowMonths = 12, chart = 'fi
 // Chart A pace is the only observed pace we track; applying it to a Chart B gap is an
 // approximation (the two charts move roughly together). No usable pace → degrade to
 // the old 1:1 reading rather than invent a number.
-const paceDaysToCalendar = (cat, country, gapDays, chart = 'finalAction') => {
+const paceCalRaw = (cat, country, gapDays, chart) => {
   if (!gapDays || gapDays <= 0) return 0;
   const hist = monthlyMovementFromArchive(cat, country, 12, chart);
   const total = hist ? hist.reduce((s, p) => s + (p.days || 0), 0) : 0;
   if (total <= 0) return gapDays;
   return Math.round((gapDays / (total / 12)) * 30.44);
+};
+// Chart B's ETA for the same case, derived from the A-chart gap: gapB = gapA minus the
+// distance between the two cutoffs. Null when B is current/unavailable or already past
+// the PD (then no floor applies).
+const chartBFloorCal = (cat, country, gapDaysA) => {
+  const cutA = bulletinCurrent.finalAction?.[cat]?.[country];
+  const cutB = bulletinCurrent.filing?.[cat]?.[country];
+  if (!cutA || !cutB || cutA === 'C' || cutB === 'C') return null;
+  const dA = parseDate(cutA);
+  const dB = parseDate(cutB);
+  if (!dA || !dB) return null;
+  const gapB = gapDaysA - Math.round((dB - dA) / 86400000);
+  if (gapB <= 0) return null;
+  return paceCalRaw(cat, country, gapB, 'filing');
+};
+const paceDaysToCalendar = (cat, country, gapDays, chart = 'finalAction') => {
+  const raw = paceCalRaw(cat, country, gapDays, chart);
+  if (chart !== 'finalAction' || !raw) return raw;
+  // Approval (chart A) can never land before filing (chart B): B's cutoff always sits
+  // ahead of A's, so a case crosses B first. Independent per-chart extrapolation can
+  // still put A earlier when A's recent pace beats B's — floor A's estimate to B's
+  // instead of showing the impossible ordering.
+  const floor = chartBFloorCal(cat, country, gapDays);
+  return floor !== null ? Math.max(raw, floor) : raw;
+};
+// Whether the floor actually changed the number — the UI shows a one-line explanation
+// only in that case.
+const paceEtaFlooredToB = (cat, country, gapDaysA) => {
+  const raw = paceCalRaw(cat, country, gapDaysA, 'finalAction');
+  if (!raw) return false;
+  const floor = chartBFloorCal(cat, country, gapDaysA);
+  return floor !== null && floor > raw;
 };
 
 // ==============================================================
@@ -3008,7 +3040,9 @@ const ShareCardModal = ({ userCase, greenCardInfo, lang, onClose }) => {
 const BulletinMovementChart = ({ cat, country }) => {
   const { lang } = useLang();
   const [windowMonths, setWindowMonths] = useState(12);
-  const [chartSel, setChartSel] = useState('A'); // 'A' finalAction | 'B' filing
+  // Defaults to the ADOPTED chart — hero says "B · 约4.5年" while the chart opened
+  // on A, two different measures on one screen with no reason.
+  const [chartSel, setChartSel] = useState(FILING_AUTHORIZED[cat] ? 'B' : 'A');
   const [sel, setSel] = useState(null); // null → latest month
 
   const points = monthlyMovementFromArchive(cat, country, windowMonths, chartSel === 'B' ? 'filing' : 'finalAction');
@@ -3656,6 +3690,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 const total12h = hist12h ? hist12h.reduce((sm, pp) => sm + (pp.days || 0), 0) : 0;
                 const paceMo = total12h > 0 ? total12h / 12 : null;
                 const paceCal = ps.days ? paceDaysToCalendar(userCase.category, country, ps.days, heroChartKey) : null;
+                const aFloored = heroSel === 'A' && ps.days ? paceEtaFlooredToB(userCase.category, country, ps.days) : false;
                 const etaDate = paceCal ? new Date(today2.getTime() + paceCal * 86400000) : null;
                 const yearsF = paceCal ? paceCal / 365.25 : null;
                 const heroText = paceCal === null ? (lang === 'en' ? 'TBD' : '待定')
@@ -3750,6 +3785,11 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                               : lang === 'tw'
                                 ? `依據：過去 12 個月表${heroSel}實際平均每月前進 ${Math.round(paceMo)} 天。`
                                 : `依据：过去 12 个月表${heroSel}实际平均每月前进 ${Math.round(paceMo)} 天。`}
+                            {aFloored && (lang === 'en'
+                              ? 'Approval can\'t precede filing, so this is floored to Chart B\'s estimate. '
+                              : lang === 'tw'
+                                ? '獲批不會早於遞件，已按表B的預計託底。'
+                                : '获批不会早于递件，已按表B的预计托底。')}
                             <button type="button" onClick={() => setShowHeroMath((v) => !v)}
                               style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600 }}>
                               {showHeroMath
@@ -3860,9 +3900,11 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                       const cal = paceDaysToCalendar(userCase.category, country, blk.st.days, blk.code === 'B' ? 'filing' : 'finalAction');
                       if (cal) {
                         const d2 = new Date(Date.now() + cal * 86400000);
+                        const floored = blk.code === 'A' && paceEtaFlooredToB(userCase.category, country, blk.st.days);
+                        const floorNote = floored ? (lang === 'en' ? ' (≥ B)' : lang === 'tw' ? '（不早於B）' : '（不早于B）') : '';
                         etaTxt = lang === 'en'
-                          ? `est. ${d2.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}`
-                          : `预计 ${d2.getFullYear()}年${d2.getMonth() + 1}月`;
+                          ? `est. ${d2.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}${floorNote}`
+                          : `预计 ${d2.getFullYear()}年${d2.getMonth() + 1}月${floorNote}`;
                       }
                     }
                     const isSelStation = (heroChart || (filingAuthorized ? 'B' : 'A')) === blk.code;

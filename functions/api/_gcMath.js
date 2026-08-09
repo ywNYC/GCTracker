@@ -5,6 +5,12 @@
 // is a browser/React file; this is the Node-side copy for send-monthly.js and preview
 // scripts. If you change the model in App.jsx, mirror the change here too.
 
+// Which chart each category ADOPTS for filing this month's I-485 (mirror of App.jsx).
+export const FILING_AUTHORIZED = {
+  EB1: false, EB2: false, EB3: false, EW: false,
+  F1: true, F2A: true, F2B: true, F3: true, F4: true,
+};
+
 export const resolveCountry = (country) => {
   if (['Taiwan', 'Mexico', 'Philippines'].includes(country)) return 'Other';
   return country;
@@ -202,17 +208,17 @@ export function applyRecentRateOverride(historyMonths, windowSize = 12) {
 // Returns both the single latest month and the trailing-window mean, because for a
 // category like F4-China — where 6 of the last 12 months moved 0 days — one 243-day jump
 // swings the estimate from ~1 year to ~7. Reporting a range beats false precision.
-export function observedRates(historyMonths, cat, country, windowSize = 12) {
+export function observedRates(historyMonths, cat, country, windowSize = 12, chart = 'finalAction') {
   const cats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
   const asc = (historyMonths || [])
-    .filter((m) => m && m.month && m.finalAction && cats.every((c) => m.finalAction[c]))
+    .filter((m) => m && m.month && m[chart] && cats.every((c) => m[chart][c]))
     .sort((a, b) => a.month.localeCompare(b.month));
   const toTime = (v) => (v && v !== 'C' && v !== 'U' ? Date.parse(`${v}T00:00:00Z`) : null);
 
   const deltas = [];
   for (let i = 1; i < asc.length; i++) {
-    const a = toTime(asc[i - 1].finalAction?.[cat]?.[country]);
-    const b = toTime(asc[i].finalAction?.[cat]?.[country]);
+    const a = toTime(asc[i - 1][chart]?.[cat]?.[country]);
+    const b = toTime(asc[i][chart]?.[cat]?.[country]);
     if (a === null || b === null) continue;
     deltas.push({ month: asc[i].month, days: (b - a) / 86400000 });
   }
@@ -232,14 +238,14 @@ export function observedRates(historyMonths, cat, country, windowSize = 12) {
 // Month-by-month cutoff VALUES (not deltas) over the trailing window — the email's
 // trend chart plots these to show where the line actually sits, complementing the
 // per-month bars. Returns [{month, cutoff: 'YYYY-MM-DD'}], skipping C/U months.
-export function cutoffHistory(historyMonths, cat, country, windowSize = 24) {
+export function cutoffHistory(historyMonths, cat, country, windowSize = 24, chart = 'finalAction') {
   const cats = ['EB1', 'EB2', 'EB3', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
   const asc = (historyMonths || [])
-    .filter((m) => m && m.month && m.finalAction && cats.every((c) => m.finalAction[c]))
+    .filter((m) => m && m.month && m[chart] && cats.every((c) => m[chart][c]))
     .sort((a, b) => a.month.localeCompare(b.month));
   const points = [];
   for (const m of asc.slice(-(windowSize + 1))) {
-    const v = m.finalAction?.[cat]?.[country];
+    const v = m[chart]?.[cat]?.[country];
     if (!v || v === 'C' || v === 'U') continue;
     points.push({ month: m.month, cutoff: v });
   }
@@ -298,11 +304,65 @@ export function computeCaseUpdate({ cat, country, priorityDate, current, previou
     };
   }
 
+  // The ADOPTED chart's own numbers — hero of the email, computed with that chart's
+  // own 12-month pace (a B gap divided by A's pace was a real logical hole).
+  const adopted = (() => {
+    const isB = !!FILING_AUTHORIZED[cat];
+    const chartKey = isB ? 'filing' : 'finalAction';
+    const st = isB ? filStatus : faStatus;
+    const mv = isB ? filMovement : faMovement;
+    const obs2 = historyMonths ? observedRates(historyMonths, cat, resolvedCountry, 12, chartKey) : null;
+    const paceMo = obs2 && obs2.windowMean > 0 ? obs2.windowMean : null;
+    // Only notCurrent has a forward gap; for eligible/current, status.days is the
+    // margin PAST the cutoff, not distance remaining.
+    const gapDays = st && st.status === 'notCurrent' && typeof st.days === 'number' ? st.days : null;
+    const etaMonths = paceMo && gapDays ? gapDays / paceMo : null;
+    return {
+      chart: isB ? 'B' : 'A',
+      gapDays, paceMo, etaMonths,
+      movement: mv, status: st,
+      series: obs2 ? obs2.series : null,
+      cutoffHistory: historyMonths ? cutoffHistory(historyMonths, cat, resolvedCountry, 24, chartKey) : null,
+    };
+  })();
+
+  // Per-chart ETAs for the two-station block.
+  const stations = (() => {
+    const mk = (chartKey, st, mv) => {
+      const obs2 = historyMonths ? observedRates(historyMonths, cat, resolvedCountry, 12, chartKey) : null;
+      const paceMo = obs2 && obs2.windowMean > 0 ? obs2.windowMean : null;
+      const gapDays = st && st.status === 'notCurrent' && typeof st.days === 'number' ? st.days : null;
+      return { gapDays, etaMonths: paceMo && gapDays ? gapDays / paceMo : null, movement: mv, status: st };
+    };
+    return {
+      B: mk('filing', filStatus, filMovement),
+      A: mk('finalAction', faStatus, faMovement),
+    };
+  })();
+
+  // Approval can never precede filing eligibility: chart B's cutoff always sits ahead
+  // of chart A's, so a case crosses B first and A after. Independent per-chart
+  // extrapolation can still land A earlier when A's recent pace beats B's — clamp A's
+  // ETA to B's and flag it so the UI can explain the floor instead of showing the
+  // impossible ordering.
+  if (typeof stations.A.etaMonths === 'number' && typeof stations.B.etaMonths === 'number'
+      && stations.A.etaMonths < stations.B.etaMonths) {
+    stations.A.etaMonths = stations.B.etaMonths;
+    stations.A.clampedToB = true;
+  }
+  if (adopted.chart === 'A' && typeof adopted.etaMonths === 'number'
+      && typeof stations.B.etaMonths === 'number' && adopted.etaMonths < stations.B.etaMonths) {
+    adopted.etaMonths = stations.B.etaMonths;
+    adopted.clampedToB = true;
+  }
+
   return {
     cat, country: resolvedCountry, priorityDate,
     finalAction: { current: faCurrent, previous: faPrevious, movement: faMovement, status: faStatus },
     filing: { current: filCurrent, previous: filPrevious, movement: filMovement, status: filStatus },
     forecast,
     cutoffHistory: historyMonths ? cutoffHistory(historyMonths, cat, resolvedCountry, 24) : null,
+    adopted,
+    stations,
   };
 }

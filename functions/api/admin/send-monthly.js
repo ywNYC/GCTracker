@@ -59,6 +59,9 @@ export async function onRequestPost(context) {
   const url = new URL(request.url);
   const dryRun = url.searchParams.get('dryRun') === '1';
   const force = url.searchParams.get('force') === '1';
+  // Safety valve for template testing: process ONLY this subscriber, skip the rest.
+  // Without it, a force-resend now reaches real strangers.
+  const only = (url.searchParams.get('only') || '').trim().toLowerCase();
   const siteUrl = (env.SITE_URL || 'https://gc.jmjvc.us').replace(/\/+$/, '');
 
   // ---- Load bulletin data (same files the frontend reads) ----
@@ -128,6 +131,7 @@ export async function onRequestPost(context) {
     const list = await env.SUBSCRIBERS.list({ cursor });
     for (const keyInfo of list.keys) {
       if (keyInfo.name.startsWith('rl:')) continue; // rate-limit counters, not subscribers
+      if (only && keyInfo.name.toLowerCase().indexOf(only) === -1) continue; // test valve
       const raw = await env.SUBSCRIBERS.get(keyInfo.name);
       if (!raw) continue;
       let record;
