@@ -3663,6 +3663,11 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                   style={{ border: '1px solid var(--gc-rule)', background: 'transparent', borderRadius: '2px', padding: '3px 5px', cursor: 'pointer', lineHeight: 0 }}>
                   <Share2 size={11} style={{ color: 'var(--gc-muted)' }} />
                 </button>
+                <button type="button" onClick={() => setTab('alerts')}
+                  title={lang === 'en' ? 'Subscribe' : '订阅'}
+                  style={{ border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)', borderRadius: '2px', padding: '3px 5px', cursor: 'pointer', lineHeight: 0 }}>
+                  <Mail size={11} style={{ color: 'var(--gc-green)' }} />
+                </button>
               </span>
             </div>
             {/* Top row: either standard distance display OR "can file now" message for eligible users */}
@@ -3894,6 +3899,8 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             </div>
                           </div>
                         )}
+                        <InlineSubscribeCTA userCase={userCase}
+                          label={lang === 'en' ? '📮 Get an email the moment this number moves' : lang === 'tw' ? '📮 這個數字一變，就發郵件告訴你' : '📮 这个数字一变，就发邮件告诉你'} />
                       </>
                     )}
                   </div>
@@ -5288,6 +5295,8 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
               <span style={{ fontWeight: 700 }}>{closeTitle}</span>
               <span style={{ color: 'var(--gc-ink-soft)' }}>{lang === 'en' ? ' — ' : '——'}{closeDesc}</span>
             </p>
+            <InlineSubscribeCTA userCase={userCase}
+              label={lang === 'en' ? 'Next month\'s recap, straight to your inbox' : lang === 'tw' ? '下個月的這份小結，直接發到你信箱' : '下个月的这份小结，直接发到你邮箱'} />
           </div>
         );
       })()}
@@ -12803,6 +12812,103 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
 // Main App
 // ============================================================
 // ============================================================
+// InlineSubscribeCTA — one-row subscribe entry embedded where intent peaks (under
+// the hero number, at the end of the monthly recap). Hidden entirely once the
+// visitor subscribed; touching it marks the session so the timed popup stays quiet.
+// ============================================================
+const InlineSubscribeCTA = ({ userCase, label }) => {
+  const { lang } = useLang();
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState(''); // '' | 'loading' | 'sent' | 'error' | 'invalid'
+  const [hidden] = useState(() => {
+    try { return !!window.localStorage.getItem('gc_subscribedEmail'); } catch { return false; }
+  });
+  if (hidden) return null;
+
+  const markTouched = () => {
+    try { window.sessionStorage.setItem('gc_subNudgeShown', '1'); } catch { /* noop */ }
+  };
+
+  const subscribe = async () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStatus('invalid');
+      setTimeout(() => setStatus(''), 2500);
+      return;
+    }
+    setStatus('loading');
+    try {
+      const resp = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          userCase,
+          alerts: { whenCurrent: true, whenEligible: true, monthlyUpdates: true, retrogression: true },
+          language: lang,
+        }),
+      });
+      const result = await resp.json().catch(() => ({ success: false }));
+      if (resp.ok && result.success) {
+        setStatus('sent');
+        markTouched();
+        try { window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase()); } catch { /* noop */ }
+      } else {
+        setStatus('error');
+        setTimeout(() => setStatus(''), 3000);
+      }
+    } catch {
+      setStatus('error');
+      setTimeout(() => setStatus(''), 3000);
+    }
+  };
+
+  if (status === 'sent') {
+    return (
+      <div style={{ marginTop: '10px', padding: '8px 10px', background: 'var(--gc-green-soft)', borderRadius: '3px', fontSize: '11px', lineHeight: 1.6, color: 'var(--gc-green-ink)' }}>
+        {lang === 'en'
+          ? `Confirmation sent to ${email.trim()} — click it to activate. Not there? Check spam.`
+          : lang === 'tw'
+            ? `確認郵件已發到 ${email.trim()}，點一下才生效；收件匣沒有就翻垃圾郵件匣。`
+            : `确认邮件已发到 ${email.trim()}，点一下才生效；收件箱没有就翻垃圾邮件。`}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: '10px', paddingTop: '9px', borderTop: '1px dashed var(--gc-rule)' }}>
+      <div style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--gc-ink-soft)', marginBottom: '5px' }}>{label}</div>
+      <div style={{ display: 'flex', gap: '6px' }}>
+        <input
+          type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+          onFocus={markTouched}
+          onKeyDown={(e) => { if (e.key === 'Enter') subscribe(); }}
+          placeholder="you@example.com"
+          style={{
+            flex: 1, minWidth: 0, fontSize: '12px', padding: '6px 9px',
+            border: status === 'invalid' || status === 'error' ? '1px solid var(--gc-red)' : '1px solid var(--gc-rule)',
+            borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)',
+          }} />
+        <button type="button" onClick={subscribe} disabled={status === 'loading'}
+          style={{
+            border: 'none', borderRadius: '3px', cursor: 'pointer', whiteSpace: 'nowrap',
+            background: 'var(--gc-green)', color: 'var(--gc-paper)', fontSize: '11px', fontWeight: 700, padding: '6px 12px',
+            opacity: status === 'loading' ? 0.6 : 1,
+          }}>
+          {lang === 'en' ? 'Subscribe' : lang === 'tw' ? '訂閱' : '订阅'}
+        </button>
+      </div>
+      {(status === 'invalid' || status === 'error') && (
+        <div style={{ fontSize: '10px', color: 'var(--gc-red)', marginTop: '3px' }}>
+          {status === 'invalid'
+            ? (lang === 'en' ? 'That email doesn\'t look right' : lang === 'tw' ? '郵箱格式不對' : '邮箱格式不对')
+            : (lang === 'en' ? 'Something went wrong — try again' : lang === 'tw' ? '出錯了，再試一次' : '出错了，再试一次')}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
 // SubscribeNudge — one-tap subscribe prompt for engaged visitors.
 // Shows once per session, only when: the visitor has an actual case picked
 // (onboarded), isn't already subscribed, and hasn't dismissed it in the last
@@ -12826,7 +12932,13 @@ const SubscribeNudge = ({ userCase, hasOnboarded, theme = 'passport' }) => {
       if (dismissedAt && Date.now() - dismissedAt < 14 * 86400000) return undefined;
     } catch { return undefined; }
     const timer = setTimeout(() => {
-      try { window.sessionStorage.setItem('gc_subNudgeShown', '1'); } catch { /* noop */ }
+      // Re-check at fire time: an inline CTA may have been touched (or used to
+      // subscribe) during the 40s — in that case the popup stays quiet.
+      try {
+        if (window.localStorage.getItem('gc_subscribedEmail')) return;
+        if (window.sessionStorage.getItem('gc_subNudgeShown')) return;
+        window.sessionStorage.setItem('gc_subNudgeShown', '1');
+      } catch { /* noop */ }
       setShow(true);
     }, SUB_NUDGE_DELAY_MS);
     return () => clearTimeout(timer);
