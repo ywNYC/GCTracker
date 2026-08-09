@@ -14912,32 +14912,22 @@ export default function App() {
             );
           })()}
           <div className="mt-8" style={{ padding: '14px 12px 16px' }}>
-            {/* Data source line */}
-            <div className="text-center gc-eyebrow" style={{ letterSpacing: '0.12em' }}>
-              <span className="gc-mono" style={{ letterSpacing: '0.02em', textTransform: 'none', color: 'var(--gc-muted)' }}>
-                {(lang === 'zh' ? `数据来自美国国务院 travel.state.gov · ${BULLETIN_CURRENT_MONTH.zh}`
-                  : lang === 'tw' ? `資料來自美國國務院 travel.state.gov · ${BULLETIN_CURRENT_MONTH.tw}`
-                  : `Data sourced from US State Department travel.state.gov · ${BULLETIN_CURRENT_MONTH.en}`)
-                  + (BULLETIN_EXTRAS?.meta?.volume ? ` · Vol. ${BULLETIN_EXTRAS.meta.volume} No. ${BULLETIN_EXTRAS.meta.number}` : '')
-                  + (lang === 'en' ? ' · Informational only, not legal advice' : lang === 'tw' ? ' · 僅供參考,不構成法律建議' : ' · 仅供参考,不构成法律建议')}
-              </span>
-            </div>
-            {/* Copyright + small theme dropdown in the same low-emphasis line.
-                Both are fine print — treated at matching weight. */}
+            {/* ONE compact fine-print line: source + month + disclaimer + copyright +
+                theme picker. Vol/No dropped — it forced a second wrapped line. */}
             <div style={{
-              marginTop: '10px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexWrap: 'wrap',
-              gap: '10px',
+              gap: '6px 8px',
               fontSize: '10px',
               color: 'var(--gc-muted-soft, var(--gc-muted))',
             }}>
-              <span className="gc-mono" style={{ letterSpacing: '0.04em', opacity: 0.75 }}>
-                Project by JMJ · © 2026 · All rights reserved
+              <span className="gc-mono" style={{ letterSpacing: '0.02em', color: 'var(--gc-muted)', whiteSpace: 'nowrap' }}>
+                {lang === 'zh' ? `数据 travel.state.gov · ${BULLETIN_CURRENT_MONTH.zh} · 仅供参考 · © 2026 JMJ`
+                  : lang === 'tw' ? `資料 travel.state.gov · ${BULLETIN_CURRENT_MONTH.tw} · 僅供參考 · © 2026 JMJ`
+                  : `Data: travel.state.gov · ${BULLETIN_CURRENT_MONTH.en} · Not legal advice · © 2026 JMJ`}
               </span>
-              <span style={{ opacity: 0.4 }}>·</span>
               {/* Small theme dropdown — low-key, sits inline with copyright */}
               {(() => {
                 const themes = [
