@@ -5374,6 +5374,77 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 // Monthly Update
 // ============================================================
 // ============================================================
+// AboutTab — what this site is, where the data comes from, and the placeholder for
+// the future partners/sponsorship slot (mortgage / immigration-attorney referrals).
+// Keep the partners card copy generic until real partners are signed.
+// ============================================================
+const AboutTab = () => {
+  const { lang } = useLang();
+  const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '14px 16px' };
+  const eyebrow = { fontSize: '9px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--gc-green)', fontWeight: 700, marginBottom: '6px' };
+  return (
+    <div className="space-y-2">
+      <div style={{ padding: '4px 0 0' }}>
+        <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>{lang === 'en' ? 'ABOUT' : '关于'}</div>
+        <h2 className="gc-serif" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 2px' }}>
+          {lang === 'en' ? 'About Green Card Tracker' : lang === 'tw' ? '關於綠卡晴雨表' : '关于绿卡晴雨表'}
+        </h2>
+      </div>
+      <div style={card}>
+        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'What this is' : lang === 'tw' ? '這是什麼' : '这是什么'}</div>
+        <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: 0 }}>
+          {lang === 'en'
+            ? 'Green Card Tracker turns the State Department\'s monthly Visa Bulletin into an answer you can actually use: how long is MY wait, how fast is my line moving, and what changed this month. Free, in Simplified / Traditional Chinese and English, updated automatically every month.'
+            : lang === 'tw'
+              ? '綠卡晴雨表把國務院每月的簽證公告，變成你真正需要的答案：我還要等多久、我的隊伍每月走多快、這個月發生了什麼。免費使用，簡體／繁體／英文，每月自動更新。'
+              : '绿卡晴雨表把国务院每月的签证公告，变成你真正需要的答案：我还要等多久、我的队伍每月走多快、这个月发生了什么。免费使用，简体／繁体／英文，每月自动更新。'}
+        </p>
+      </div>
+      <div style={card}>
+        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'Data & limits' : lang === 'tw' ? '資料與邊界' : '数据与边界'}</div>
+        <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: 0 }}>
+          {lang === 'en'
+            ? 'All cutoff dates come from the official Visa Bulletin (travel.state.gov). Wait estimates are model projections from real historical pace — the bulletin can speed up, slow down, or retrogress. Nothing here is legal advice; consult a licensed immigration attorney for decisions.'
+            : lang === 'tw'
+              ? '所有截止日均來自官方簽證公告（travel.state.gov）。等待預計是按真實歷史速度的模型推算——排期可能加速、放緩或倒退。本站內容不構成法律意見，重大決定請諮詢持牌移民律師。'
+              : '所有截止日均来自官方签证公告（travel.state.gov）。等待预计是按真实历史速度的模型推算——排期可能加速、放缓或倒退。本站内容不构成法律意见，重大决定请咨询持牌移民律师。'}
+        </p>
+      </div>
+      <div style={{ ...card, borderStyle: 'dashed', background: 'var(--gc-paper-soft)' }}>
+        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'Partners · coming soon' : lang === 'tw' ? '合作欄位 · 敬請期待' : '合作栏位 · 敬请期待'}</div>
+        <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: 0 }}>
+          {lang === 'en'
+            ? 'We plan to open a small number of partner slots for services our readers actually need — immigration attorneys (EB-4 / SIJ / EB-5), U.S. mortgage lending, and cross-border finance. Want to be among the first? Subscribe and reply to any of our emails to reach us.'
+            : lang === 'tw'
+              ? '本站計劃開放少量合作欄位，只限讀者真正需要的服務：移民律師（EB-4／SIJ／EB-5）、美國房屋貸款、跨境金融。想成為首批合作方？訂閱後直接回覆任一封郵件即可聯繫到我們。'
+              : '本站计划开放少量合作栏位，只限读者真正需要的服务：移民律师（EB-4／SIJ／EB-5）、美国房屋贷款、跨境金融。想成为首批合作方？订阅后直接回复任一封邮件即可联系到我们。'}
+        </p>
+      </div>
+      <div style={card}>
+        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'Reminders & subscription' : lang === 'tw' ? '提醒與訂閱' : '提醒与订阅'}</div>
+        <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: '0 0 8px' }}>
+          {lang === 'en'
+            ? 'Email updates when your line moves, plus I-751 / N-400 timing reminders.'
+            : lang === 'tw'
+              ? '排期一動就發郵件，另有 I-751／N-400 時點提醒。'
+              : '排期一动就发邮件，另有 I-751／N-400 时点提醒。'}
+        </p>
+        <div className="flex items-center" style={{ gap: '8px' }}>
+          <button type="button" onClick={() => window.dispatchEvent(new Event('gc-open-subscribe'))}
+            style={{ border: 'none', borderRadius: '4px', background: 'var(--gc-green)', color: 'var(--gc-paper)', padding: '8px 16px', cursor: 'pointer', fontSize: '12px', fontWeight: 700 }}>
+            {lang === 'en' ? 'Subscribe' : lang === 'tw' ? '訂閱' : '订阅'}
+          </button>
+          <button type="button" onClick={() => window.dispatchEvent(new Event('gc-goto-alerts'))}
+            style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-paper)', padding: '7px 12px', cursor: 'pointer', fontSize: '11.5px', color: 'var(--gc-ink-soft)' }}>
+            {lang === 'en' ? 'Reminder settings' : lang === 'tw' ? '提醒設定' : '提醒设置'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
 // BulletinTab — the bulletin itself as a first-class page: official notices
 // (trilingual), DV cutoffs, statutory quotas, edition metadata.
 // ============================================================
@@ -13158,7 +13229,7 @@ export default function App() {
   const [tab, setTab] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search).get('tab');
-      if (['overview', 'trends', 'update', 'bulletin', 'compare', 'index', 'alerts'].includes(p)) return p;
+      if (['overview', 'trends', 'update', 'bulletin', 'compare', 'index', 'alerts', 'about'].includes(p)) return p;
     } catch (e) { /* noop */ }
     return 'overview';
   });
@@ -13678,7 +13749,7 @@ export default function App() {
     { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
     { id: 'compare', label: t.navCompare, icon: Target },
     { id: 'index', label: t.navIndex, icon: ClipboardList },
-    { id: 'alerts', label: t.navAlerts, icon: Mail },
+    { id: 'about', label: lang === 'en' ? 'About' : lang === 'tw' ? '關於' : '关于', icon: Info },
   ];
 
   // Split tabs into two rows for better mobile layout
@@ -14619,6 +14690,30 @@ export default function App() {
                 </button>
 
                 <LangSwitcher />
+                {/* Subscribe lives in the header now — promoted out of the nav so the
+                    nav slot can become the partners/about page. */}
+                <button onClick={() => setShowSubModal(true)}
+                  aria-label={lang === 'en' ? 'Subscribe' : '订阅'}
+                  className="flex items-center active:opacity-80"
+                  style={{
+                    gap: '4px',
+                    padding: '0 10px',
+                    height: '26px',
+                    background: 'var(--gc-green)',
+                    color: 'var(--gc-paper)',
+                    border: '1px solid var(--gc-green)',
+                    borderRadius: '13px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap',
+                    letterSpacing: '0.01em',
+                  }}>
+                  <Mail size={12} strokeWidth={2.2} style={{ flexShrink: 0 }} />
+                  <span>{lang === 'en' ? 'Subscribe' : lang === 'tw' ? '訂閱' : '订阅'}</span>
+                </button>
               </div>
             </div>
           </header>
@@ -14662,26 +14757,24 @@ export default function App() {
                   const Icon = tb.icon;
                   const active = tab === tb.id;
                   const isAIHighlighted = tb.id === 'trends' && !active;
-                  // The subscribe tab is the site's one conversion action — it keeps a
-                  // green fill in both states so it reads as a button among tabs.
-                  const isSubscribeTab = tb.id === 'alerts';
+
                   // In English mode, stack icon above label (vertical) — English labels
                   // ("Overview", "Compare", "Forecast") are wider than 2-char Chinese
                   // labels and would truncate in horizontal layout at mobile widths.
                   // Stacking frees the full tab width for the label.
                   const stackVertical = lang === 'en';
                   return (
-                    <button key={tb.id} onClick={() => (tb.id === 'alerts' ? setShowSubModal(true) : handleTabChange(tb.id))}
+                    <button key={tb.id} onClick={() => handleTabChange(tb.id)}
                       style={{
                         flex: '1 1 0%', minWidth: 0, boxSizing: 'border-box',
                         position: 'relative',
                         padding: stackVertical ? '6px 3px 5px' : '10px 4px 9px',
                         fontSize: '11px',
-                        fontWeight: isSubscribeTab ? 700 : active ? 700 : 500,
+                        fontWeight: active ? 700 : 500,
                         letterSpacing: '0.02em',
-                        color: isSubscribeTab ? 'var(--gc-paper)' : active ? 'var(--gc-ink)' : 'var(--gc-muted)',
-                        background: isSubscribeTab ? 'var(--gc-green)' : active ? 'var(--gc-paper-soft)' : 'transparent',
-                        borderBottom: active ? (isSubscribeTab ? '2px solid var(--gc-ink)' : '2px solid var(--gc-green)') : '2px solid transparent',
+                        color: active ? 'var(--gc-ink)' : 'var(--gc-muted)',
+                        background: active ? 'var(--gc-paper-soft)' : 'transparent',
+                        borderBottom: active ? '2px solid var(--gc-green)' : '2px solid transparent',
                         transition: 'all 120ms',
                       }}
                       className={stackVertical
@@ -14748,6 +14841,7 @@ export default function App() {
               {tab === 'i485' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
               {tab === 'bulletin' && <BulletinTab userCase={userCase} />}
+              {tab === 'about' && <AboutTab />}
               {tab === 'compare' && <CompareHub userCase={userCase} />}
               {tab === 'index' && <TheIndex userCase={userCase} setTab={handleTabChange} setUserCase={setUserCase} previousTab={previousTab} onSetupCase={() => { setOnboardingInitialMode('form'); setHasOnboarded(false); }} />}
               {tab === 'help' && <HelpCenter />}
