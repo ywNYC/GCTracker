@@ -5384,6 +5384,26 @@ const MonthlyUpdate = ({ userCase }) => {
           </div>
         );
       })()}
+      {/* B3: the bulletin's own lettered notices, verbatim */}
+      {BULLETIN_NOTICES.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+            {lang === 'en' ? 'Official notices (from the bulletin)' : lang === 'tw' ? '公告原文提醒（官方）' : '公告原文提醒（官方）'}
+          </div>
+          {BULLETIN_NOTICES.map((nz, ni) => (
+            <div key={ni} style={{ borderLeft: '2px solid var(--gc-amber-border)', padding: '6px 10px', marginBottom: '6px', background: 'var(--gc-paper-soft)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+                {nz.letter ? `${nz.letter} · ` : ''}{nz.title}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.6, marginTop: '2px' }}>
+                {(nz.text || '').slice(0, 220)}{(nz.text || '').length > 220 ? '…' : ''}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+
       <div>
         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{t.categoryChanges}</div>
         <div className="space-y-1">
@@ -5434,25 +5454,6 @@ const MonthlyUpdate = ({ userCase }) => {
         </div>
       </div>
     
-      {/* B3: the bulletin's own lettered notices, verbatim */}
-      {BULLETIN_NOTICES.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-            {lang === 'en' ? 'Official notices (from the bulletin)' : lang === 'tw' ? '公告原文提醒（官方）' : '公告原文提醒（官方）'}
-          </div>
-          {BULLETIN_NOTICES.map((nz, ni) => (
-            <div key={ni} style={{ borderLeft: '2px solid var(--gc-amber-border)', padding: '6px 10px', marginBottom: '6px', background: 'var(--gc-paper-soft)' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)' }}>
-                {nz.letter ? `${nz.letter} · ` : ''}{nz.title}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.6, marginTop: '2px' }}>
-                {(nz.text || '').slice(0, 220)}{(nz.text || '').length > 220 ? '…' : ''}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* B1: DV lottery rank cutoffs — scraped since day one, displayed at last */}
       {BULLETIN_EXTRAS?.dv && (
         <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
@@ -6609,25 +6610,15 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
 // timelines as evidence — same language as the Overview card.
 // ============================================================
 const CompareHub = ({ userCase }) => {
-  const { t, lang } = useLang();
-  const [scen, setScen] = useState('spouse');
-  const [spouseCountry, setSpouseCountry] = useState(userCase.country === 'China' ? 'Taiwan' : 'China');
-  const [catPair, setCatPair] = useState(0);
-  const [whatIfChart, setWhatIfChart] = useState(null); // null → adopted
-  const [showRule, setShowRule] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
+  const { lang } = useLang();
+  const [openRule, setOpenRule] = useState(null); // index of the card whose rule is open
 
-  const chartSel = whatIfChart || (FILING_AUTHORIZED[userCase.category] ? 'B' : 'A');
+  // Zero choices: everything below is auto-computed from the user's own case, on the
+  // adopted chart. The three-scenario picker version confused its one real user —
+  // an answer page beats a tool page here. (Comparison component kept, unused.)
+  const chartSel = FILING_AUTHORIZED[userCase.category] ? 'B' : 'A';
   const chartKey = chartSel === 'B' ? 'filing' : 'finalAction';
 
-  const countryLabelOf = (c) => c === 'China' ? (lang === 'en' ? 'China' : '中国大陆')
-    : c === 'Taiwan' ? (lang === 'en' ? 'ROW/HK/TW' : '全球/港澳台')
-    : c === 'India' ? (lang === 'en' ? 'India' : '印度')
-    : c === 'Mexico' ? (lang === 'en' ? 'Mexico' : '墨西哥')
-    : c === 'Philippines' ? (lang === 'en' ? 'Philippines' : lang === 'tw' ? '菲律賓' : '菲律宾') : c;
-
-  // One estimator for every scenario: gap on the chosen chart ÷ that chart's own
-  // 12-month pace for that category+country (identical math to the Overview card).
   const etaFor = (cat, country) => {
     const rc = resolveCountry(country);
     const cutoff = bulletinCurrent[chartKey]?.[cat]?.[rc];
@@ -6635,222 +6626,140 @@ const CompareHub = ({ userCase }) => {
     if (cutoff === 'C' || ['current', 'eligible', 'overdue'].includes(st.status)) return { now: true, months: 0 };
     if (st.days === null) return { unavailable: true, months: null };
     const cal = paceDaysToCalendar(cat, rc, st.days, chartKey);
-    return { months: cal / 30.44, eta: new Date(Date.now() + cal * 86400000), gap: st.days };
+    return { months: cal / 30.44, eta: new Date(Date.now() + cal * 86400000) };
   };
   const fmtEta = (r) => r.now ? (lang === 'en' ? 'now' : '现在就可')
-    : r.unavailable ? (lang === 'en' ? 'U (no visas)' : '无名额 U')
+    : r.unavailable ? 'U'
     : r.months / 12 >= 1.5 ? (lang === 'en' ? `~${(r.months / 12).toFixed(1)} yrs` : `约 ${(r.months / 12).toFixed(1)} 年`)
     : (lang === 'en' ? `~${Math.max(Math.round(r.months), 1)} mo` : `约 ${Math.max(Math.round(r.months), 1)} 个月`);
   const fmtYM2 = (d) => !d ? '' : lang === 'en'
     ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
     : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+  const diffText = (m) => Math.abs(m) / 12 >= 1
+    ? `${(Math.abs(m) / 12).toFixed(1)} ${lang === 'en' ? 'yrs' : '年'}`
+    : `${Math.round(Math.abs(m))} ${lang === 'en' ? 'mo' : '个月'}`;
 
-  const DualTimeline = ({ rows }) => {
-    const maxM = Math.max(...rows.map((r) => r.months || 0), 1);
-    return (
-      <div style={{ marginTop: '10px' }}>
-        {rows.map((r, i) => (
-          <div key={i} style={{ marginBottom: '8px' }}>
-            <div className="flex items-center justify-between" style={{ fontSize: '11px', marginBottom: '3px' }}>
-              <span style={{ fontWeight: 600, color: 'var(--gc-ink)' }}>{r.label}</span>
-              <span className="gc-mono" style={{ fontWeight: 700, color: r.color }}>{r.valueText}</span>
-            </div>
-            <div style={{ height: '8px', background: 'var(--gc-rule-soft)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.max(((r.months || 0) / maxM) * 100, r.now ? 2 : 4)}%`, background: r.color, borderRadius: '4px' }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  const cards = [];
 
-  const saveScenario = (verdict) => {
-    try {
-      const arr = JSON.parse(window.localStorage.getItem('gc_scenarios') || '[]');
-      arr.unshift({ at: Date.now(), verdict });
-      window.localStorage.setItem('gc_scenarios', JSON.stringify(arr.slice(0, 5)));
-      setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1500);
-    } catch (e) { /* noop */ }
-  };
-
-  const VerdictCard = ({ verdict, tone, rows, rule }) => (
-    <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderLeft: `2px solid ${tone}`, borderRadius: '4px', padding: '12px 14px', marginTop: '8px' }}>
-      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', lineHeight: 1.5 }}>{verdict}</div>
-      <DualTimeline rows={rows} />
-      <div className="flex items-center gap-3" style={{ marginTop: '8px' }}>
-        {rule && (
-          <button type="button" onClick={() => setShowRule((v) => !v)}
-            style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600 }}>
-            {showRule ? (lang === 'en' ? 'hide the rule' : '收起规则') : (lang === 'en' ? 'which rule allows this?' : '依据什么规则？')}
-          </button>
-        )}
-        <button type="button" onClick={() => saveScenario(verdict)}
-          style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600 }}>
-          {savedFlash ? (lang === 'en' ? 'saved ✓' : '已存 ✓') : (lang === 'en' ? 'save this scenario' : '存为我的情景')}
-        </button>
-      </div>
-      {rule && showRule && (
-        <div style={{ fontSize: '11px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px', padding: '8px 10px', marginTop: '7px' }}>
-          {rule}
-        </div>
-      )}
-    </div>
-  );
-
-  // ---- Scenario: spouse (cross-chargeability) ----
-  const renderSpouse = () => {
+  // Card 1 — spouse's birth country, always vs the ROW pool (the only pool that helps).
+  if (userCase.country !== 'Taiwan') {
     const mine = etaFor(userCase.category, userCase.country);
-    const theirs = etaFor(userCase.category, spouseCountry);
-    const diffM = (mine.months ?? 0) - (theirs.months ?? 0);
-    const diffTxt = Math.abs(diffM) / 12 >= 1 ? `${(Math.abs(diffM) / 12).toFixed(1)} ${lang === 'en' ? 'yrs' : '年'}` : `${Math.round(Math.abs(diffM))} ${lang === 'en' ? 'mo' : '个月'}`;
-    const verdict = theirs.now && !mine.now
-      ? (lang === 'en' ? `Charged to your spouse's country, you could proceed NOW.` : `按配偶的出生国计，你现在就可推进。`)
-      : diffM > 1
-        ? (lang === 'en' ? `Charged to your spouse's country: about ${diffTxt} sooner.` : `按配偶的出生国计，约可提前 ${diffTxt}。`)
-        : diffM < -1
-          ? (lang === 'en' ? `Your own country is actually faster here (by ~${diffTxt}).` : `你自己的出生国反而更快（约快 ${diffTxt}）。`)
-          : (lang === 'en' ? 'Both countries are about the same for this category.' : '两个出生国在此类别下差别不大。');
-    return (
-      <>
-        <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', lineHeight: 1.6, margin: '8px 0' }}>
-          {lang === 'en'
-            ? 'If your spouse was born in a different country, your case can be charged to THEIR country of birth.'
-            : '如果配偶出生在别的国家，你的案子可以按【配偶的出生国】计算排期。'}
-        </div>
-        <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginBottom: '4px' }}>
-          {lang === 'en' ? "SPOUSE'S COUNTRY OF BIRTH" : '配偶的出生地'}
-        </div>
-        <div className="grid grid-cols-5" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
-          {['Taiwan', 'China', 'India', 'Mexico', 'Philippines'].map((c, i) => (
-            <button key={c} type="button" onClick={() => setSpouseCountry(c)}
-              style={{
-                padding: '7px 4px', fontSize: '10px', fontWeight: 700, cursor: 'pointer', border: 'none',
-                borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                background: spouseCountry === c ? 'var(--gc-green)' : 'var(--gc-surface)',
-                color: spouseCountry === c ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
-              }}>
-              {COUNTRY_CODE[c] || c}
-            </button>
-          ))}
-        </div>
-        <VerdictCard
-          verdict={verdict}
-          tone={theirs.now || diffM > 1 ? 'var(--gc-green)' : 'var(--gc-ink)'}
-          rows={[
-            { label: lang === 'en' ? `You · ${countryLabelOf(userCase.country)}` : `你 · ${countryLabelOf(userCase.country)}`, months: mine.months, now: mine.now, valueText: `${fmtEta(mine)}${mine.eta ? ` · ${fmtYM2(mine.eta)}` : ''}`, color: 'var(--gc-blue)' },
-            { label: lang === 'en' ? `Via spouse · ${countryLabelOf(spouseCountry)}` : `按配偶 · ${countryLabelOf(spouseCountry)}`, months: theirs.months, now: theirs.now, valueText: `${fmtEta(theirs)}${theirs.eta ? ` · ${fmtYM2(theirs.eta)}` : ''}`, color: 'var(--gc-green)' },
-          ]}
-          rule={lang === 'en'
-            ? 'Cross-chargeability (INA §202(b)(2)): a derivative spouse may be charged to the principal\'s country — and vice versa — when both immigrate together. Both file at the better cutoff. Consult a lawyer for edge cases.'
-            : '交叉归属（INA §202(b)(2)）：夫妻一同移民时，可把案件计入任一方的出生国配额——两人都按更快的那国排期递件。细节因案而异，建议咨询律师。'}
-        />
-      </>
-    );
-  };
+    const row = etaFor(userCase.category, 'Taiwan');
+    const d = (mine.months ?? 0) - (row.months ?? 0);
+    cards.push({
+      title: lang === 'en' ? 'If your spouse was born elsewhere' : '如果配偶出生在非积压国',
+      verdict: row.now && !mine.now
+        ? (lang === 'en' ? 'Charged to a ROW-born spouse, you could proceed NOW.' : '按配偶的出生国（非积压国）计，你现在就可推进。')
+        : d > 1
+          ? (lang === 'en' ? `Marrying/married to someone born outside China·India etc. saves about ${diffText(d)}.` : `按配偶的出生国计，约可提前 ${diffText(d)}。`)
+          : (lang === 'en' ? 'Right now this would not change your wait much.' : '目前这样做对你的等待影响不大。'),
+      tone: (row.now && !mine.now) || d > 1 ? 'var(--gc-green)' : 'var(--gc-ink)',
+      rows: [
+        { label: lang === 'en' ? 'As is' : '按你的出生国', r: mine, color: 'var(--gc-blue)' },
+        { label: lang === 'en' ? 'Via spouse (ROW)' : '按配偶出生国（ROW）', r: row, color: 'var(--gc-green)' },
+      ],
+      rule: lang === 'en'
+        ? 'Cross-chargeability, INA §202(b)(2): when spouses immigrate together, the case may be charged to either spouse\'s country of birth. Consult a lawyer for specifics.'
+        : '交叉归属（INA §202(b)(2)）：夫妻一同移民时，案件可计入任一方的出生国配额，两人都按更快的那国排期。细节请咨询律师。',
+    });
+  } else {
+    cards.push({
+      title: lang === 'en' ? 'Your quota pool' : '你的配额池',
+      verdict: lang === 'en' ? 'You are already in the fastest (ROW) pool — a spouse\'s birth country cannot speed this up.' : '你已在最快的全球配额池——配偶出生地无法再加速。',
+      tone: 'var(--gc-green)', rows: [], rule: null,
+    });
+  }
 
-  // ---- Scenario: category change ----
-  const CAT_PAIRS = [
-    { from: 'F2A', to: 'IR', label: lang === 'en' ? 'Spouse naturalizes: F2A → IR' : '配偶入籍：F2A → 直系亲属',
-      rule: lang === 'en' ? 'Spouses of U.S. citizens are Immediate Relatives — no annual quota, no bulletin wait. Upgrading is automatic upon naturalization; file I-130 upgrade notice.' : '公民配偶属「直系亲属 IR」——不占年度配额、无需等公告。担保人入籍后类别自动升级，通知 USCIS 即可。' },
-    { from: 'F2B', to: 'F1', label: lang === 'en' ? 'Parent naturalizes: F2B → F1' : '父母入籍：F2B → F1',
-      rule: lang === 'en' ? 'When an LPR parent naturalizes, F2B converts to F1 automatically. CAUTION: for some countries F2B is FASTER than F1 — CSPA §6 lets you opt out in writing to STAY in F2B. Compare below before deciding.' : '绿卡父母入籍后 F2B 自动转 F1。注意：部分国家 F2B 反而比 F1 快——CSPA 第 6 条允许书面 opt-out 留在 F2B。先看下方对比再决定。' },
-    { from: 'EB2', to: 'EB3', label: lang === 'en' ? 'Downgrade: EB-2 → EB-3' : '降级：EB-2 → EB-3',
-      rule: lang === 'en' ? 'You may file a new I-140 under EB-3 with the same PERM and KEEP the original priority date (8 CFR 204.5(e)). Popular when EB-3 runs ahead of EB-2.' : '可用同一份 PERM 重递 EB-3 的 I-140，并保留原优先日（8 CFR 204.5(e)）。EB-3 跑赢 EB-2 时的常见操作。' },
-    { from: 'EB3', to: 'EB2', label: lang === 'en' ? 'Upgrade back: EB-3 → EB-2' : '回流：EB-3 → EB-2',
-      rule: lang === 'en' ? 'Same mechanism in reverse — priority date retention applies as long as the original I-140 was approved.' : '同一机制反向操作——只要原 I-140 获批过，优先日同样保留。' },
-  ];
-  const renderCategory = () => {
-    const pair = CAT_PAIRS[catPair];
-    const from = etaFor(pair.from, userCase.country);
-    const to = pair.to === 'IR' ? { now: true, months: 0 } : etaFor(pair.to, userCase.country);
-    const diffM = (from.months ?? 0) - (to.months ?? 0);
-    const diffTxt = Math.abs(diffM) / 12 >= 1 ? `${(Math.abs(diffM) / 12).toFixed(1)} ${lang === 'en' ? 'yrs' : '年'}` : `${Math.round(Math.abs(diffM))} ${lang === 'en' ? 'mo' : '个月'}`;
-    const verdict = pair.to === 'IR'
-      ? (lang === 'en' ? 'As an Immediate Relative there is NO bulletin wait at all.' : '升级为直系亲属后完全不用等公告——随时可递。')
-      : diffM > 1
-        ? (lang === 'en' ? `Switching saves about ${diffTxt}.` : `转换后约可提前 ${diffTxt}。`)
-        : diffM < -1
-          ? (lang === 'en' ? `Careful — the new category is SLOWER by ~${diffTxt}.` : `注意：新类别反而慢约 ${diffTxt}（考虑 opt-out 留在原类别）。`)
-          : (lang === 'en' ? 'Both categories are about the same right now.' : '两个类别目前差别不大。');
-    return (
-      <>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', margin: '8px 0' }}>
-          {CAT_PAIRS.map((pp, i) => (
-            <button key={i} type="button" onClick={() => { setCatPair(i); setShowRule(false); }}
-              style={{
-                textAlign: 'left', padding: '8px 10px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-                border: `1px solid ${catPair === i ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
-                background: catPair === i ? 'var(--gc-green-soft)' : 'var(--gc-surface)',
-                color: 'var(--gc-ink)', borderRadius: '3px',
-              }}>
-              {pp.label}
-            </button>
-          ))}
-        </div>
-        <VerdictCard
-          verdict={verdict}
-          tone={pair.to === 'IR' || diffM > 1 ? 'var(--gc-green)' : diffM < -1 ? 'var(--gc-red)' : 'var(--gc-ink)'}
-          rows={[
-            { label: pair.from, months: from.months, now: from.now, valueText: `${fmtEta(from)}${from.eta ? ` · ${fmtYM2(from.eta)}` : ''}`, color: 'var(--gc-blue)' },
-            { label: pair.to === 'IR' ? (lang === 'en' ? 'IR (immediate relative)' : '直系亲属 IR') : pair.to, months: to.months, now: to.now, valueText: fmtEta(to) + (to.eta ? ` · ${fmtYM2(to.eta)}` : ''), color: 'var(--gc-green)' },
-          ]}
-          rule={pair.rule}
-        />
-      </>
-    );
-  };
-
-  const scens = [
-    { id: 'spouse', label: lang === 'en' ? 'Spouse\'s country' : '配偶出生地' },
-    { id: 'category', label: lang === 'en' ? 'Category change' : '类别转换' },
-    { id: 'free', label: lang === 'en' ? 'Free compare' : '自由对比' },
-  ];
+  // Card 2 — the one category move that applies to THIS case, if any.
+  const catMove = {
+    F2A: { to: 'IR', title: lang === 'en' ? 'If your spouse naturalizes' : '如果配偶入籍',
+      rule: lang === 'en' ? 'Spouses of U.S. citizens are Immediate Relatives: no quota, no bulletin. The upgrade is automatic on naturalization.' : '公民配偶属直系亲属（IR）：不占配额、不用等公告。担保人入籍后自动升级，通知 USCIS 即可。' },
+    F2B: { to: 'F1', title: lang === 'en' ? 'If your parent naturalizes' : '如果父母入籍',
+      rule: lang === 'en' ? 'F2B auto-converts to F1 on naturalization. If F1 is SLOWER for your country, CSPA §6 lets you opt out in writing and stay in F2B.' : 'F2B 在父母入籍后自动转 F1。若你的国家 F1 反而更慢，CSPA 第 6 条允许书面 opt-out 留在 F2B。' },
+    EB2: { to: 'EB3', title: lang === 'en' ? 'If you downgrade to EB-3' : '如果降级到 EB-3',
+      rule: lang === 'en' ? 'File a new I-140 under EB-3 with the same PERM and keep your original priority date (8 CFR 204.5(e)).' : '用同一份 PERM 重递 EB-3 的 I-140，原优先日保留（8 CFR 204.5(e)）。' },
+    EB3: { to: 'EB2', title: lang === 'en' ? 'If you upgrade to EB-2' : '如果升回 EB-2',
+      rule: lang === 'en' ? 'Same mechanism in reverse; priority date retention applies if the original I-140 was approved.' : '同一机制反向操作；只要原 I-140 获批过，优先日同样保留。' },
+  }[userCase.category];
+  if (catMove) {
+    const from = etaFor(userCase.category, userCase.country);
+    const to = catMove.to === 'IR' ? { now: true, months: 0 } : etaFor(catMove.to, userCase.country);
+    const d = (from.months ?? 0) - (to.months ?? 0);
+    cards.push({
+      title: catMove.title,
+      verdict: catMove.to === 'IR'
+        ? (lang === 'en' ? 'You would become an Immediate Relative — no bulletin wait at all.' : '你将升级为直系亲属——完全不用再等公告。')
+        : d > 1
+          ? (lang === 'en' ? `The switch saves about ${diffText(d)}.` : `转换后约可提前 ${diffText(d)}。`)
+          : d < -1
+            ? (lang === 'en' ? `Careful — the new category is slower by ~${diffText(d)}. Consider opting out.` : `注意：新类别反而慢约 ${diffText(d)}——可考虑 opt-out 留在原类别。`)
+            : (lang === 'en' ? 'Both categories are about the same right now.' : '两个类别目前差别不大。'),
+      tone: catMove.to === 'IR' || d > 1 ? 'var(--gc-green)' : d < -1 ? 'var(--gc-red)' : 'var(--gc-ink)',
+      rows: [
+        { label: userCase.category, r: from, color: 'var(--gc-blue)' },
+        { label: catMove.to === 'IR' ? (lang === 'en' ? 'IR' : '直系亲属') : catMove.to, r: to, color: 'var(--gc-green)' },
+      ],
+      rule: catMove.rule,
+    });
+  }
 
   return (
     <div className="space-y-2">
       <div style={{ padding: '4px 0 0' }}>
         <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>{lang === 'en' ? 'WHAT IF' : '如果'}</div>
-        <h2 className="gc-serif" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 4px' }}>
-          {lang === 'en' ? 'What would change your wait?' : '什么能改变你的等待？'}
+        <h2 className="gc-serif" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 2px' }}>
+          {lang === 'en' ? 'What could change your wait' : '什么能改变你的等待'}
         </h2>
+        <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: 0 }}>
+          {lang === 'en'
+            ? `Auto-computed from your case (${userCase.category} · PD ${userCase.priorityDate}). Nothing to configure.`
+            : `已根据你的案子（${userCase.category} · 优先日 ${userCase.priorityDate}）自动算好，无需任何设置。`}
+        </p>
       </div>
-      <div style={{ display: 'flex', border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
-        {scens.map((sc, i) => (
-          <button key={sc.id} type="button" onClick={() => { setScen(sc.id); setShowRule(false); }}
-            style={{
-              flex: 1, padding: '9px 6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
-              borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-              background: scen === sc.id ? 'var(--gc-green)' : 'var(--gc-surface)',
-              color: scen === sc.id ? 'var(--gc-paper)' : 'var(--gc-muted)',
-            }}>
-            {sc.label}
-          </button>
-        ))}
-      </div>
-      {scen !== 'free' && (
-        <div className="flex items-center justify-between" style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>
-          <span>
-            {lang === 'en' ? `Based on your case: ${userCase.category} · PD ${userCase.priorityDate}` : `基于你的案子：${userCase.category} · 优先日 ${userCase.priorityDate}`}
-          </span>
-          <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
-            {['B', 'A'].map((c, i) => (
-              <button key={c} type="button" onClick={() => setWhatIfChart(c)}
-                className="gc-mono"
-                style={{
-                  fontSize: '9px', fontWeight: 700, padding: '2px 7px', border: 'none', cursor: 'pointer',
-                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                  background: chartSel === c ? 'var(--gc-green)' : 'var(--gc-surface)',
-                  color: chartSel === c ? 'var(--gc-paper)' : 'var(--gc-muted)',
-                }}>
-                {lang === 'en' ? `Chart ${c}` : `表${c}`}
-              </button>
-            ))}
-          </span>
-        </div>
-      )}
-      {scen === 'spouse' && renderSpouse()}
-      {scen === 'category' && renderCategory()}
-      {scen === 'free' && <Comparison userCase={userCase} />}
+      {cards.map((c, i) => {
+        const maxM = Math.max(...c.rows.map((r) => r.r.months || 0), 1);
+        return (
+          <div key={i} style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderLeft: `2px solid ${c.tone}`, borderRadius: '4px', padding: '12px 14px' }}>
+            <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginBottom: '4px' }}>{c.title}</div>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', lineHeight: 1.5 }}>{c.verdict}</div>
+            {c.rows.length > 0 && (
+              <div style={{ marginTop: '10px' }}>
+                {c.rows.map((r, ri) => (
+                  <div key={ri} style={{ marginBottom: '7px' }}>
+                    <div className="flex items-center justify-between" style={{ fontSize: '11px', marginBottom: '3px' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--gc-ink)' }}>{r.label}</span>
+                      <span className="gc-mono" style={{ fontWeight: 700, color: r.color }}>
+                        {fmtEta(r.r)}{r.r.eta ? ` · ${fmtYM2(r.r.eta)}` : ''}
+                      </span>
+                    </div>
+                    <div style={{ height: '8px', background: 'var(--gc-rule-soft)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.max(((r.r.months || 0) / maxM) * 100, r.r.now ? 3 : 4)}%`, background: r.color, borderRadius: '4px' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {c.rule && (
+              <>
+                <button type="button" onClick={() => setOpenRule(openRule === i ? null : i)}
+                  style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600, marginTop: '7px' }}>
+                  {openRule === i ? (lang === 'en' ? 'hide the rule' : '收起规则') : (lang === 'en' ? 'which rule allows this?' : '依据什么规则？')}
+                </button>
+                {openRule === i && (
+                  <div style={{ fontSize: '11px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px', padding: '8px 10px', marginTop: '6px' }}>
+                    {c.rule}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
+      <p style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.6, margin: '4px 2px 0' }}>
+        {lang === 'en'
+          ? 'Estimates use the same 12-month real pace as the Overview. Individual cases vary — talk to a lawyer before acting.'
+          : '估算与总结页同口径（近 12 个月实速）。个案有差异，行动前请咨询律师。'}
+      </p>
     </div>
   );
 };
