@@ -986,6 +986,11 @@ let DEFAULT_VIEWING_MONTH = '2026-05';
 // Every pace/window helper caps its archive walk at this month, so a historical view
 // shows the numbers as they stood THEN — not today's pace under an old month's header.
 let VIEWING_MONTH_KEY = null;
+// The current bulletin's lettered notice sections (D onward) from /bulletin.json —
+// the State Department's own words (retrogression warnings etc.), shown verbatim
+// in the monthly summary. Never fabricated: empty until the fetch fills it.
+let BULLETIN_NOTICES = [];
+let BULLETIN_NOTICES_MONTH = null;
 
 // Average monthly movement (days) — approximate, from Nov 2025 - Apr 2026 trend
 // ==============================================================
@@ -1545,6 +1550,7 @@ const StatusBadge = ({ status, daysAgo }) => {
       <Icon size={10} strokeWidth={2.5} />
       <span>{c.label}</span>
     </span>
+
   );
 };
 
@@ -1849,9 +1855,9 @@ const InputPanel = ({ userCase, setUserCase }) => {
 // Three fields inline: country / category / priority date. F-category adds
 // a fourth (petitioner) inline when needed. Taps open inline controls.
 // ============================================================
-const CompactCaseBar = ({ userCase, setUserCase }) => {
+const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
   const { t, lang } = useLang();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const categories = [
     { v: 'EB1' }, { v: 'EB2' }, { v: 'EB3' },
     { v: 'F1' }, { v: 'F2A' }, { v: 'F2B' }, { v: 'F3' }, { v: 'F4' },
@@ -4993,6 +4999,43 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           etaBlock = { sentence, formula };
         }
 
+        // Real-world context, never fabricated: (a) the bulletin's own lettered
+        // notices that mention this category, quoted with their section letter;
+        // (b) the fiscal-year calendar, which is a hard fact of the system.
+        const officialNotes = [];
+        {
+          const catTok = userCase.category || '';
+          const catRe2 = catTok.startsWith('EB')
+            ? new RegExp(`EB-?${catTok.slice(2)}\\b`, 'i')
+            : new RegExp(`\\b${catTok}\\b`, 'i');
+          const isViewingNoticeMonth = !VIEWING_MONTH_KEY || !BULLETIN_NOTICES_MONTH || VIEWING_MONTH_KEY === BULLETIN_NOTICES_MONTH;
+          if (isViewingNoticeMonth) {
+            const hit = BULLETIN_NOTICES.find((nz) => nz && (catRe2.test(nz.title || '') || catRe2.test(nz.text || '')));
+            if (hit) {
+              officialNotes.push(lang === 'en'
+                ? `Official notice (section ${hit.letter || '—'}): “${(hit.title || '').slice(0, 90)}”.`
+                : lang === 'tw'
+                  ? `官方提醒（公告 ${hit.letter || '—'} 節）：「${(hit.title || '').slice(0, 90)}」。`
+                  : `官方提醒（公告 ${hit.letter || '—'} 节）：「${(hit.title || '').slice(0, 90)}」。`);
+            }
+          }
+          const vm = VIEWING_MONTH_KEY || '';
+          const mo = parseInt(vm.split('-')[1] || '0', 10);
+          if (mo === 8 || mo === 9) {
+            officialNotes.push(lang === 'en'
+              ? 'Fiscal-year note: annual quotas run out by Sep 30 and reset Oct 1 — late-summer slowdowns or retrogressions often rebound in October.'
+              : lang === 'tw'
+                ? '財年提示：年度配額 9 月 30 日用盡、10 月 1 日重置——夏末的放緩或倒退常在 10 月回彈。'
+                : '财年提示：年度配额 9 月 30 日用尽、10 月 1 日重置——夏末的放缓或倒退常在 10 月回弹。');
+          } else if (mo === 10) {
+            officialNotes.push(lang === 'en'
+              ? 'Fiscal-year note: October opens a new fiscal year with fresh quotas — early-FY movement is often faster than the spring.'
+              : lang === 'tw'
+                ? '財年提示：10 月是新財年首月、配額全新——財年初的推進常快於春季。'
+                : '财年提示：10 月是新财年首月、配额全新——财年初的推进常快于春季。');
+          }
+        }
+
         // Same branch order as getActionRec, but pulling the description strings.
         const closeDesc = isSuspicious
           ? (lang === 'en' ? 'Verify your priority date first — the numbers above assume it is right.' : lang === 'tw' ? '請先核實優先日——以上結論都建立在它正確的前提上。' : '请先核实优先日——以上结论都建立在它正确的前提上。')
@@ -5070,15 +5113,11 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 {etaBlock.formula}
               </div>
             )}
-            {etaBlock && (
-              <p style={{ fontSize: '10.5px', lineHeight: 1.6, color: 'var(--gc-muted)', margin: '4px 0 0' }}>
-                {lang === 'en'
-                  ? 'A straight-line estimate — the Forecast tab models acceleration and policy shifts.'
-                  : lang === 'tw'
-                    ? '直線外推的粗估——「預測」頁有考慮加速與政策變化的完整模型。'
-                    : '直线外推的粗估——「预测」页有考虑加速与政策变化的完整模型。'}
+            {officialNotes.map((note, ni) => (
+              <p key={ni} style={{ fontSize: '11px', lineHeight: 1.65, color: 'var(--gc-amber-ink, var(--gc-ink-soft))', margin: '5px 0 0', paddingLeft: '8px', borderLeft: '2px solid var(--gc-amber-border, var(--gc-rule))' }}>
+                {note}
               </p>
-            )}
+            ))}
             <p style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--gc-green-ink)', margin: sentences.length > 0 || etaBlock ? '4px 0 0' : 0 }}>
               <span style={{ fontWeight: 700 }}>{closeTitle}</span>
               <span style={{ color: 'var(--gc-ink-soft)' }}>{lang === 'en' ? ' — ' : '——'}{closeDesc}</span>
@@ -5159,6 +5198,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 const MonthlyUpdate = ({ userCase }) => {
   const { t, lang } = useLang();
   const userCountry = resolveCountry(userCase.country);
+  // Which chart the whole page reads: A (finalAction) or B (filing).
+  const [updChart, setUpdChart] = useState('A');
+  const chartKey = updChart === 'B' ? 'filing' : 'finalAction';
   const showsTwoColumns = userCase.country === 'China' || userCase.country === 'India'; // These have separate cutoffs from ROW
 
   // Time machine: detect if we have previous-month data to diff against
@@ -5177,24 +5219,24 @@ const MonthlyUpdate = ({ userCase }) => {
       // Return category rows but with no movement deltas
       return cats.map(c => ({
         cat: c, label: catLabels[c],
-        primaryDate: bulletinCurrent.finalAction[c]?.[userCountry],
-        secondaryDate: userCountry !== 'Other' ? bulletinCurrent.finalAction[c]?.Other : null,
+        primaryDate: bulletinCurrent[chartKey][c]?.[userCountry],
+        secondaryDate: userCountry !== 'Other' ? bulletinCurrent[chartKey][c]?.Other : null,
         primary: { type: 'none', days: 0 },
         secondary: userCountry !== 'Other' ? { type: 'none', days: 0 } : null,
       }));
     }
     return cats.map(c => ({
       cat: c, label: catLabels[c],
-      primaryDate: bulletinCurrent.finalAction[c][userCountry],
-      secondaryDate: userCountry !== 'Other' ? bulletinCurrent.finalAction[c].Other : null,
-      primary: computeMovement(bulletinCurrent.finalAction[c][userCountry], bulletinPrevious.finalAction[c][userCountry]),
-      secondary: userCountry !== 'Other' ? computeMovement(bulletinCurrent.finalAction[c].Other, bulletinPrevious.finalAction[c].Other) : null,
+      primaryDate: bulletinCurrent[chartKey][c]?.[userCountry],
+      secondaryDate: userCountry !== 'Other' ? bulletinCurrent[chartKey][c]?.Other : null,
+      primary: computeMovement(bulletinCurrent[chartKey][c]?.[userCountry], bulletinPrevious[chartKey]?.[c]?.[userCountry]),
+      secondary: userCountry !== 'Other' ? computeMovement(bulletinCurrent[chartKey][c]?.Other, bulletinPrevious[chartKey]?.[c]?.Other) : null,
     }));
   })();
 
   const userImpact = !hasPreviousData
     ? { type: 'none', days: 0 }
-    : computeMovement(bulletinCurrent.finalAction[userCase.category][userCountry], bulletinPrevious.finalAction[userCase.category][userCountry]);
+    : computeMovement(bulletinCurrent[chartKey][userCase.category]?.[userCountry], bulletinPrevious[chartKey]?.[userCase.category]?.[userCountry]);
 
   const impactText = {
     advanced: t.impactAdvanced, retrogressed: t.impactRetrogressed, none: t.impactNoChange, current: t.impactBecameCurrent,
@@ -5217,6 +5259,21 @@ const MonthlyUpdate = ({ userCase }) => {
           <h2 className="text-base font-bold text-slate-900">{t.updateTitle}</h2>
           <span className="px-2 py-0.5 bg-slate-900 text-white text-[10px] font-bold rounded-full">
             {BULLETIN_CURRENT_MONTH[lang]}
+          </span>
+          <span className="inline-flex" style={{ marginLeft: 'auto', border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
+            {['A', 'B'].map((c, i) => (
+              <button key={c} type="button" onClick={() => setUpdChart(c)}
+                className="gc-mono"
+                style={{
+                  fontSize: '10px', fontWeight: 700, padding: '3px 9px', lineHeight: 1.4,
+                  border: 'none', cursor: 'pointer',
+                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                  background: updChart === c ? 'var(--gc-green)' : 'var(--gc-surface)',
+                  color: updChart === c ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                }}>
+                {lang === 'en' ? `Chart ${c}` : `表${c}`}
+              </button>
+            ))}
           </span>
         </div>
         <p className="text-[11px] text-slate-500">{t.updateSubtitle}</p>
@@ -5943,7 +6000,8 @@ const CompareByCountry = ({ userCase }) => {
 // ============================================================
 // Smart Alerts Component
 // ============================================================
-const SmartAlerts = ({ userCase, setTab = () => {}, greenCardInfo = { approvalDate: null, isConditional: false } }) => {
+const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, greenCardInfo = { approvalDate: null, isConditional: false } }) => {
+  const [showCaseEdit, setShowCaseEdit] = useState(false);
   const { t, lang } = useLang();
   const [alerts, setAlerts] = useState({
     whenCurrent: false,
@@ -6200,7 +6258,7 @@ const SmartAlerts = ({ userCase, setTab = () => {}, greenCardInfo = { approvalDa
                 </span>
                 <button
                   type="button"
-                  onClick={() => setTab('overview')}
+                  onClick={() => setShowCaseEdit(true)}
                   className="flex items-center gap-0.5 flex-shrink-0"
                   style={{
                     fontSize: '10px', fontWeight: 700,
@@ -6372,10 +6430,28 @@ const SmartAlerts = ({ userCase, setTab = () => {}, greenCardInfo = { approvalDa
         </div>
       </div>
 
+    
+      {/* Case-edit modal — the old Edit button dumped users back on the Overview tab;
+          now the same segmented editor opens in place, pre-expanded. */}
+      {showCaseEdit && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '48px 16px', background: 'rgba(15,20,25,0.55)' }}
+             onClick={() => setShowCaseEdit(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px' }}>
+            <CompactCaseBar userCase={userCase} setUserCase={setUserCase} defaultExpanded />
+            <button type="button" onClick={() => setShowCaseEdit(false)}
+              style={{
+                width: '100%', marginTop: '8px', padding: '10px', fontSize: '13px', fontWeight: 700,
+                background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none',
+                borderRadius: '4px', cursor: 'pointer',
+              }}>
+              {lang === 'en' ? 'Done' : lang === 'tw' ? '完成' : '完成'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
 
 // ============================================================
 // Comparison — By-country view (the "By Priority Date" variant was removed)
@@ -6592,7 +6668,6 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
     setHoveredMonthIndex(null);
     setHoveredForecast(null);
   }, [pastMonths, forecastMonths]);
-
 
   // Helper to safely add months and return ISO date string
   const addMonths = (year, month, monthsToAdd) => {
@@ -9645,7 +9720,6 @@ const ForecastHub = ({ userCase, i485ServiceCenter = 'average', completedI485Ste
   );
 };
 
-
 // ============================================================
 // FAQ - Frequently Asked Questions (including cost breakdown)
 // ============================================================
@@ -12202,6 +12276,16 @@ export default function App() {
   // Rebuilt newest-first so the picker lists recent months at the top.
   useEffect(() => {
     let cancelled = false;
+    fetch('/bulletin.json', { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.current?.notices && Array.isArray(data.current.notices)) {
+          BULLETIN_NOTICES = data.current.notices;
+          BULLETIN_NOTICES_MONTH = data.current.month || null;
+          setBulletinTick((t) => t + 1);
+        }
+      })
+      .catch(() => {});
     fetch('/history.json', { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('history-fetch-not-ok'))))
       .then((hist) => {
@@ -12617,7 +12701,9 @@ export default function App() {
 
   const tabs = [
     { id: 'overview', label: t.navOverview, icon: Eye },
-    { id: 'trends', label: t.navTrends, icon: BarChart3 },
+    // 预测 tab 下架：总结页的估算+推导链已覆盖其价值（下月概率的增量不足以撑一个 tab）。
+    // ForecastHub 代码保留，恢复时解开此行。
+    // { id: 'trends', label: t.navTrends, icon: BarChart3 },
     { id: 'update', label: t.navUpdate, icon: TrendingUp },
     { id: 'compare', label: t.navCompare, icon: Users },
     { id: 'index', label: t.navIndex, icon: ClipboardList },
@@ -13280,12 +13366,12 @@ export default function App() {
                     </svg>
                   </div>
                 </div>
-                <div style={{ minWidth: 0, flex: '1 1 0%' }}>
-                  <h1 className="gc-serif truncate" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--gc-ink)', lineHeight: 1.15, letterSpacing: '-0.01em' }}>
+                <div style={{ minWidth: 0, flex: '1 1 0%', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h1 className="gc-serif truncate" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--gc-ink)', lineHeight: 1.15, letterSpacing: '-0.01em', flexShrink: 1, minWidth: 0 }}>
                     {t.appTitle}
                   </h1>
-                  {/* Time Machine — filing stamp style */}
-                  <div className="relative inline-block" style={{ marginTop: '1px' }}>
+                  {/* Time Machine — inline beside the brand (was stacked below it) */}
+                  <div className="relative inline-block" style={{ flexShrink: 0 }}>
                     <button
                       onClick={() => setShowTimeMachine((v) => !v)}
                       className="flex items-center gap-1 active:opacity-70"
@@ -13653,65 +13739,6 @@ export default function App() {
                 boxSizing: 'border-box',
                 width: '100%',
               }}>
-          {/* Bulletin-month selector, promoted from the tiny header dropdown: the Time
-              Machine is one of the site's best features and nobody found it up there. */}
-          <div style={{ position: 'relative', marginBottom: '8px' }}>
-            <button type="button" onClick={() => setShowMonthBar((v) => !v)}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                gap: '8px', padding: '7px 12px', background: 'var(--gc-surface)',
-                border: '1px solid var(--gc-rule)', borderRadius: '4px', cursor: 'pointer', textAlign: 'left',
-              }}>
-              <span className="inline-flex items-center" style={{ gap: '7px', minWidth: 0 }}>
-                <History size={12} style={{ color: 'var(--gc-muted)', flexShrink: 0 }} />
-                <span className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', flexShrink: 0 }}>
-                  {lang === 'en' ? 'BULLETIN' : lang === 'tw' ? '公告月份' : '公告月份'}
-                </span>
-                <span className="gc-mono" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink)' }}>
-                  {BULLETIN_ARCHIVE[viewingMonth]?.label[lang === 'en' ? 'en' : lang === 'tw' ? 'tw' : 'zh'] || viewingMonth}
-                </span>
-                {viewingMonth === DEFAULT_VIEWING_MONTH && (
-                  <span className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-green)', border: '1px solid var(--gc-green-border)', borderRadius: '2px', padding: '1px 4px', flexShrink: 0 }}>
-                    {lang === 'en' ? 'LATEST' : '最新'}
-                  </span>
-                )}
-              </span>
-              <span className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-green-ink)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                {lang === 'en' ? 'PAST MONTHS' : lang === 'tw' ? '查看往期' : '查看往期'}
-                <span style={{ transform: showMonthBar ? 'rotate(180deg)' : 'none', transition: 'transform 140ms', display: 'inline-block' }}>⌄</span>
-              </span>
-            </button>
-            {showMonthBar && (
-              <>
-                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowMonthBar(false)} />
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
-                  background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px',
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.15)', maxHeight: '280px', overflowY: 'auto',
-                }}>
-                  {Object.keys(BULLETIN_ARCHIVE).sort().reverse().map((k) => (
-                    <button key={k} type="button"
-                      onClick={() => { setViewingMonth(k); setShowMonthBar(false); }}
-                      style={{
-                        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '8px 12px', border: 'none', cursor: 'pointer', textAlign: 'left',
-                        borderBottom: '1px solid var(--gc-rule-soft)',
-                        background: k === viewingMonth ? 'var(--gc-green-soft)' : 'transparent',
-                      }}>
-                      <span className="gc-mono" style={{ fontSize: '12px', fontWeight: k === viewingMonth ? 700 : 500, color: 'var(--gc-ink)' }}>
-                        {BULLETIN_ARCHIVE[k].label[lang === 'en' ? 'en' : lang === 'tw' ? 'tw' : 'zh']}
-                      </span>
-                      {k === DEFAULT_VIEWING_MONTH && (
-                        <span className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-green)' }}>
-                          {lang === 'en' ? 'LATEST' : '最新'}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
           {(() => {
             // Overview now uses the same CompactCaseBar as other tabs (no more full sidebar).
             // This keeps the page narrow and matches user expectation from every other tab.
@@ -13741,7 +13768,7 @@ export default function App() {
               {tab === 'update' && <MonthlyUpdate userCase={userCase} />}
               {tab === 'forecast' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
               {tab === 'i485' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
-              {tab === 'alerts' && <SmartAlerts userCase={userCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
+              {tab === 'alerts' && <SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
               {tab === 'compare' && <Comparison userCase={userCase} />}
               {tab === 'index' && <TheIndex userCase={userCase} setTab={handleTabChange} setUserCase={setUserCase} previousTab={previousTab} onSetupCase={() => { setOnboardingInitialMode('form'); setHasOnboarded(false); }} />}
               {tab === 'help' && <HelpCenter />}

@@ -168,6 +168,26 @@ Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19
 6. U 案子的月度邮件没有图表和 ETA（forecast 为 null 时整块跳过）——语义正确但可以
    考虑降级显示历史柱图。
 
+## 2026-08-08 第六轮：连续迭代（PR #13–#21）
+
+用户逐屏反馈驱动的密集迭代，主线：
+- 邮件柱状图数字贴柱（#13）；总结页层级反转 12 项（#14）；显式推理链（#15）
+- B/A 口径切换 + 时光机全页一致（VIEWING_MONTH_KEY 封顶所有速度计算）+
+  月份选择器（#16）；选中色统一绿/自然语言/预测页区间化/USC-LPR 中文（#17）
+- 状态卡与案卡合并单卡（#18）；**B 口径改用表B 自身速度**（#19，重要逻辑修正：
+  monthlyMovementFromArchive/paceDaysToCalendar 带 chart 参数）
+- 图表独立成卡+表A/B切换、I-485 等排期到才显示、文案锁单行（#20）
+- 预测 tab 下架（代码保留）；动态页 A/B 切换；提醒页修改改弹窗
+  （CompactCaseBar defaultExpanded）；本月小结接入 /bulletin.json 官方 notices
+  （BULLETIN_NOTICES 模块变量）+ 财年规则句；月份 chip 与品牌并列（#21）
+
+**教训**：①python 批量替换的锚点必须避开 translations 字典里的同名字符串
+（「我们尊重你的隐私」在两处，插错组件炸页面）；②shell 管道后接 && echo OK
+反映的是 tail 的退出码——验证构建必须显式 `echo exit=$?`。
+
+**对比 tab 重构提案（待用户拍板）**：改「如果……会怎样」情景页：①配偶出生地
+交叉归属 ②类别转换（F2B→F1/EB 降级）③自由对比。
+
 ## 2026-08-08 第五轮：Pareto 图表（分支 feat/pareto-figure）
 
 - **App BulletinMovementChart**：单月柱独立比例 + SVG 绿色累计阶梯线叠加（独立归一化，
