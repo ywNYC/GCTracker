@@ -2982,9 +2982,10 @@ const ShareCardModal = ({ userCase, greenCardInfo, lang, onClose }) => {
 const BulletinMovementChart = ({ cat, country }) => {
   const { lang } = useLang();
   const [windowMonths, setWindowMonths] = useState(12);
+  const [chartSel, setChartSel] = useState('A'); // 'A' finalAction | 'B' filing
   const [sel, setSel] = useState(null); // null → latest month
 
-  const points = monthlyMovementFromArchive(cat, country, windowMonths);
+  const points = monthlyMovementFromArchive(cat, country, windowMonths, chartSel === 'B' ? 'filing' : 'finalAction');
   if (!points || points.filter((p) => p.days !== null).length < 3) return null;
 
   const total = points.reduce((s, p) => s + (p.days || 0), 0);
@@ -3060,30 +3061,50 @@ const BulletinMovementChart = ({ cat, country }) => {
   const manual = sel !== null;
 
   return (
-    <div style={{ padding: '10px 12px 9px', borderTop: '1px solid var(--gc-rule-soft)' }}>
-      {/* Header: eyebrow + 12/24 window toggle */}
+    <div style={{ padding: '10px 12px 9px' }}>
+      {/* Header: eyebrow + chart (A/B) and window (12/24) toggles */}
       <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
         <span className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', minWidth: 0 }}>
-          {lang === 'en' ? 'Bulletin movement · Chart A' : '排期推进 · 表 A'}
+          {lang === 'en' ? 'Bulletin movement' : '排期推进'}
           <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', marginLeft: '5px', color: 'var(--gc-muted-soft)' }}>
-            {lang === 'en' ? '— Chart A pace (approval milestone)' : lang === 'tw' ? '—— 獲批口徑（表A）的速度' : '—— 获批口径（表A）的速度'}
+            {chartSel === 'A'
+              ? (lang === 'en' ? '— approval pace (Chart A)' : lang === 'tw' ? '—— 獲批口徑（表A）' : '—— 获批口径（表A）')
+              : (lang === 'en' ? '— filing pace (Chart B)' : lang === 'tw' ? '—— 遞件口徑（表B）' : '—— 递件口径（表B）')}
           </span>
         </span>
-        <div className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
-          {[12, 24].map((w, i) => (
-            <button key={w} type="button"
-              onClick={() => { setWindowMonths(w); setSel(null); }}
-              className="gc-mono"
-              style={{
-                fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.4,
-                border: 'none', cursor: 'pointer',
-                borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                background: windowMonths === w ? 'var(--gc-ink)' : 'transparent',
-                color: windowMonths === w ? 'var(--gc-paper)' : 'var(--gc-muted)',
-              }}>
-              {lang === 'en' ? `${w}mo` : `${w}月`}
-            </button>
-          ))}
+        <div className="inline-flex items-center" style={{ gap: '5px', flexShrink: 0 }}>
+          <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
+            {['A', 'B'].map((c, i) => (
+              <button key={c} type="button"
+                onClick={() => { setChartSel(c); setSel(null); }}
+                className="gc-mono"
+                style={{
+                  fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.4,
+                  border: 'none', cursor: 'pointer',
+                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                  background: chartSel === c ? 'var(--gc-green)' : 'var(--gc-surface)',
+                  color: chartSel === c ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                }}>
+                {lang === 'en' ? c : `表${c}`}
+              </button>
+            ))}
+          </span>
+          <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
+            {[12, 24].map((w, i) => (
+              <button key={w} type="button"
+                onClick={() => { setWindowMonths(w); setSel(null); }}
+                className="gc-mono"
+                style={{
+                  fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.4,
+                  border: 'none', cursor: 'pointer',
+                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                  background: windowMonths === w ? 'var(--gc-ink)' : 'transparent',
+                  color: windowMonths === w ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                }}>
+                {lang === 'en' ? `${w}mo` : `${w}月`}
+              </button>
+            ))}
+          </span>
         </div>
       </div>
 
@@ -3681,19 +3702,20 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                         <div className="gc-serif" style={{ fontSize: '32px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '-0.02em', lineHeight: 1 }}>
                           {heroText}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', marginTop: '7px', lineHeight: 1.55 }}>
-                          {etaDate && ps.days !== null && (heroSel === 'B'
-                            ? (lang === 'en'
-                                ? `At the current pace you could file around ${fmtYM(etaDate)} — the cutoff still has ${ps.days.toLocaleString('en-US')} days to cover.`
-                                : lang === 'tw'
-                                  ? `照這個速度，大約 ${fmtYM(etaDate)} 前後就能遞件——排期還要再走 ${ps.days.toLocaleString('en-US')} 天。`
-                                  : `照这个速度，大约 ${fmtYM(etaDate)} 前后就能递件——排期还要再走 ${ps.days.toLocaleString('en-US')} 天。`)
-                            : (lang === 'en'
-                                ? `At the current pace, approval opens around ${fmtYM(etaDate)} — the cutoff still has ${ps.days.toLocaleString('en-US')} days to cover.`
-                                : lang === 'tw'
-                                  ? `照這個速度，大約 ${fmtYM(etaDate)} 前後可獲批——排期還要再走 ${ps.days.toLocaleString('en-US')} 天。`
-                                  : `照这个速度，大约 ${fmtYM(etaDate)} 前后可获批——排期还要再走 ${ps.days.toLocaleString('en-US')} 天。`))}
-                        </div>
+                        {/* Two short lines, each forced single-line — the combined
+                            sentence wrapped mid-phrase on phones. */}
+                        {etaDate && ps.days !== null && (
+                          <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', marginTop: '7px', lineHeight: 1.55 }}>
+                            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {heroSel === 'B'
+                                ? (lang === 'en' ? `At this pace you could file around ${fmtYM(etaDate)}` : lang === 'tw' ? `照這個速度，約 ${fmtYM(etaDate)} 前後就能遞件` : `照这个速度，约 ${fmtYM(etaDate)} 前后就能递件`)
+                                : (lang === 'en' ? `At this pace, approval opens around ${fmtYM(etaDate)}` : lang === 'tw' ? `照這個速度，約 ${fmtYM(etaDate)} 前後可獲批` : `照这个速度，约 ${fmtYM(etaDate)} 前后可获批`)}
+                            </div>
+                            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {lang === 'en' ? `The cutoff still has ${ps.days.toLocaleString('en-US')} days to cover` : lang === 'tw' ? `排期還要再走 ${ps.days.toLocaleString('en-US')} 天` : `排期还要再走 ${ps.days.toLocaleString('en-US')} 天`}
+                            </div>
+                          </div>
+                        )}
                         {/* Where the number comes from — declared up front, expandable proof */}
                         {paceMo && (
                           <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginTop: '5px', lineHeight: 1.5 }}>
@@ -3854,9 +3876,17 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
         );
       })()}
 
-      {/* I-485 Progress — collapsed by default; expanding reveals the full checklist
-          with service-center speed selector and cascading step completion. */}
-      {(() => {
+      {/* Bulletin movement chart — its own card now. It used to live inside the
+          I-485 card's waiting preview; with I-485 hidden until filing opens, the
+          chart earns a standalone home right under the case card. */}
+      <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' }}>
+        <BulletinMovementChart cat={userCase.category} country={country} />
+      </div>
+
+      {/* I-485 Progress — only once it's actionable: your date has arrived (or you
+          have already logged steps). A 0/6 checklist promising dates seven years out
+          was dead weight between the case card and the chart. */}
+      {(['current', 'eligible', 'overdue'].includes(primaryStatus.status) || primaryCutoff === 'C' || completedI485Steps.length > 0) && (() => {
         const I485_STEPS = ['receipt', 'biometrics', 'ead', 'ap', 'interview', 'approval'];
         const stepMeta = {
           receipt:    { estMin: 7,   estMax: 30,  estimatedDays: 14,  icon: FileText,    scAffected: false },
@@ -4163,11 +4193,6 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                     {dateText}
                   </span>
                 </div>
-                {/* Still queued → nothing procedural to track yet, so show how the
-                    bulletin has actually been moving instead of a 10-years-out date. */}
-                {isWaitingForPD && (
-                  <BulletinMovementChart cat={userCase.category} country={country} />
-                )}
                 </>
               );
             })()}
