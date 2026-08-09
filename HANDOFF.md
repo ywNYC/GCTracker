@@ -168,6 +168,22 @@ Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19
 6. U 案子的月度邮件没有图表和 ETA（forecast 为 null 时整块跳过）——语义正确但可以
    考虑降级显示历史柱图。
 
+## 月度更新配套清单（每次新公告触发，缺一不可）
+
+1. 抓取：routine 跑 npm run scrape（10–23 号窗口自动）→ bulletin.json/history.json 更新
+2. npm run scrape:uscis → 表 A/B 判定更新
+3. **notices 翻译**：把 current.notices 忠实译为简/繁（台港表达），写入
+   public/notice-translations.json 对应月份（AI 步骤，见第十轮说明；漏做则回退英文）
+4. 一致性自检（全部应自动跟随，抽查即可）：页脚月份、公告 tab 页头 Vol/No、
+   下期倒计时、总结 hero/推导链数字、图表窗口终点、同期对照
+5. 发送订阅邮件：POST /api/admin/send-monthly（无需 force，幂等保护生效）
+
+## 2026-08-09 第十一轮：公告独立成第 3 个 tab（PR #28）
+
+notices（三语）+DV+配额+Vol/No 从动态页拆出，独立「公告」tab 列导航第 3 位，
+「如果」退第 4；动态页回归纯「变化解读」（影响条/之最/倒计时/类别表）。
+?tab=bulletin 深链支持。
+
 ## 2026-08-09 第十轮：公告 notices 三语化（PR #27）
 
 - 新增 public/notice-translations.json：按 月份→节号 存 zh/tw AI 译文（独立文件，
