@@ -4552,7 +4552,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
         // Only show dual-row if filing is authorized AND both tables are meaningfully
         // different (otherwise one row is redundant). Always show when filingAuthorized
         // to give users the full picture.
-        const showDualStatus = filingAuthorized;
+        const showDualStatus = true; // every category — EB users need the A/B breakdown too
         const dualB = showDualStatus ? buildDualRow(filingStatus, filingCutoff) : null;
         const dualA = showDualStatus ? buildDualRow(finalActionStatus, finalActionCutoff) : null;
 
@@ -4779,29 +4779,6 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 }
                 return (
                   <div style={{ padding: '12px 14px 12px' }}>
-                    <div className="flex items-center justify-between gap-2" style={{ marginBottom: '8px' }}>
-                      <span className="inline-flex items-center gap-2" style={{ minWidth: 0 }}>
-                        <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
-                          {[
-                            { code: 'B', label: lang === 'en' ? 'B · File' : lang === 'tw' ? 'B · 遞件' : 'B · 递件' },
-                            { code: 'A', label: lang === 'en' ? 'A · Approve' : lang === 'tw' ? 'A · 獲批' : 'A · 获批' },
-                          ].map((opt, oi) => (
-                            <button key={opt.code} type="button"
-                              onClick={() => setHeroChart(opt.code)}
-                              className="gc-mono"
-                              style={{
-                                fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.5,
-                                border: 'none', cursor: 'pointer', letterSpacing: '0.03em',
-                                borderLeft: oi === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                                background: heroSel === opt.code ? 'var(--gc-green)' : 'var(--gc-surface)',
-                                color: heroSel === opt.code ? 'var(--gc-paper)' : 'var(--gc-muted)',
-                              }}>
-                              {opt.label}
-                            </button>
-                          ))}
-                        </span>
-                      </span>
-                    </div>
                     {ps.status === 'unavailable' ? (
                       <>
                         <div className="gc-serif" style={{ fontSize: '30px', fontWeight: 700, color: accentColor, letterSpacing: '-0.02em', lineHeight: 1 }}>
@@ -4820,17 +4797,13 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                         <div className="gc-serif" style={{ fontSize: '32px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '-0.02em', lineHeight: 1 }}>
                           {heroText}
                         </div>
-                        {/* Two short lines, each forced single-line — the combined
-                            sentence wrapped mid-phrase on phones. */}
+                        {/* Single forced line — wrapping mid-phrase reads badly on phones. */}
                         {etaDate && ps.days !== null && (
                           <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', marginTop: '7px', lineHeight: 1.55 }}>
                             <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {heroSel === 'B'
                                 ? (lang === 'en' ? `At this pace you could file around ${fmtYM(etaDate)}` : lang === 'tw' ? `照這個速度，約 ${fmtYM(etaDate)} 前後就能遞件` : `照这个速度，约 ${fmtYM(etaDate)} 前后就能递件`)
                                 : (lang === 'en' ? `At this pace, approval opens around ${fmtYM(etaDate)}` : lang === 'tw' ? `照這個速度，約 ${fmtYM(etaDate)} 前後可獲批` : `照这个速度，约 ${fmtYM(etaDate)} 前后可获批`)}
-                            </div>
-                            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {lang === 'en' ? `The cutoff still has ${ps.days.toLocaleString('en-US')} days to cover` : lang === 'tw' ? `排期還要再走 ${ps.days.toLocaleString('en-US')} 天` : `排期还要再走 ${ps.days.toLocaleString('en-US')} 天`}
                             </div>
                           </div>
                         )}
@@ -4960,9 +4933,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
               </div>
             </div>
             )}
-            {/* Dual status row — shows BOTH A and B tables' statuses compactly.
-                Only for filing-authorized categories (F types); gives users the
-                full picture rather than seeing only the "primary" (adopted) table.
+            {/* Dual status row — shows BOTH A and B tables' statuses compactly,
+                for every category; gives users the full picture rather than
+                seeing only the "primary" (adopted) table.
                 Placement: below the main title block, above monthly movement. */}
             {showDualStatus && (
               <div style={{
@@ -16006,11 +15979,6 @@ export default function App() {
               fontSize: '10px',
               color: 'var(--gc-muted-soft, var(--gc-muted))',
             }}>
-              <span className="gc-mono" style={{ letterSpacing: '0.02em', color: 'var(--gc-muted)', whiteSpace: 'nowrap' }}>
-                {lang === 'zh' ? `数据 travel.state.gov · ${BULLETIN_CURRENT_MONTH.zh} · 仅供参考 · © 2026 JMJ`
-                  : lang === 'tw' ? `資料 travel.state.gov · ${BULLETIN_CURRENT_MONTH.tw} · 僅供參考 · © 2026 JMJ`
-                  : `Data: travel.state.gov · ${BULLETIN_CURRENT_MONTH.en} · Not legal advice · © 2026 JMJ`}
-              </span>
               {/* Small theme dropdown — low-key, sits inline with copyright */}
               {(() => {
                 const themes = [
@@ -16129,10 +16097,8 @@ export default function App() {
               {/* Reset all data — destructive, two-stage confirmation.
                   First click: button turns amber, shows "确认?" + "取消".
                   Second click within 5s: wipes all gc_* localStorage, reloads app.
-                  After 5s idle, reverts to neutral.
-                  Forced onto its own line, pushed away from the theme picker: a
-                  wipe-everything action should not sit 8px from a cosmetic toggle. */}
-              <span style={{ flexBasis: '100%', height: 0 }} aria-hidden="true" />
+                  After 5s idle, reverts to neutral. Sits beside the theme picker
+                  on row 1; the fine-print data line moves to its own row below. */}
               {confirmReset === null ? (
                 <button
                   onClick={() => {
@@ -16209,6 +16175,12 @@ export default function App() {
                   </button>
                 </span>
               )}
+              <span style={{ flexBasis: '100%', height: 0 }} aria-hidden="true" />
+              <span className="gc-mono" style={{ letterSpacing: '0.02em', color: 'var(--gc-muted)', whiteSpace: 'nowrap' }}>
+                {lang === 'zh' ? `数据 travel.state.gov · ${BULLETIN_CURRENT_MONTH.zh} · 仅供参考 · © 2026 JMJ`
+                  : lang === 'tw' ? `資料 travel.state.gov · ${BULLETIN_CURRENT_MONTH.tw} · 僅供參考 · © 2026 JMJ`
+                  : `Data: travel.state.gov · ${BULLETIN_CURRENT_MONTH.en} · Not legal advice · © 2026 JMJ`}
+              </span>
             </div>
           </div>
         </main>
