@@ -413,6 +413,29 @@ Cloudflare Pages 的 `RESEND_WEBHOOK_SECRET` 并**触发新部署**（Retry depl
 
 ---
 
+## 第 15 轮（2026-08-10）：排期到行动中心 + 分享卡改版
+
+**ActionCenter**（仅 `isActionable` = current/eligible/overdue/C 渲染，等待视图零改动，
+三态截图验证过）：递件窗口 banner、六步路线图（按 `userCase.inUS` 分境内 I-485 /
+境外领事馆 CP，CP 附 6 个月签证有效期与 USCIS 移民费两大坑）、材料清单（通用+EB/F+
+境内外分支，勾选存 localStorage `gc_packChecklist`）、匿名进度共建。
+
+**/api/progress**：POST 匿名上报（cat/country/filedMonth/milestone，白名单校验，
+每 IP 每日 5 次），GET 按类别聚合。存 `pr:<cat>:<uuid>`（TTL 2 年）+ `prl:` 限流。
+**订阅者遍历现在要跳过六种前缀**：rl: an: ev: es: pr: prl:。前端样本 <5 只显示
+已收集份数，≥5 显示阶段分布条。
+
+**EB-5 条件卡**：绿卡庆祝区的解除条件表格按类别切换——EB5* 显示 I-829（窗口算法
+与 I-751 相同：2 周年前 90 天），并在未勾选条件卡时提示「EB-5 新卡必为条件卡」。
+
+**分享卡改版**：副标题/题注用本人真实等待（优先日→获批日的天数与年数），卡面精修
+（金芯片、机读区、软阴影、纸屑），三栏数据行。SVG→Canvas 下载管道未动。
+
+**坑（本轮踩了两次同一个）**：`git checkout -- src/App.jsx` 会连未提交的功能改动一起
+抹掉——临时测试补丁要用 python 定点还原（存原文再替换回来），不要用 checkout。
+
+---
+
 ## 别重踩的坑
 
 - **推 `main` 即上线**（Cloudflare Pages 自动部署），推送前先问用户。改动走功能分支 + PR。
