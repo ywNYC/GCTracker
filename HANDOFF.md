@@ -436,6 +436,29 @@ Cloudflare Pages 的 `RESEND_WEBHOOK_SECRET` 并**触发新部署**（Retry depl
 
 ---
 
+## 第 16 轮（2026-08-10 晚）：社区数据系统（10 项收集）
+
+**/api/community** 一个端点收 8 种匿名记录：timeline（六节点日期+服务中心/领事馆+
+AOS/CP）、rfe（是否+类型）、switch（降级/换雇主/加急+结果）、cost（四档区间）、
+poll（月度投票，pollId 硬编码在 App 的 CURRENT_POLL，每月手动换）、wall（等待天数+
+≤60字留言，服务端剥掉链接/6位以上数字/微信QQ字样——公开墙必须 fail closed）、
+question（原文仅 ADMIN_TOKEN 可读）、postgc（绿卡后去向）。cd: TTL 2 年，crl: 每 IP
+日 20。**订阅遍历跳过前缀现有八种**：rl: an: ev: es: pr: prl: cd: crl:。
+
+**触点**：CommunityHub（全员，小结下方，三页签：每月一题/打卡墙/调查·提问，EB 类
+才显示降级调查）；ActionCenter 互助区升级为完整时间线+RFE（仅排期到）；绿卡庆祝区
+postgc 一键去向。均 localStorage 防重复。聚合门槛：时间线中位数 ≥3 份，投票即时。
+
+**第 10 项（邮件内渐进画像）暂缓**：需要月度邮件模板改造+签名令牌，等 9 月群发一并做。
+
+**已知测试痕迹**：打卡墙上有一条我 API 实测留下的 1234 天空留言记录（敏感词过滤的
+验证品）；无删除接口，要么留作种子要么下轮加 admin 清理端点。
+
+**KV 最终一致性**：list 索引落后写入几十秒，POST 后立刻 GET 聚合可能少一条——前端
+体验无碍（用户下次展开就有了），别当 bug 修。
+
+---
+
 ## 别重踩的坑
 
 - **推 `main` 即上线**（Cloudflare Pages 自动部署），推送前先问用户。改动走功能分支 + PR。
