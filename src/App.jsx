@@ -3073,12 +3073,23 @@ const ShareCardModal = ({ userCase, greenCardInfo, lang, onClose }) => {
     : `${approvalDate.getFullYear()}年${approvalDate.getMonth()+1}月${approvalDate.getDate()}日`;
 
   const headline = lang === 'en' ? 'I got my green card.' : lang === 'tw' ? '我拿到綠卡了。' : '我拿到绿卡了。';
-  const subline = lang === 'en' ? 'After years of waiting — this day finally came.'
-    : lang === 'tw' ? '等了這些年 — 這一天終於來了。'
-    : '等了这些年 — 这一天终于来了。';
+  // The number that makes people stop scrolling: how long THIS person waited,
+  // priority date → approval, in days.
+  const pdDate = userCase.priorityDate ? new Date(userCase.priorityDate + 'T00:00:00') : null;
+  const waitedDays = pdDate && approvalDate && approvalDate > pdDate
+    ? Math.round((approvalDate - pdDate) / 86400000) : null;
+  const waitedYearsTxt = waitedDays !== null ? (waitedDays / 365.25).toFixed(1) : null;
+  const subline = waitedDays !== null
+    ? (lang === 'en' ? `${waitedDays.toLocaleString('en-US')} days from priority date to approval.`
+      : lang === 'tw' ? `從優先日到這一天，一共 ${waitedDays.toLocaleString('en-US')} 天。`
+      : `从优先日到这一天，一共 ${waitedDays.toLocaleString('en-US')} 天。`)
+    : (lang === 'en' ? 'After years of waiting — this day finally came.'
+      : lang === 'tw' ? '等了這些年 — 這一天終於來了。'
+      : '等了这些年 — 这一天终于来了。');
   const catLabel = lang === 'en' ? 'CATEGORY' : '类别';
   const dateLabel = lang === 'en' ? 'APPROVED' : '获批日';
-  const footerLabel = lang === 'en' ? 'tracked with Green Card Tracker' : '绿卡晴雨表';
+  const waitLabel = lang === 'en' ? 'THE WAIT' : '等待';
+  const footerLabel = 'gc.jmjvc.us · ' + (lang === 'en' ? 'Green Card Tracker' : lang === 'tw' ? '綠卡晴雨表' : '绿卡晴雨表');
 
   // Download as PNG via canvas — serializes SVG → image → canvas → blob → link download
   const handleDownload = async () => {
@@ -3171,93 +3182,117 @@ const ShareCardModal = ({ userCase, greenCardInfo, lang, onClose }) => {
             <rect width={W} height={H} fill="url(#gc-bg)" />
             <rect width={W} height={H} fill="url(#gc-grain)" />
 
-            {/* Frame border — editorial hairline */}
-            <rect x="40" y="40" width={W - 80} height={H - 80}
-              fill="none" stroke="#0e4d2e" strokeWidth="2" />
-            <rect x="52" y="52" width={W - 104} height={H - 104}
-              fill="none" stroke="#0e4d2e" strokeWidth="0.5" opacity="0.35" />
+            {/* Double editorial frame */}
+            <rect x="40" y="40" width={W - 80} height={H - 80} fill="none" stroke="#0e4d2e" strokeWidth="2.5" />
+            <rect x="54" y="54" width={W - 108} height={H - 108} fill="none" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.35" />
+
+            {/* Confetti — muted brand palette, deterministic scatter */}
+            <g opacity="0.85">
+              {[[150,230,7,'#d4a343'],[230,180,5,'#0e4d2e'],[330,250,4,'#8a2a1c'],[880,210,6,'#d4a343'],
+                [800,270,4,'#0e4d2e'],[950,300,5,'#3d5a80'],[120,420,4,'#3d5a80'],[960,450,6,'#8a2a1c'],
+                [180,880,5,'#d4a343'],[900,860,4,'#0e4d2e'],[120,1060,5,'#8a2a1c'],[955,1080,6,'#d4a343'],
+                [280,1180,4,'#3d5a80'],[760,1170,5,'#0e4d2e']].map(([cx,cy,r,f],i2) => (
+                <circle key={i2} cx={cx} cy={cy} r={r} fill={f} opacity="0.55" />
+              ))}
+            </g>
 
             {/* Eyebrow */}
-            <text x={W / 2} y="150" textAnchor="middle"
-              fontFamily="Georgia, serif" fontSize="22" letterSpacing="8"
+            <text x={W / 2} y="148" textAnchor="middle"
+              fontFamily="Georgia, serif" fontSize="24" letterSpacing={lang === 'en' ? 6 : 10}
               fill="#0e4d2e" fontWeight="700">
               {lang === 'en' ? 'GREEN CARD TRACKER · MILESTONE' : lang === 'tw' ? '綠卡晴雨表 · 里程碑' : '绿卡晴雨表 · 里程碑'}
             </text>
-            <line x1={W / 2 - 120} y1="175" x2={W / 2 + 120} y2="175" stroke="#0e4d2e" strokeWidth="1" />
+            <line x1={W / 2 - 130} y1="174" x2={W / 2 + 130} y2="174" stroke="#0e4d2e" strokeWidth="1.2" />
 
-            {/* Headline — big serif */}
-            <text x={W / 2} y="340" textAnchor="middle"
-              fontFamily="Georgia, serif" fontSize="92" fontWeight="700"
-              fill="#0e4d2e" letterSpacing="-1">
+            {/* Headline */}
+            <text x={W / 2} y="330" textAnchor="middle"
+              fontFamily="Georgia, serif" fontSize="88" fontWeight="700"
+              fill="#0e4d2e">
               {headline}
             </text>
 
-            {/* Subline — soft muted */}
-            <text x={W / 2} y="420" textAnchor="middle"
-              fontFamily="Georgia, serif" fontSize="32" fontWeight="400"
+            {/* Subline — the personal number */}
+            <text x={W / 2} y="408" textAnchor="middle"
+              fontFamily="Georgia, serif" fontSize="34" fontWeight="400"
               fill="#6d604e" fontStyle="italic">
               {subline}
             </text>
 
-            {/* Green card — illustration in center */}
-            <g transform={`translate(${W / 2 - 240}, 540)`}>
-              {/* Card body — dark green gradient */}
-              <rect x="0" y="0" width="480" height="280" rx="16"
-                fill="url(#gc-card)" stroke="#000" strokeWidth="2" />
-              {/* Top white stripe — like a real GC */}
-              <rect x="0" y="0" width="480" height="56" rx="16" fill="#f5efd9" />
-              <rect x="0" y="40" width="480" height="16" fill="#f5efd9" />
-              {/* "PERMANENT RESIDENT CARD" text */}
-              <text x="24" y="36" fontFamily="Arial, sans-serif" fontSize="22"
-                fontWeight="700" fill="#0e4d2e" letterSpacing="2">
-                PERMANENT RESIDENT
+            {/* Green card illustration */}
+            <g transform={`translate(${W / 2 - 280}, 490)`}>
+              {/* soft shadow */}
+              <rect x="14" y="20" width="560" height="336" rx="22" fill="#3a3325" opacity="0.18" />
+              {/* card body */}
+              <rect x="0" y="0" width="560" height="336" rx="22" fill="url(#gc-card)" stroke="#06200f" strokeWidth="2" />
+              {/* top cream band */}
+              <path d="M 0 22 Q 0 0 22 0 L 538 0 Q 560 0 560 22 L 560 64 L 0 64 Z" fill="#f5efd9" />
+              <text x="28" y="42" fontFamily="Arial, sans-serif" fontSize="24" fontWeight="700"
+                fill="#0e4d2e" letterSpacing="3">PERMANENT RESIDENT</text>
+              <text x="532" y="42" textAnchor="end" fontFamily="Georgia, serif" fontSize="22"
+                fontWeight="700" fill="#8a2a1c" letterSpacing="2">USA</text>
+              {/* photo box */}
+              <rect x="30" y="92" width="150" height="188" rx="8" fill="#1c3f2c" stroke="#d4a343" strokeWidth="1.5" />
+              <circle cx="105" cy="158" r="32" fill="#5d8a6e" />
+              <path d="M 58 252 Q 105 212 152 252 L 152 268 Q 152 274 146 274 L 64 274 Q 58 274 58 268 Z" fill="#5d8a6e" />
+              {/* gold chip */}
+              <rect x="470" y="92" width="60" height="46" rx="8" fill="#d4a343" stroke="#a67c2e" strokeWidth="1.5" />
+              <line x1="470" y1="115" x2="530" y2="115" stroke="#a67c2e" strokeWidth="1.2" />
+              <line x1="500" y1="92" x2="500" y2="138" stroke="#a67c2e" strokeWidth="1.2" />
+              {/* info block */}
+              <text x="210" y="120" fontFamily="Arial, sans-serif" fontSize="14"
+                fill="#77b088" letterSpacing="2">CATEGORY</text>
+              <text x="210" y="162" fontFamily="Georgia, serif" fontSize="40"
+                fontWeight="700" fill="#f5efd9" letterSpacing="1">{userCase.category}</text>
+              <text x="210" y="204" fontFamily="Arial, sans-serif" fontSize="14"
+                fill="#77b088" letterSpacing="2">RESIDENT SINCE</text>
+              <text x="210" y="240" fontFamily="Georgia, serif" fontSize="28"
+                fontWeight="600" fill="#f5efd9">{approvalDate.getFullYear()}</text>
+              {/* machine-readable zone */}
+              <path d="M 0 292 L 560 292 L 560 314 Q 560 336 538 336 L 22 336 Q 0 336 0 314 Z" fill="#f5efd9" />
+              <text x="24" y="322" fontFamily="Courier, monospace" fontSize="19" fill="#0e4d2e" letterSpacing="2.5">
+                {`USA${userCase.category}<<<<GREEN<CARD<TRACKER<<<<<<`.slice(0, 40)}
               </text>
-              {/* Portrait placeholder box */}
-              <rect x="24" y="80" width="128" height="160" rx="4"
-                fill="#2a5e42" stroke="#d4a343" strokeWidth="1" />
-              <circle cx="88" cy="140" r="26" fill="#4a7a5e" />
-              <path d="M 52 210 Q 88 180 124 210 L 124 232 L 52 232 Z" fill="#4a7a5e" />
-              {/* Right side — info block */}
-              <text x="172" y="104" fontFamily="Arial, sans-serif" fontSize="13"
-                fill="#77b088" letterSpacing="1.5">CATEGORY</text>
-              <text x="172" y="138" fontFamily="Georgia, serif" fontSize="34"
-                fontWeight="700" fill="#f5efd9" letterSpacing="1">
-                {userCase.category}
-              </text>
-              <text x="172" y="180" fontFamily="Arial, sans-serif" fontSize="13"
-                fill="#77b088" letterSpacing="1.5">APPROVED</text>
-              <text x="172" y="210" fontFamily="Georgia, serif" fontSize="22"
-                fontWeight="600" fill="#f5efd9">
-                {approvalDateStr}
-              </text>
-              {/* Bottom accent strip */}
-              <rect x="0" y="260" width="480" height="20" fill="#d4a343" />
             </g>
 
-            {/* Stats row */}
-            <g transform="translate(0, 920)">
-              <line x1="120" y1="0" x2={W - 120} y2="0" stroke="#0e4d2e" strokeWidth="0.5" opacity="0.3" />
-              {/* Cat */}
-              <text x={W / 4} y="48" textAnchor="middle"
-                fontFamily="Arial, sans-serif" fontSize="18" letterSpacing="4"
-                fill="#6d604e">{catLabel}</text>
-              <text x={W / 4} y="108" textAnchor="middle"
-                fontFamily="Georgia, serif" fontSize="58" fontWeight="700"
-                fill="#0e4d2e">{userCase.category}</text>
-              {/* Date */}
-              <text x={(W / 4) * 3} y="48" textAnchor="middle"
-                fontFamily="Arial, sans-serif" fontSize="18" letterSpacing="4"
-                fill="#6d604e">{dateLabel}</text>
-              <text x={(W / 4) * 3} y="108" textAnchor="middle"
-                fontFamily="Georgia, serif" fontSize="38" fontWeight="600"
-                fill="#0e4d2e">{approvalDateStr}</text>
-              <line x1="120" y1="150" x2={W - 120} y2="150" stroke="#0e4d2e" strokeWidth="0.5" opacity="0.3" />
+            {/* Stats row — three columns */}
+            <g transform="translate(0, 960)">
+              <line x1="110" y1="0" x2={W - 110} y2="0" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.35" />
+              <text x={W * 0.22} y="52" textAnchor="middle" fontFamily="Arial, sans-serif"
+                fontSize="17" letterSpacing="4" fill="#6d604e">{catLabel}</text>
+              <text x={W * 0.22} y="118" textAnchor="middle" fontFamily="Georgia, serif"
+                fontSize="56" fontWeight="700" fill="#0e4d2e">{userCase.category}</text>
+              <line x1={W * 0.37} y1="26" x2={W * 0.37} y2="128" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.25" />
+              <text x={W / 2} y="52" textAnchor="middle" fontFamily="Arial, sans-serif"
+                fontSize="17" letterSpacing="4" fill="#6d604e">{waitLabel}</text>
+              <text x={W / 2} y="118" textAnchor="middle" fontFamily="Georgia, serif"
+                fontSize="56" fontWeight="700" fill="#0e4d2e">
+                {waitedDays !== null
+                  ? (lang === 'en' ? `${waitedYearsTxt} yrs` : `${waitedYearsTxt} 年`)
+                  : '—'}
+              </text>
+              <line x1={W * 0.63} y1="26" x2={W * 0.63} y2="128" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.25" />
+              <text x={W * 0.78} y="52" textAnchor="middle" fontFamily="Arial, sans-serif"
+                fontSize="17" letterSpacing="4" fill="#6d604e">{dateLabel}</text>
+              <text x={W * 0.78} y="110" textAnchor="middle" fontFamily="Georgia, serif"
+                fontSize="34" fontWeight="600" fill="#0e4d2e">{approvalDateStr}</text>
+              <line x1="110" y1="160" x2={W - 110} y2="160" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.35" />
             </g>
+
+            {/* waited-days caption under stats */}
+            {waitedDays !== null && (
+              <text x={W / 2} y="1180" textAnchor="middle" fontFamily="Georgia, serif"
+                fontSize="26" fontStyle="italic" fill="#6d604e">
+                {lang === 'en'
+                  ? `= ${waitedDays.toLocaleString('en-US')} days, counted one bulletin at a time`
+                  : lang === 'tw' ? `= ${waitedDays.toLocaleString('en-US')} 天，一期一期公告數過來的`
+                  : `= ${waitedDays.toLocaleString('en-US')} 天，一期一期公告数过来的`}
+              </text>
+            )}
 
             {/* Footer */}
-            <text x={W / 2} y={H - 90} textAnchor="middle"
-              fontFamily="Arial, sans-serif" fontSize="20" letterSpacing="3"
-              fill="#6d604e" fontStyle="italic">
+            <text x={W / 2} y={H - 84} textAnchor="middle"
+              fontFamily="Courier, monospace" fontSize="22" letterSpacing="3"
+              fill="#6d604e">
               {footerLabel}
             </text>
           </svg>
