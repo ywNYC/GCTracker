@@ -32,7 +32,9 @@ export async function onRequestGet(context) {
       if (day < since) continue;
       try {
         const rec = JSON.parse(await env.SUBSCRIBERS.get(k.name));
-        if (rec) events.push(rec);
+        // example.com is RFC 2606 reserved — it can only ever be a self-test post,
+        // so those rows never count toward the real numbers.
+        if (rec && !/@example\.(com|net|org)$/i.test(rec.email || '')) events.push(rec);
       } catch { /* skip malformed */ }
     }
     cursor = list.list_complete ? null : list.cursor;
