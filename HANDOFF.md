@@ -387,6 +387,32 @@ INFRASTRUCTURE 匹配）。2026-08 三个预留类别对所有国家（含中国
 
 ---
 
+## 第 14 轮（2026-08-10 凌晨）：邮件投递可观测性
+
+**接入 Resend webhook**（`/api/webhooks/resend`）：收 email.sent / delivered /
+opened / clicked / bounced / complained / delivery_delayed。签名走 Svix 规范
+（HMAC-SHA256 over `<id>.<ts>.<body>`，密钥是 `whsec_` 后的 base64 段），实现已用
+Svix 官方测试向量对过（`g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=`），5 分钟
+重放窗口。**未配置 `RESEND_WEBHOOK_SECRET` 时仍收录但打 `verified:false`**，这样
+端点一注册就有数据；密钥配好后自动转为已验证，`email-stats` 里的
+`unverifiedEvents` 就是「密钥还没配」的指示灯。
+
+**存储**：`ev:<日期>:<id>`（原始事件，TTL 180 天）+ `es:<邮箱>`（按地址汇总）。
+**遍历订阅者的地方现在要跳过四种前缀**：`rl:`（限流）、`an:`（访问统计）、
+`ev:`/`es:`（邮件事件）——send-monthly 与 subscribers 已改。
+
+**`/api/admin/email-stats`**：打开率按**地址**而非事件计（同一人开六次算一次），
+分母优先用 delivered、退回用 sent；产出三个可执行清单：硬退信、投诉、从未打开。
+`?days=30` 可限窗口。`@example.com`（RFC 2606 保留域）事件永久排除，自测不污染真值。
+
+**业主待办（需 Resend 后台权限）**：① Webhooks 里新建端点指向
+`https://gc.jmjvc.us/api/webhooks/resend`，勾全部 email.* 事件；② 把签名密钥写进
+Cloudflare Pages 的 `RESEND_WEBHOOK_SECRET` 并**触发新部署**（Retry deployment 不
+生效，见下方坑）；③ 域名设置里**单独打开 Open tracking 与 Click tracking**，否则
+这两类事件根本不会产生。
+
+---
+
 ## 别重踩的坑
 
 - **推 `main` 即上线**（Cloudflare Pages 自动部署），推送前先问用户。改动走功能分支 + PR。
