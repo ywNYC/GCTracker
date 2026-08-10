@@ -4141,8 +4141,26 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             </div>
                           </div>
                         )}
-                        <InlineSubscribeCTA userCase={userCase}
-                          label={lang === 'en' ? '📮 Get an email the moment this number moves' : lang === 'tw' ? '📮 這個數字一變，就發郵件告訴你' : '📮 这个数字一变，就发邮件告诉你'} />
+                        {/* The pitch is segmented by how long this person is actually
+                            waiting: a 7-year wait and a 6-month wait need different
+                            reasons to hand over an email address. */}
+                        <InlineSubscribeCTA userCase={userCase} label={(() => {
+                          const yrs = yearsF;
+                          if (yrs !== null && yrs >= 3) {
+                            const yTxt = yrs.toFixed(1);
+                            return lang === 'en' ? `📮 ${yTxt} years is a long watch — we'll do it for you`
+                              : lang === 'tw' ? `📮 這一等就是 ${yTxt} 年，每月替你盯著`
+                              : `📮 这一等就是 ${yTxt} 年，每月替你盯着`;
+                          }
+                          if (yrs !== null && yrs < 1) {
+                            return lang === 'en' ? '📮 Almost there — get the email the day it opens'
+                              : lang === 'tw' ? '📮 快到了，遞件窗口一開就發郵件提醒你'
+                              : '📮 快到了，递件窗口一开就发邮件提醒你';
+                          }
+                          return lang === 'en' ? '📮 Get an email the moment this number moves'
+                            : lang === 'tw' ? '📮 這個數字一變，就發郵件告訴你'
+                            : '📮 这个数字一变，就发邮件告诉你';
+                        })()} />
                       </>
                     )}
                   </div>
