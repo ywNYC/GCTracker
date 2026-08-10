@@ -3299,6 +3299,331 @@ const ShareCardModal = ({ userCase, greenCardInfo, lang, onClose }) => {
 };
 
 // ============================================================
+// ActionCenter — everything a person whose date HAS ARRIVED needs next.
+// Rendered ONLY when the case is actionable (current/eligible/overdue/C);
+// the waiting view is untouched by design (owner requirement 2026-08-10).
+// Three cards: don't-miss-the-window banner, the 6-step roadmap (AOS vs
+// consular picked by userCase.inUS), and the document checklist. Plus the
+// anonymous crowd-progress report (minimal v1).
+// ============================================================
+const AC_MILESTONES = [
+  { id: 'filed', zh: '已递交', tw: '已遞交', en: 'Filed' },
+  { id: 'receipt', zh: '收到收据', tw: '收到收據', en: 'Receipt' },
+  { id: 'ead', zh: 'EAD 到手', tw: 'EAD 到手', en: 'EAD' },
+  { id: 'interview', zh: '面试通知', tw: '面試通知', en: 'Interview' },
+  { id: 'approved', zh: '已批准', tw: '已批准', en: 'Approved' },
+];
+
+const ActionCenter = ({ userCase }) => {
+  const { lang } = useLang();
+  const inUS = !!userCase.inUS;
+  const isEB = !userCase.category?.startsWith('F');
+  const [openList, setOpenList] = useState(false);
+  const [checked, setChecked] = useState(() => {
+    try { return JSON.parse(window.localStorage.getItem('gc_packChecklist')) || {}; } catch { return {}; }
+  });
+  const toggleItem = (id) => {
+    const next = { ...checked, [id]: !checked[id] };
+    setChecked(next);
+    try { window.localStorage.setItem('gc_packChecklist', JSON.stringify(next)); } catch { /* noop */ }
+  };
+
+  // ---- crowd progress ----
+  const [crowdOpen, setCrowdOpen] = useState(false);
+  const [agg, setAgg] = useState(null);
+  const [repMonth, setRepMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [repMilestone, setRepMilestone] = useState('filed');
+  const [repState, setRepState] = useState(''); // '' | 'loading' | 'done' | 'error'
+  useEffect(() => {
+    if (!crowdOpen || agg) return;
+    fetch(`/api/progress?cat=${userCase.category}`)
+      .then((r) => r.json()).then(setAgg).catch(() => setAgg({ total: 0, byMilestone: {} }));
+  }, [crowdOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const submitReport = async () => {
+    setRepState('loading');
+    try {
+      const r = await fetch('/api/progress', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cat: userCase.category, country: userCase.country, filedMonth: repMonth, milestone: repMilestone }),
+      });
+      if (!r.ok) throw new Error();
+      setRepState('done');
+      try { window.localStorage.setItem('gc_progressReported', JSON.stringify({ m: repMonth, ms: repMilestone, at: Date.now() })); } catch { /* noop */ }
+      setAgg(null); // refetch on next open
+    } catch { setRepState('error'); setTimeout(() => setRepState(''), 2500); }
+  };
+
+  const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' };
+  const eyebrow = { fontSize: '9px', letterSpacing: '0.12em', fontWeight: 700 };
+
+  // ---- roadmap steps ----
+  const steps = inUS
+    ? (lang === 'en' ? [
+        ['Medical exam (I-693)', 'See a USCIS-designated civil surgeon; keep the sealed envelope sealed.', '1-2 wk'],
+        ['Assemble your packet', 'Use the checklist below — missing items are the #1 cause of rejection.', '1-2 wk'],
+        ['File I-485', 'Add I-765 (work permit) and I-131 (travel permit) in the same package — no extra fee.', 'day 0'],
+        ['Receipt (I-797) & biometrics', 'Receipt in ~2-6 weeks, fingerprint appointment in ~1-2 months.', '1-2 mo'],
+        ['EAD / AP arrive; possible RFE', 'Work & travel cards typically 2-6 months; answer any RFE fully and on time.', '2-6 mo'],
+        ['Interview or waiver → approval', 'After filing, track each step with the I-485 progress card below.', 'varies'],
+      ] : lang === 'tw' ? [
+        ['體檢 I-693', '找 USCIS 認證的 civil surgeon，密封信封不要拆。', '1-2 週'],
+        ['備齊材料包', '用下方清單逐項勾——缺件是被退件的頭號原因。', '1-2 週'],
+        ['遞交 I-485', '同包附上 I-765（工卡）與 I-131（回美證），免額外費用。', '第 0 天'],
+        ['收據 I-797 與打指模', '收據約 2-6 週，指模預約約 1-2 個月。', '1-2 月'],
+        ['EAD／回美證下發；可能補件', '工卡回美證一般 2-6 個月；收到 RFE 按時完整回覆。', '2-6 月'],
+        ['面試或免面試 → 批准', '遞交後用下方「I-485 流程進度」逐步打勾。', '不定'],
+      ] : [
+        ['体检 I-693', '找 USCIS 认证的 civil surgeon，密封信封不要拆。', '1-2 周'],
+        ['备齐材料包', '用下方清单逐项勾——缺件是被退件的头号原因。', '1-2 周'],
+        ['递交 I-485', '同包附上 I-765（工卡）与 I-131（回美证），免额外费用。', '第 0 天'],
+        ['收据 I-797 与打指模', '收据约 2-6 周，指模预约约 1-2 个月。', '1-2 月'],
+        ['EAD／回美证下发；可能补件', '工卡回美证一般 2-6 个月；收到 RFE 按时完整回复。', '2-6 月'],
+        ['面试或免面试 → 批准', '递交后用下方「I-485 流程进度」逐步打勾。', '不定'],
+      ])
+    : (lang === 'en' ? [
+        ['NVC welcome & fees', 'NVC opens your case; pay the IV and AOS fees online.', '2-6 wk'],
+        ['File DS-260', 'The online immigrant-visa application, one per applicant.', '1 wk'],
+        ['Upload civil documents', 'Birth/marriage notarials, police certificates → CEAC.', '2-8 wk'],
+        ['Documentarily qualified → wait for interview', 'NVC confirms your file is complete, then the consulate schedules you.', '1-6 mo'],
+        ['Medical at panel physician + interview', 'Exam only at designated hospitals; visa usually issued days after approval.', '2-4 wk'],
+        ['Enter the U.S. & pay the USCIS fee', 'Visa is typically valid 6 months — enter before it expires, then pay the $235 immigrant fee online or the card will not be mailed.', '≤6 mo'],
+      ] : lang === 'tw' ? [
+        ['NVC 建檔與繳費', 'NVC 開案後在線繳 IV 簽證費與 AOS 費。', '2-6 週'],
+        ['填 DS-260', '移民簽證網上申請表，每位申請人一份。', '1 週'],
+        ['上傳民事文件', '出生／結婚公證、無犯罪證明 → 上傳 CEAC。', '2-8 週'],
+        ['審結（DQ）→ 等面試排期', 'NVC 確認材料齊全後，由使領館排面試。', '1-6 月'],
+        ['指定醫院體檢 + 面試', '體檢只認指定醫院；面試通過後簽證通常數日內簽發。', '2-4 週'],
+        ['入境美國並繳 USCIS 移民費', '移民簽證一般僅 6 個月有效——過期作廢；入境後在線繳 $235，不繳綠卡不會寄出。', '≤6 月'],
+      ] : [
+        ['NVC 建档与缴费', 'NVC 开案后在线缴 IV 签证费与 AOS 费。', '2-6 周'],
+        ['填 DS-260', '移民签证网上申请表，每位申请人一份。', '1 周'],
+        ['上传民事文件', '出生／结婚公证、无犯罪证明 → 上传 CEAC。', '2-8 周'],
+        ['审结（DQ）→ 等面试排期', 'NVC 确认材料齐全后，由使领馆排面试。', '1-6 月'],
+        ['指定医院体检 + 面试', '体检只认指定医院；面试通过后签证通常数日内签发。', '2-4 周'],
+        ['入境美国并缴 USCIS 移民费', '移民签证一般仅 6 个月有效——过期作废；入境后在线缴 $235，不缴绿卡不会寄出。', '≤6 月'],
+      ]);
+
+  // ---- checklist ----
+  const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
+  const groups = [
+    {
+      title: L('所有人都要', '所有人都要', 'Everyone'),
+      items: [
+        ['passport', L('护照全本复印（含所有签证页）', '護照全本影印（含所有簽證頁）', 'Full passport copy (all visa pages)')],
+        ['birth', L('出生公证（白皮书）', '出生公證（白皮書）', 'Birth certificate notarial booklet')],
+        ['photos', L('美式 2×2 寸照片', '美式 2×2 吋照片', '2×2 inch US-style photos')],
+        ['petition', L(isEB ? 'I-140 批准通知（I-797）副本' : 'I-130 批准通知（I-797）副本',
+                       isEB ? 'I-140 批准通知（I-797）副本' : 'I-130 批准通知（I-797）副本',
+                       isEB ? 'I-140 approval notice (I-797) copy' : 'I-130 approval notice (I-797) copy')],
+        ...(userCase.priorityDate ? [['marriage', L('结婚公证（如随行配偶）', '結婚公證（如隨行配偶）', 'Marriage notarial (if spouse included)')]] : []),
+      ],
+    },
+    isEB ? {
+      title: L('职业移民专属', '職業移民專屬', 'Employment-based'),
+      items: [
+        ['joblet', L('雇主在职信 / Supplement J（仍在原岗位）', '雇主在職信 / Supplement J（仍在原崗位）', 'Employer letter / Supplement J')],
+        ['degree', L('学历学位证明与认证', '學歷學位證明與認證', 'Degree certificates & evaluation')],
+      ],
+    } : {
+      title: L('亲属移民专属', '親屬移民專屬', 'Family-based'),
+      items: [
+        ['i864', L('担保人 I-864 + 最近报税记录', '擔保人 I-864 + 最近報稅記錄', 'Sponsor I-864 + recent tax returns')],
+        ['relation', L('亲属关系证明（户口本/出生公证链）', '親屬關係證明', 'Relationship evidence')],
+      ],
+    },
+    inUS ? {
+      title: L('境内递件（I-485）', '境內遞件（I-485）', 'Filing inside the U.S.'),
+      items: [
+        ['i693', L('I-693 体检密封件（civil surgeon）', 'I-693 體檢密封件', 'Sealed I-693 medical (civil surgeon)'), ],
+        ['i94', L('I-94 与当前身份文件（I-797/I-20 等）', 'I-94 與當前身份文件', 'I-94 & current status documents')],
+        ['combo', L('I-765 + I-131 组合递交（免费拿工卡与回美证）', 'I-765 + I-131 組合遞交', 'I-765 + I-131 combo (free with I-485)')],
+      ],
+    } : {
+      title: L('境外领事馆（CP）', '境外領事館（CP）', 'Consular processing'),
+      items: [
+        ['ds260', L('DS-260 确认页', 'DS-260 確認頁', 'DS-260 confirmation page')],
+        ['police', L('无犯罪证明（16 岁后住满 6 个月的国家都要）', '無犯罪證明（16 歲後住滿 6 個月的國家）', 'Police certificates (countries lived 6+ months since 16)')],
+        ['nvcfee', L('NVC 缴费收据', 'NVC 繳費收據', 'NVC fee receipts')],
+      ],
+    },
+  ];
+  const totalItems = groups.reduce((n, g) => n + g.items.length, 0);
+  const doneItems = groups.reduce((n, g) => n + g.items.filter(([id]) => checked[id]).length, 0);
+
+  return (
+    <>
+      {/* ① Don't-miss-the-window banner */}
+      <div style={{ ...card, borderLeft: '3px solid var(--gc-green)', background: 'var(--gc-green-soft)' }}>
+        <div style={{ padding: '12px 14px' }}>
+          <div className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-green)' }}>
+            {L('递件窗口已开', '遞件窗口已開', 'FILING WINDOW OPEN')}
+          </div>
+          <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--gc-green-ink)', margin: '4px 0 3px' }}>
+            {L('本月就递，别等下个月', '本月就遞，別等下個月', 'File this month — don\'t wait')}
+          </div>
+          <div style={{ fontSize: '11.5px', lineHeight: 1.65, color: 'var(--gc-ink-soft)' }}>
+            {L('排期每月重算，截止日可能回调（历史上多次发生）。窗口一关，你会退回等待，重新排到没有时间表。材料齐了就尽快递交。',
+               '排期每月重算，截止日可能回調（歷史上多次發生）。窗口一關就退回等待，重新排到沒有時間表。材料齊了就盡快遞交。',
+               'The bulletin resets monthly and cutoffs can retrogress — it has happened many times. If the window closes you go back to waiting with no timetable. File as soon as your packet is ready.')}
+          </div>
+        </div>
+      </div>
+
+      {/* ② Roadmap */}
+      <div style={card}>
+        <div style={{ padding: '12px 14px 4px' }}>
+          <div className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
+            {inUS
+              ? L('接下来 6 步 · 境内递件（I-485）', '接下來 6 步 · 境內遞件（I-485）', 'NEXT 6 STEPS · ADJUSTMENT (I-485)')
+              : L('接下来 6 步 · 境外领事馆（CP）', '接下來 6 步 · 境外領事館（CP）', 'NEXT 6 STEPS · CONSULAR')}
+          </div>
+        </div>
+        <div style={{ padding: '6px 14px 12px' }}>
+          {steps.map(([tt, dd, dur], i) => (
+            <div key={i} className="flex" style={{ gap: '10px', padding: '7px 0', borderBottom: i < steps.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none' }}>
+              <span className="gc-mono flex-shrink-0" style={{
+                width: '20px', height: '20px', borderRadius: '50%', textAlign: 'center', lineHeight: '20px',
+                fontSize: '10px', fontWeight: 700, background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)',
+                border: '1px solid var(--gc-green-border)',
+              }}>{i + 1}</span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink)' }}>{tt}</span>
+                <span className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginLeft: '7px' }}>{dur}</span>
+                <div style={{ fontSize: '11px', lineHeight: 1.55, color: 'var(--gc-ink-soft)', marginTop: '1px' }}>{dd}</div>
+              </span>
+            </div>
+          ))}
+          {!inUS && (
+            <div style={{ marginTop: '9px', padding: '8px 10px', background: 'var(--gc-amber-soft)', borderLeft: '2px solid var(--gc-amber)', fontSize: '10.5px', lineHeight: 1.6, color: 'var(--gc-amber-ink)' }}>
+              {L('两个最常踩的坑：①移民签证有效期一般只有 6 个月，逾期作废要重走流程；②入境后不缴 USCIS 移民费，绿卡永远不会寄出。',
+                 '兩個最常踩的坑：①移民簽證一般僅 6 個月有效，逾期作廢要重走流程；②入境後不繳 USCIS 移民費，綠卡永遠不會寄出。',
+                 'Two classic traps: ① the immigrant visa is typically valid only 6 months — expired means starting over; ② skip the USCIS immigrant fee after entry and the card is never mailed.')}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ③ Document checklist */}
+      <div style={card}>
+        <button type="button" onClick={() => setOpenList((v) => !v)}
+          className="flex items-center justify-between"
+          style={{ width: '100%', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+          <span className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
+            {L('材料清单', '材料清單', 'DOCUMENT CHECKLIST')}
+            <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '10px', color: doneItems === totalItems && totalItems > 0 ? 'var(--gc-green)' : 'var(--gc-muted)', letterSpacing: 0, textTransform: 'none' }}>
+              {doneItems}/{totalItems}
+            </span>
+          </span>
+          <span style={{ fontSize: '9px', color: 'var(--gc-muted)', transform: openList ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+        </button>
+        {openList && (
+          <div style={{ padding: '0 14px 12px' }}>
+            {groups.map((g, gi) => (
+              <div key={gi} style={{ marginBottom: gi < groups.length - 1 ? '10px' : 0 }}>
+                <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.1em', fontWeight: 700, color: 'var(--gc-green)', margin: '6px 0 3px' }}>{g.title}</div>
+                {g.items.map(([id, label]) => (
+                  <label key={id} className="flex items-center" style={{ gap: '8px', padding: '4px 0', cursor: 'pointer', fontSize: '12px', color: checked[id] ? 'var(--gc-muted)' : 'var(--gc-ink-soft)', textDecoration: checked[id] ? 'line-through' : 'none' }}>
+                    <input type="checkbox" checked={!!checked[id]} onChange={() => toggleItem(id)}
+                      style={{ accentColor: 'var(--gc-green)', width: '14px', height: '14px', flexShrink: 0 }} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            ))}
+            <div style={{ marginTop: '8px', fontSize: '10px', lineHeight: 1.6, color: 'var(--gc-muted)' }}>
+              {inUS
+                ? L('提示：EAD 一般 1-2 年有效，过期前 180 天内可递 I-765 续期，别等断档。清单为常见项，个案差异请以律师意见为准。',
+                    '提示：EAD 一般 1-2 年有效，過期前 180 天內可遞 I-765 續期。清單為常見項，個案請以律師意見為準。',
+                    'Note: EADs typically run 1-2 years; renew within 180 days of expiry. This list covers the common items — follow your attorney for case specifics.')
+                : L('清单为常见项，各领事馆要求略有差异，以面试通知与律师意见为准。',
+                    '清單為常見項，各領事館要求略有差異，以面試通知與律師意見為準。',
+                    'Common items only — consulates vary; follow your interview notice and attorney.')}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ④ Crowd progress (minimal v1) */}
+      <div style={card}>
+        <button type="button" onClick={() => setCrowdOpen((v) => !v)}
+          className="flex items-center justify-between"
+          style={{ width: '100%', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+          <span className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
+            {L('递件互助进度（匿名）', '遞件互助進度（匿名）', 'CROWD PROGRESS (ANONYMOUS)')}
+          </span>
+          <span style={{ fontSize: '9px', color: 'var(--gc-muted)', transform: crowdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+        </button>
+        {crowdOpen && (
+          <div style={{ padding: '0 14px 12px' }}>
+            <div style={{ fontSize: '11px', lineHeight: 1.6, color: 'var(--gc-ink-soft)', marginBottom: '8px' }}>
+              {L('报一下你的递件月份和进展（完全匿名，不留邮箱不留案号），帮同类别的后来人看清真实时间线。',
+                 '報一下你的遞件月份和進展（完全匿名），幫同類別的後來人看清真實時間線。',
+                 'Report your filing month and stage — fully anonymous — so others in your category can see real timelines.')}
+            </div>
+            <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <input type="month" value={repMonth} min="2020-01" max={new Date().toISOString().slice(0, 7)}
+                onChange={(e) => setRepMonth(e.target.value)}
+                className="gc-mono"
+                style={{ fontSize: '11px', padding: '5px 7px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-surface)', color: 'var(--gc-ink)' }} />
+              <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden', flexWrap: 'wrap' }}>
+                {AC_MILESTONES.map((m, mi) => (
+                  <button key={m.id} type="button" onClick={() => setRepMilestone(m.id)}
+                    style={{
+                      fontSize: '10px', fontWeight: 700, padding: '5px 8px', border: 'none', cursor: 'pointer',
+                      borderLeft: mi === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                      background: repMilestone === m.id ? 'var(--gc-green)' : 'var(--gc-surface)',
+                      color: repMilestone === m.id ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                    }}>
+                    {lang === 'en' ? m.en : lang === 'tw' ? m.tw : m.zh}
+                  </button>
+                ))}
+              </span>
+              <button type="button" onClick={submitReport} disabled={repState === 'loading' || repState === 'done'}
+                style={{ fontSize: '11px', fontWeight: 700, padding: '6px 12px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: repState === 'done' ? 'var(--gc-green-soft)' : 'var(--gc-green)', color: repState === 'done' ? 'var(--gc-green-ink)' : 'var(--gc-paper)' }}>
+                {repState === 'done' ? L('已提交 ✓', '已提交 ✓', 'Sent ✓') : repState === 'loading' ? '…' : L('匿名提交', '匿名提交', 'Submit')}
+              </button>
+            </div>
+            {repState === 'error' && (
+              <div style={{ fontSize: '10px', color: 'var(--gc-red)', marginTop: '4px' }}>{L('提交失败，稍后再试', '提交失敗，稍後再試', 'Failed — try again later')}</div>
+            )}
+            <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--gc-rule-soft)' }}>
+              {agg === null ? (
+                <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>…</div>
+              ) : agg.total < 5 ? (
+                <div style={{ fontSize: '10.5px', lineHeight: 1.6, color: 'var(--gc-muted)' }}>
+                  {L(`${userCase.category} 已收集 ${agg.total} 份进度，满 5 份后这里会显示各阶段分布。`,
+                     `${userCase.category} 已收集 ${agg.total} 份進度，滿 5 份後這裡會顯示各階段分佈。`,
+                     `${agg.total} report(s) so far for ${userCase.category} — distribution appears at 5+.`)}
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '5px' }}>
+                    {L(`${userCase.category} 共 ${agg.total} 份匿名进度：`, `${userCase.category} 共 ${agg.total} 份匿名進度：`, `${agg.total} anonymous reports for ${userCase.category}:`)}
+                  </div>
+                  {AC_MILESTONES.map((m) => {
+                    const n = agg.byMilestone?.[m.id] || 0;
+                    const pct = agg.total ? Math.round((n / agg.total) * 100) : 0;
+                    return (
+                      <div key={m.id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
+                        <span style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', width: '64px', flexShrink: 0 }}>{lang === 'en' ? m.en : lang === 'tw' ? m.tw : m.zh}</span>
+                        <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
+                        </span>
+                        <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '30px', textAlign: 'right' }}>{n}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+// ============================================================
 // Overview - Summary page showing user's status at a glance
 // ============================================================
 // While the case is still queued, the I-485 card has nothing procedural to show — so it
@@ -3643,6 +3968,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 
   const primaryStatus = filingAuthorized ? filingStatus : finalActionStatus;
   const primaryCutoff = filingAuthorized ? filingCutoff : finalActionCutoff;
+  // Gate for the arrived-date experience: everything in ActionCenter renders
+  // ONLY here — the waiting view stays byte-identical.
+  const isActionable = ['current', 'eligible', 'overdue'].includes(primaryStatus.status) || primaryCutoff === 'C';
 
   return (
     <div className="space-y-2">
@@ -4273,6 +4601,10 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           </div>
         );
       })()}
+
+      {/* Arrived-date action center — window banner, roadmap, checklist, crowd
+          progress. Strictly gated: waiting cases never see any of it. */}
+      {isActionable && <ActionCenter userCase={userCase} />}
 
       {/* Bulletin movement chart — its own card now. It used to live inside the
           I-485 card's waiting preview; with I-485 hidden until filing opens, the
@@ -4919,6 +5251,11 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                   const n400EligibleDate = approvalDate
                     ? new Date(approvalDate.getTime() + yearsToN400 * 365.25 * 24 * 60 * 60 * 1000)
                     : null;
+                  // EB-5 investors get the SAME 2-year conditional card but remove
+                  // conditions with I-829 (not the marriage-based I-751) — the window
+                  // math (90 days before the 2-year anniversary) is identical.
+                  const isEB5Card = userCase.category?.startsWith('EB5');
+                  const removalForm = isEB5Card ? 'I-829' : 'I-751';
                   // I-751 window: 90 days BEFORE 2-year anniversary, ends AT 2-year anniversary
                   const i751WindowStart = approvalDate
                     ? new Date(approvalDate.getTime() + (2 * 365.25 - 90) * 24 * 60 * 60 * 1000)
@@ -5025,12 +5362,27 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             onChange={(e) => setGreenCardInfo({ ...greenCardInfo, isConditional: e.target.checked })}
                             style={{ accentColor: 'var(--gc-green)' }}
                           />
-                          {lang === 'en'
-                            ? 'Conditional 2-year card (CR-1) — requires I-751'
-                            : lang === 'tw'
-                            ? '條件 2 年綠卡 (CR-1) — 需要遞 I-751'
-                            : '条件 2 年绿卡 (CR-1) — 需要递 I-751'}
+                          {isEB5Card
+                            ? (lang === 'en'
+                                ? 'Conditional 2-year card (EB-5) — requires I-829'
+                                : lang === 'tw'
+                                ? '條件 2 年綠卡（EB-5 投資）— 需要遞 I-829'
+                                : '条件 2 年绿卡（EB-5 投资）— 需要递 I-829')
+                            : (lang === 'en'
+                                ? 'Conditional 2-year card (CR-1) — requires I-751'
+                                : lang === 'tw'
+                                ? '條件 2 年綠卡 (CR-1) — 需要遞 I-751'
+                                : '条件 2 年绿卡 (CR-1) — 需要递 I-751')}
                         </label>
+                        {isEB5Card && !greenCardInfo.isConditional && (
+                          <div style={{ fontSize: '10px', color: 'var(--gc-amber-ink)', marginTop: '4px', lineHeight: 1.5 }}>
+                            {lang === 'en'
+                              ? 'Note: every new EB-5 green card is a 2-year conditional card — this almost certainly applies to you.'
+                              : lang === 'tw'
+                              ? '提示：EB-5 新發綠卡一律是 2 年條件卡——這一項幾乎必然適用於你。'
+                              : '提示：EB-5 新发绿卡一律是 2 年条件卡——这一项几乎必然适用于你。'}
+                          </div>
+                        )}
                       </div>
 
                       {/* I-751 countdown — only if conditional */}
@@ -5043,16 +5395,16 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                         }}>
                           <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: inI751Window ? 'var(--gc-amber-ink)' : 'var(--gc-muted)', letterSpacing: '0.12em', marginBottom: '4px' }}>
                             {inI751Window
-                              ? (lang === 'en' ? '⚠ I-751 WINDOW OPEN NOW' : '⚠ I-751 申请窗口已开')
-                              : (lang === 'en' ? 'I-751 (REMOVE CONDITIONS)' : 'I-751 解除条件')}
+                              ? (lang === 'en' ? `⚠ ${removalForm} WINDOW OPEN NOW` : `⚠ ${removalForm} 申请窗口已开`)
+                              : (lang === 'en' ? `${removalForm} (REMOVE CONDITIONS)` : `${removalForm} 解除条件`)}
                           </div>
                           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gc-ink)', lineHeight: 1.5 }}>
                             {inI751Window
                               ? (lang === 'en'
-                                  ? `File I-751 before ${i751WindowEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} (2-year anniversary)`
+                                  ? `File ${removalForm} before ${i751WindowEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} (2-year anniversary)`
                                   : lang === 'tw'
-                                  ? `請在 ${i751WindowEnd.getFullYear()}/${i751WindowEnd.getMonth()+1}/${i751WindowEnd.getDate()} 前遞交 I-751(2 年期限)`
-                                  : `请在 ${i751WindowEnd.getFullYear()}/${i751WindowEnd.getMonth()+1}/${i751WindowEnd.getDate()} 前递交 I-751(2 年期限)`)
+                                  ? `請在 ${i751WindowEnd.getFullYear()}/${i751WindowEnd.getMonth()+1}/${i751WindowEnd.getDate()} 前遞交 ${removalForm}(2 年期限)`
+                                  : `请在 ${i751WindowEnd.getFullYear()}/${i751WindowEnd.getMonth()+1}/${i751WindowEnd.getDate()} 前递交 ${removalForm}(2 年期限)`)
                               : daysUntilI751Start > 0
                               ? (lang === 'en'
                                   ? `Window opens in ${daysUntilI751Start} days (${i751WindowStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })})`
