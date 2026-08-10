@@ -14609,7 +14609,6 @@ export default function App() {
   const [showTimeMachine, setShowTimeMachine] = useState(false);
   // Shows a mini green-card dashboard popover in the header.
   // Only actually rendered when greenCardInfo.approvalDate is set.
-  const [showGreenCardInfo, setShowGreenCardInfo] = useState(false);
   // Which I-485 steps the user has marked complete. Persisted to localStorage so it
   // survives refresh. Critical: without persistence, stepActualDates (which IS persisted)
   // would desync — user would see receipt date but no step checkmark on reload, and
@@ -15633,179 +15632,24 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Right: Help + GreenCardChip + LangSwitcher */}
+              {/* Right: Help + LangSwitcher + Subscribe */}
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                {/* Green Card quick-access pill — shown only when user has approvalDate (I-485 complete).
-                    Click to open mini dashboard with countdowns. */}
-                {greenCardInfo.approvalDate && (
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <button
-                      onClick={() => setShowGreenCardInfo(!showGreenCardInfo)}
-                      aria-label={lang === 'en' ? 'My green card' : '我的绿卡'}
-                      className="flex items-center active:opacity-80"
-                      style={{
-                        gap: '5px',
-                        padding: '0 9px',
-                        height: '26px',
-                        background: 'var(--gc-green)',
-                        color: 'var(--gc-paper)',
-                        border: '1px solid var(--gc-green)',
-                        borderRadius: '13px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 140ms ease',
-                        lineHeight: 1,
-                        whiteSpace: 'nowrap',
-                        letterSpacing: '0.01em',
-                      }}>
-                      <CheckCircle2 size={12} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                      <span>{lang === 'en' ? 'GC' : '绿卡'}</span>
-                    </button>
-                    {showGreenCardInfo && (() => {
-                      const approvalDate = new Date(greenCardInfo.approvalDate);
-                      const yearsToN400 = greenCardInfo.isConditional ? 3 : 5;
-                      const n400Date = new Date(approvalDate.getTime() + yearsToN400 * 365.25 * 86400000);
-                      const now = new Date();
-                      const daysUntilN400 = Math.ceil((n400Date.getTime() - now.getTime()) / 86400000);
-                      const i751Start = greenCardInfo.isConditional
-                        ? new Date(approvalDate.getTime() + (2 * 365.25 - 90) * 86400000)
-                        : null;
-                      const i751End = greenCardInfo.isConditional
-                        ? new Date(approvalDate.getTime() + 2 * 365.25 * 86400000)
-                        : null;
-                      const daysUntilI751 = i751Start
-                        ? Math.ceil((i751Start.getTime() - now.getTime()) / 86400000)
-                        : null;
-                      const inI751Window = i751Start && i751End && now >= i751Start && now <= i751End;
-                      const fmtDate = (d) => lang === 'en'
-                        ? d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                        : `${d.getFullYear()}年${d.getMonth()+1}月`;
-                      return (
-                        <>
-                          {/* Backdrop — click outside to close */}
-                          <div onClick={() => setShowGreenCardInfo(false)} style={{
-                            position: 'fixed', inset: 0, zIndex: 45,
-                            background: 'transparent',
-                          }} />
-                          <div style={{
-                            position: 'absolute',
-                            top: '34px', right: 0,
-                            width: '260px', maxWidth: 'calc(100vw - 24px)',
-                            background: 'var(--gc-surface)',
-                            border: '1px solid var(--gc-green)',
-                            borderLeft: '3px solid var(--gc-green)',
-                            borderRadius: '4px',
-                            padding: '10px 12px',
-                            boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
-                            zIndex: 50,
-                            fontSize: '11px',
-                            lineHeight: 1.5,
-                          }}>
-                            <div className="gc-eyebrow" style={{ color: 'var(--gc-green-ink)', marginBottom: '6px', fontSize: '9px' }}>
-                              {lang === 'en' ? 'YOUR GREEN CARD' : lang === 'tw' ? '你的綠卡' : '你的绿卡'}
-                            </div>
-                            <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', marginBottom: '8px' }}>
-                              {lang === 'en' ? 'Approved' : lang === 'tw' ? '獲批' : '获批'}{' '}
-                              <span className="gc-mono" style={{ fontWeight: 700, color: 'var(--gc-ink)' }}>
-                                {fmtDate(approvalDate)}
-                              </span>
-                              {greenCardInfo.isConditional && (
-                                <span style={{
-                                  marginLeft: '6px', padding: '1px 5px', fontSize: '9px',
-                                  background: 'var(--gc-amber-soft)', color: 'var(--gc-amber-ink)',
-                                  border: '1px solid var(--gc-amber-border)', borderRadius: '2px',
-                                  fontWeight: 700, letterSpacing: '0.06em',
-                                }}>CR-1</span>
-                              )}
-                            </div>
-                            {/* I-751 mini-row when conditional */}
-                            {greenCardInfo.isConditional && (
-                              <div style={{
-                                padding: '6px 8px',
-                                background: inI751Window ? 'var(--gc-amber-soft)' : 'var(--gc-paper-soft)',
-                                border: `1px solid ${inI751Window ? 'var(--gc-amber-border)' : 'var(--gc-rule-soft)'}`,
-                                borderRadius: '3px',
-                                marginBottom: '6px',
-                              }}>
-                                <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: inI751Window ? 'var(--gc-amber-ink)' : 'var(--gc-muted)' }}>
-                                  I-751
-                                </div>
-                                <div style={{ fontSize: '11px', color: 'var(--gc-ink)', fontWeight: 600 }}>
-                                  {inI751Window
-                                    ? (lang === 'en' ? `⚠ File before ${fmtDate(i751End)}` : `⚠ ${fmtDate(i751End)} 前递交`)
-                                    : daysUntilI751 > 0
-                                    ? (lang === 'en' ? `${daysUntilI751} days to window` : `还有 ${daysUntilI751} 天开窗`)
-                                    : (lang === 'en' ? 'Window passed' : '窗口已过')}
-                                </div>
-                              </div>
-                            )}
-                            {/* N-400 mini-row */}
-                            <div style={{
-                              padding: '6px 8px',
-                              background: 'var(--gc-green-soft)',
-                              border: '1px solid var(--gc-green-border)',
-                              borderRadius: '3px',
-                            }}>
-                              <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-green-ink)' }}>
-                                N-400
-                              </div>
-                              {daysUntilN400 > 0 ? (
-                                <div style={{ fontSize: '11px', color: 'var(--gc-ink)', fontWeight: 600 }}>
-                                  <span className="gc-mono" style={{ fontSize: '14px', color: 'var(--gc-green-ink)', fontWeight: 700 }}>
-                                    {daysUntilN400.toLocaleString()}
-                                  </span>
-                                  {lang === 'en'
-                                    ? ` days to file (${fmtDate(n400Date)})`
-                                    : ` 天后可申请(${fmtDate(n400Date)})`}
-                                </div>
-                              ) : (
-                                <div style={{ fontSize: '11.5px', color: 'var(--gc-green-ink)', fontWeight: 700 }}>
-                                  {lang === 'en' ? '✓ Eligible now!' : '✓ 现在可申请!'}
-                                </div>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => { setShowGreenCardInfo(false); handleTabChange('overview'); }}
-                              style={{
-                                marginTop: '8px', width: '100%',
-                                padding: '6px 8px',
-                                fontSize: '10.5px', fontWeight: 600,
-                                background: 'transparent',
-                                color: 'var(--gc-muted)',
-                                border: '1px solid var(--gc-rule)',
-                                borderRadius: '3px',
-                                cursor: 'pointer',
-                                letterSpacing: '0.01em',
-                              }}>
-                              {lang === 'en' ? 'Open full dashboard →' : '打开完整面板 →'}
-                            </button>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
                 {/* Help — icon-led pill, sharp and balanced with the other header chips */}
                 <button onClick={() => setShowHelp(true)}
                   aria-label={lang === 'en' ? 'Help' : '帮助'}
-                  className="flex items-center active:opacity-80"
+                  title={lang === 'en' ? 'Help' : lang === 'tw' ? '幫助' : '帮助'}
+                  className="flex items-center justify-center active:opacity-80"
                   style={{
-                    gap: '5px',
-                    padding: '0 9px',
+                    width: '26px',
                     height: '26px',
                     background: 'var(--gc-surface)',
                     color: 'var(--gc-ink)',
                     border: '1px solid var(--gc-rule)',
-                    borderRadius: '13px',
-                    fontSize: '11px',
-                    fontWeight: 600,
+                    borderRadius: '50%',
                     cursor: 'pointer',
                     transition: 'all 140ms ease',
                     flexShrink: 0,
                     lineHeight: 1,
-                    whiteSpace: 'nowrap',
-                    letterSpacing: '0.01em',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'var(--gc-green)';
@@ -15817,8 +15661,7 @@ export default function App() {
                     e.currentTarget.style.color = 'var(--gc-ink)';
                     e.currentTarget.style.borderColor = 'var(--gc-rule)';
                   }}>
-                  <HelpCircle size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
-                  <span>{lang === 'en' ? 'Help' : lang === 'tw' ? '幫助' : '帮助'}</span>
+                  <HelpCircle size={14} strokeWidth={2} style={{ flexShrink: 0 }} />
                 </button>
 
                 <LangSwitcher />
