@@ -3365,6 +3365,7 @@ const ActionCenter = ({ userCase }) => {
   const inUS = !!userCase.inUS;
   const isEB = !userCase.category?.startsWith('F');
   const [openList, setOpenList] = useState(false);
+  const [roadmapOpen, setRoadmapOpen] = useState(false);
   const [checked, setChecked] = useState(() => {
     try { return JSON.parse(window.localStorage.getItem('gc_packChecklist')) || {}; } catch { return {}; }
   });
@@ -3538,16 +3539,20 @@ const ActionCenter = ({ userCase }) => {
         </div>
       </div>
 
-      {/* ② Roadmap */}
+      {/* ② Roadmap — collapsed by default: reference material, not a dashboard */}
       <div style={card}>
-        <div style={{ padding: '12px 14px 4px' }}>
-          <div className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
+        <button type="button" onClick={() => setRoadmapOpen((v) => !v)}
+          className="flex items-center justify-between"
+          style={{ width: '100%', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+          <span className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
             {inUS
               ? L('接下来 6 步 · 境内递件（I-485）', '接下來 6 步 · 境內遞件（I-485）', 'NEXT 6 STEPS · ADJUSTMENT (I-485)')
               : L('接下来 6 步 · 境外领事馆（CP）', '接下來 6 步 · 境外領事館（CP）', 'NEXT 6 STEPS · CONSULAR')}
-          </div>
-        </div>
-        <div style={{ padding: '6px 14px 12px' }}>
+          </span>
+          <span style={{ fontSize: '9px', color: 'var(--gc-muted)', transform: roadmapOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+        </button>
+        {roadmapOpen && (
+        <div style={{ padding: '0 14px 12px' }}>
           {steps.map(([tt, dd, dur], i) => (
             <div key={i} className="flex" style={{ gap: '10px', padding: '7px 0', borderBottom: i < steps.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none' }}>
               <span className="gc-mono flex-shrink-0" style={{
@@ -3570,6 +3575,7 @@ const ActionCenter = ({ userCase }) => {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* ③ Document checklist */}
@@ -4262,9 +4268,11 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
                   {p.days === 0 && (
                     <div style={{ width: '100%', maxWidth: '12px', height: '2px', background: 'var(--gc-subtle)', opacity: manual && !isSel ? 0.4 : 1 }} />
                   )}
-                  {p.days === null && (
+                  {p.days === null && (p.cutoff === 'C' ? (
+                    <span className="gc-mono" style={{ fontSize: '8px', lineHeight: '9px', fontWeight: 700, color: 'var(--gc-green)', opacity: manual && !isSel ? 0.4 : 0.85 }}>C</span>
+                  ) : (
                     <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid var(--gc-subtle)', marginBottom: '-1px' }} />
-                  )}
+                  ))}
                 </div>
                 {hasNegative && (
                   <div style={{ height: `${downPx}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
@@ -4335,6 +4343,12 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
           <span className="inline-flex items-center gap-1">
             <span style={{ width: '10px', height: '2px', background: 'var(--gc-green)', display: 'inline-block' }} />
             {lang === 'en' ? `${windowMonths}-mo cumulative (own scale)` : `${windowMonths}个月累计（独立比例）`}
+          </span>
+        )}
+        {points.some((p) => p.cutoff === 'C') && (
+          <span className="inline-flex items-center gap-1">
+            <span className="gc-mono" style={{ fontWeight: 700, color: 'var(--gc-green)' }}>C</span>
+            {lang === 'en' ? 'current, no queue' : lang === 'tw' ? '無需排隊' : '无需排队'}
           </span>
         )}
       </div>
