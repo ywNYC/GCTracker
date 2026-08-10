@@ -4892,26 +4892,6 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             </div>
                           </div>
                         )}
-                        {/* The pitch is segmented by how long this person is actually
-                            waiting: a 7-year wait and a 6-month wait need different
-                            reasons to hand over an email address. */}
-                        <InlineSubscribeCTA userCase={userCase} label={(() => {
-                          const yrs = yearsF;
-                          if (yrs !== null && yrs >= 3) {
-                            const yTxt = yrs.toFixed(1);
-                            return lang === 'en' ? `📮 ${yTxt} years is a long watch — we'll do it for you`
-                              : lang === 'tw' ? `📮 這一等就是 ${yTxt} 年，每月替你盯著`
-                              : `📮 这一等就是 ${yTxt} 年，每月替你盯着`;
-                          }
-                          if (yrs !== null && yrs < 1) {
-                            return lang === 'en' ? '📮 Almost there — get the email the day it opens'
-                              : lang === 'tw' ? '📮 快到了，遞件窗口一開就發郵件提醒你'
-                              : '📮 快到了，递件窗口一开就发邮件提醒你';
-                          }
-                          return lang === 'en' ? '📮 Get an email the moment this number moves'
-                            : lang === 'tw' ? '📮 這個數字一變，就發郵件告訴你'
-                            : '📮 这个数字一变，就发邮件告诉你';
-                        })()} />
                       </>
                     )}
                   </div>
@@ -5038,6 +5018,38 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           chart={heroChart || (filingAuthorized ? 'B' : 'A')}
           onChartChange={setHeroChart} />
       </div>
+
+      {/* Inline subscribe — moved out of the case card to sit under the movement
+          chart, where "watch this number for me" lands hardest. Waiting cases
+          only; the component hides itself once subscribed. */}
+      {!isActionable && (() => {
+        const selOut = heroChart || (filingAuthorized ? 'B' : 'A');
+        const stOut = selOut === 'B' ? filingStatus : finalActionStatus;
+        const calOut = stOut?.status === 'notCurrent' && stOut.days
+          ? paceDaysToCalendar(userCase.category, country, stOut.days, selOut === 'B' ? 'filing' : 'finalAction')
+          : null;
+        const yrs = calOut ? calOut / 365.25 : null;
+        let ctaLabel;
+        if (yrs !== null && yrs >= 3) {
+          const yTxt = yrs.toFixed(1);
+          ctaLabel = lang === 'en' ? `📮 ${yTxt} years is a long watch — we'll do it for you`
+            : lang === 'tw' ? `📮 這一等就是 ${yTxt} 年，每月替你盯著`
+            : `📮 这一等就是 ${yTxt} 年，每月替你盯着`;
+        } else if (yrs !== null && yrs < 1) {
+          ctaLabel = lang === 'en' ? '📮 Almost there — get the email the day it opens'
+            : lang === 'tw' ? '📮 快到了，遞件窗口一開就發郵件提醒你'
+            : '📮 快到了，递件窗口一开就发邮件提醒你';
+        } else {
+          ctaLabel = lang === 'en' ? '📮 Get an email the moment this number moves'
+            : lang === 'tw' ? '📮 這個數字一變，就發郵件告訴你'
+            : '📮 这个数字一变，就发邮件告诉你';
+        }
+        return (
+          <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '0 14px 12px' }}>
+            <InlineSubscribeCTA userCase={userCase} label={ctaLabel} />
+          </div>
+        );
+      })()}
 
       {/* I-485 Progress — only once it's actionable: your date has arrived (or you
           have already logged steps). A 0/6 checklist promising dates seven years out
