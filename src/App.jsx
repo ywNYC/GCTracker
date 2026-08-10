@@ -1803,7 +1803,7 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
 // a day grid. Same fixed-position pattern as CategoryDropdown (ancestors clip absolute
 // panels with their overflow:hidden animations).
 // ============================================================
-const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
+const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, placeholder = '' }) => {
   const { lang } = useLang();
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
@@ -1813,7 +1813,10 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
   const [view, setView] = useState('ymd');
   const wrapRef = useRef(null);
   const panelRef = useRef(null);
-  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '') || [null, '2020', '01', '01'];
+  const rawParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+  const hasValue = !!rawParts;
+  // Empty + allowEmpty: the panel still needs a cursor position — default to今年.
+  const parts = rawParts || [null, String(new Date().getFullYear()), '01', '01'];
   const y = parseInt(parts[1], 10);
   const m = parseInt(parts[2], 10);
   const d = parseInt(parts[3], 10);
@@ -1861,9 +1864,11 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
   const days = [];
   for (let dd = 1; dd <= dim; dd++) days.push(dd);
 
-  const fmt = lang === 'en'
-    ? new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-    : `${y}年${m}月${d}日`;
+  const fmt = hasValue
+    ? (lang === 'en'
+        ? new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+        : `${y}年${m}月${d}日`)
+    : (placeholder || (lang === 'en' ? 'Select date' : lang === 'tw' ? '選擇日期' : '选择日期'));
 
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
@@ -1894,8 +1899,14 @@ const DateDropdown = ({ value, onChange, triggerStyle = {} }) => {
           borderRadius: '3px', cursor: 'pointer',
           ...triggerStyle,
         }}>
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fmt}</span>
-        <span style={{ flexShrink: 0, color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: hasValue ? 'inherit' : 'var(--gc-muted)', fontWeight: hasValue ? 'inherit' : 400 }}>{fmt}</span>
+        <span className="flex items-center flex-shrink-0" style={{ gap: '6px' }}>
+          {allowEmpty && hasValue && (
+            <span role="button" onClick={(e) => { e.stopPropagation(); onChange(''); setOpen(false); }}
+              style={{ color: 'var(--gc-muted)', fontSize: '11px', lineHeight: 1, padding: '2px' }}>✕</span>
+          )}
+          <span style={{ color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+        </span>
       </button>
       {open && rect && createPortal(
         <div ref={panelRef} className="visa-root" data-theme={currentThemeAttr()} style={{
@@ -3639,8 +3650,12 @@ const ActionCenter = ({ userCase }) => {
             ) : null}
 
             {tlState === 'done' ? (
-              <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 600, marginBottom: '8px' }}>
-                {L('时间线已提交 ✓ 谢谢你帮到了后来人', '時間線已提交 ✓ 謝謝', 'Timeline submitted ✓')}
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 600 }}>
+                  {L('时间线已提交 ✓ 谢谢你帮到了后来人', '時間線已提交 ✓ 謝謝', 'Timeline submitted ✓')}
+                </div>
+                <InlineSubscribeCTA userCase={userCase}
+                  label={L('订阅后，你类别的时间线统计每月发到你邮箱', '訂閱後，你類別的時間線統計每月發到你信箱', 'Get your category\'s timeline stats by email monthly')} />
               </div>
             ) : (
               <>
@@ -3653,13 +3668,14 @@ const ActionCenter = ({ userCase }) => {
                   {[['filed', L('递件日 *', '遞件日 *', 'Filed *')], ['receipt', L('收据', '收據', 'Receipt')],
                     ['biometrics', L('打指模', '打指模', 'Biometrics')], ['ead', L('EAD 到手', 'EAD 到手', 'EAD')],
                     ['interview', L('面试', '面試', 'Interview')], ['approved', L('批准', '批准', 'Approved')]].map(([k, label]) => (
-                    <label key={k} style={{ fontSize: '9.5px', color: 'var(--gc-muted)' }}>
+                    <div key={k} style={{ fontSize: '9.5px', color: 'var(--gc-muted)' }}>
                       {label}
-                      <input type="date" value={tlDates[k]}
-                        onChange={(e) => setTlDates({ ...tlDates, [k]: e.target.value })}
-                        className="gc-mono"
-                        style={{ display: 'block', width: '100%', boxSizing: 'border-box', fontSize: '11px', padding: '4px 6px', marginTop: '2px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-surface)', color: 'var(--gc-ink)' }} />
-                    </label>
+                      <div style={{ marginTop: '2px' }}>
+                        <DateDropdown allowEmpty value={tlDates[k]}
+                          onChange={(v) => setTlDates({ ...tlDates, [k]: v })}
+                          triggerStyle={{ padding: '5px 7px', fontSize: '11px' }} />
+                      </div>
+                    </div>
                   ))}
                 </div>
                 <div className="flex items-center" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
@@ -3747,7 +3763,7 @@ const CommunityHub = ({ userCase }) => {
   const { lang } = useLang();
   const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
   const isEB = !userCase.category?.startsWith('F');
-  const [tab, setTab] = useState('poll'); // poll | wall | survey
+  const [tab, setTab] = useState(null); // null = collapsed | poll | wall | survey
   const [busy, setBusy] = useState('');
 
   const post = async (payload, doneKey) => {
@@ -3777,7 +3793,15 @@ const CommunityHub = ({ userCase }) => {
   const vote = async (choice) => {
     if (await post({ type: 'poll', pollId: pollKey, choice }, pollKey)) {
       setVoted(true);
-      fetch(`/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json()).then(setPollAgg).catch(() => {});
+      // Optimistic: KV's list index lags writes by up to a minute — the voter must
+      // still see their own vote in the bars immediately.
+      setPollAgg((prev) => {
+        const base = prev || { total: 0, choices: {} };
+        return { total: base.total + 1, choices: { ...base.choices, [choice]: (base.choices[choice] || 0) + 1 } };
+      });
+      fetch(`/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json())
+        .then((data) => setPollAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
+        .catch(() => {});
     }
   };
 
@@ -3803,8 +3827,14 @@ const CommunityHub = ({ userCase }) => {
 
   // surveys
   const [swAction, setSwAction] = useState(null);
+  const [swAgg, setSwAgg] = useState(null);
   const [swOutcome, setSwOutcome] = useState(null);
   const [swDone, setSwDone] = useState(() => done('switch'));
+  useEffect(() => {
+    if (tab === 'survey' && swDone && !swAgg) {
+      fetch(`/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json()).then(setSwAgg).catch(() => {});
+    }
+  }, [tab, swDone]); // eslint-disable-line react-hooks/exhaustive-deps
   const [costDone, setCostDone] = useState(() => done('cost'));
   const [qText, setQText] = useState('');
   const [qDone, setQDone] = useState(() => done('question'));
@@ -3827,7 +3857,7 @@ const CommunityHub = ({ userCase }) => {
         </span>
         <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
           {[['poll', L('每月一题', '每月一題', 'Poll')], ['wall', L('打卡墙', '打卡牆', 'Wall')], ['survey', L('调查·提问', '調查·提問', 'Surveys')]].map(([id, label], i) => (
-            <button key={id} type="button" onClick={() => setTab(id)}
+            <button key={id} type="button" onClick={() => setTab(tab === id ? null : id)}
               style={{
                 fontSize: '10px', fontWeight: 700, padding: '3px 9px', border: 'none', cursor: 'pointer',
                 borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
@@ -3838,6 +3868,8 @@ const CommunityHub = ({ userCase }) => {
         </span>
       </div>
 
+      {tab === null && <div style={{ height: '11px' }} />}
+      {tab !== null && (
       <div style={{ padding: '10px 14px 13px' }}>
         {tab === 'poll' && (
           <div>
@@ -3939,12 +3971,47 @@ const CommunityHub = ({ userCase }) => {
                     )}
                     {swAction && (swAction === 'none' || swOutcome) && (
                       <button type="button" style={submitBtn} disabled={busy === 'switch'}
-                        onClick={async () => { if (await post({ type: 'switch', action: swAction, outcome: swOutcome }, 'switch')) setSwDone(true); }}>
+                        onClick={async () => {
+                          if (await post({ type: 'switch', action: swAction, outcome: swOutcome }, 'switch')) {
+                            setSwDone(true);
+                            setSwAgg((prev) => {
+                              const base = prev || { total: 0, actions: {} };
+                              return { total: base.total + 1, actions: { ...base.actions, [swAction]: (base.actions[swAction] || 0) + 1 } };
+                            });
+                            fetch(`/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json())
+                              .then((data) => setSwAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
+                              .catch(() => {});
+                          }
+                        }}>
                         {L('匿名提交', '匿名提交', 'Submit')}
                       </button>
                     )}
                   </>
-                ) : doneNote(L('已提交 ✓ 谢谢', '已提交 ✓ 謝謝', 'Submitted ✓'))}
+                ) : (
+                  <div>
+                    {doneNote(L('已提交 ✓', '已提交 ✓', 'Submitted ✓'))}
+                    {swAgg && swAgg.total > 0 && (
+                      <div style={{ marginTop: '5px' }}>
+                        {[['downgrade', L('降级 EB-3', '降級 EB-3', 'Downgrade')], ['porting', L('换雇主', '換雇主', 'Port')], ['premium', L('加急', '加急', 'Premium')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => {
+                          const n = swAgg.actions?.[id] || 0;
+                          const pct = swAgg.total ? Math.round((n / swAgg.total) * 100) : 0;
+                          return (
+                            <div key={id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
+                              <span style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
+                              <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
+                              </span>
+                              <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
+                            </div>
+                          );
+                        })}
+                        <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '3px' }}>
+                          {L(`${swAgg.total} 份 · 匿名`, `${swAgg.total} 份 · 匿名`, `${swAgg.total} responses`)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -3980,7 +4047,14 @@ const CommunityHub = ({ userCase }) => {
             </div>
           </div>
         )}
+        {(voted || walled || swDone || costDone || qDone) && (
+          <div style={{ marginTop: '4px' }}>
+            <InlineSubscribeCTA userCase={userCase}
+              label={L('这批社区数据的完整分析，每月随排期邮件发出', '這批社區數據的完整分析，每月隨排期郵件發出', 'Full analysis of this data ships with the monthly email')} />
+          </div>
+        )}
       </div>
+      )}
     </div>
   );
 };
@@ -5509,36 +5583,16 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                                 {lang === 'en' ? '← actual date' : '← 实际日期'}
                               </span>
                             )}
-                            <input
-                              type="date"
-                              value={stepActualDates[step.id] || ''}
-                              onChange={(e) => {
-                                const val = e.target.value || null;
+                            <span style={{ minWidth: '132px', display: 'inline-block' }}>
+                            <DateDropdown allowEmpty value={stepActualDates[step.id] || ''}
+                              onChange={(val) => {
                                 const next = { ...stepActualDates };
                                 if (val) next[step.id] = val;
                                 else delete next[step.id];
                                 setStepActualDates(next);
                               }}
-                              onClick={(e) => e.stopPropagation()}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onTouchStart={(e) => e.stopPropagation()}
-                              aria-label={(lang === 'en' ? 'Actual date: ' : '实际日期: ') + step.title}
-                              className="gc-mono"
-                              style={{
-                                fontSize: '10px',
-                                fontWeight: 600,
-                                color: stepActualDates[step.id] ? 'var(--gc-green-ink)' : 'var(--gc-muted)',
-                                background: stepActualDates[step.id] ? 'var(--gc-green-soft)' : 'var(--gc-paper)',
-                                border: '1.5px dashed ' + (stepActualDates[step.id] ? 'var(--gc-green)' : 'var(--gc-rule)'),
-                                borderRadius: '3px',
-                                padding: '3px 5px',
-                                cursor: 'pointer',
-                                letterSpacing: '0.01em',
-                                WebkitAppearance: 'none',
-                                MozAppearance: 'textfield',
-                                minWidth: '110px',
-                              }}
-                            />
+                              triggerStyle={{ padding: '3px 6px', fontSize: '10.5px' }} />
+                          </span>
                           </div>
                         ) : (
                           <span className="gc-mono" style={{
@@ -5701,21 +5755,11 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                           <span style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', flexShrink: 0 }}>
                             {lang === 'en' ? 'Approval date:' : lang === 'tw' ? '獲批日:' : '获批日:'}
                           </span>
-                          <input
-                            type="date"
-                            value={greenCardInfo.approvalDate || ''}
-                            onChange={(e) => setGreenCardInfo({ ...greenCardInfo, approvalDate: e.target.value })}
-                            className="gc-mono"
-                            style={{
-                              fontSize: '11px',
-                              padding: '3px 6px',
-                              border: '1px solid var(--gc-rule)',
-                              borderRadius: '3px',
-                              background: 'var(--gc-surface)',
-                              color: 'var(--gc-ink)',
-                              fontWeight: 600,
-                            }}
-                          />
+                          <span style={{ minWidth: '150px', display: 'inline-block' }}>
+                            <DateDropdown allowEmpty value={greenCardInfo.approvalDate || ''}
+                              onChange={(v) => setGreenCardInfo({ ...greenCardInfo, approvalDate: v })}
+                              triggerStyle={{ padding: '4px 7px', fontSize: '11px' }} />
+                          </span>
                         </div>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '11px', color: 'var(--gc-ink-soft)' }}>
                           <input
@@ -5943,31 +5987,19 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                                   borderTop: travelRecords.length > 0 ? '1px solid var(--gc-rule-soft)' : 'none',
                                   flexWrap: 'wrap',
                                 }}>
-                                  <input
-                                    type="date"
-                                    value={newTripFrom}
-                                    onChange={(e) => setNewTripFrom(e.target.value)}
-                                    placeholder={lang === 'en' ? 'Left US' : '离开日'}
-                                    style={{
-                                      flex: '1 1 100px', minWidth: 0,
-                                      fontSize: '11px', padding: '4px 6px',
-                                      border: '1px solid var(--gc-rule)', borderRadius: '3px',
-                                      background: 'var(--gc-surface)',
-                                    }}
-                                  />
+                                  <span style={{ flex: '1 1 110px', minWidth: 0, display: 'inline-block' }}>
+                                    <DateDropdown allowEmpty value={newTripFrom}
+                                      onChange={(v) => setNewTripFrom(v)}
+                                      placeholder={lang === 'en' ? 'Left US' : '离开日'}
+                                      triggerStyle={{ padding: '4px 6px', fontSize: '11px' }} />
+                                  </span>
                                   <span style={{ color: 'var(--gc-muted)', fontSize: '11px' }}>→</span>
-                                  <input
-                                    type="date"
-                                    value={newTripTo}
-                                    onChange={(e) => setNewTripTo(e.target.value)}
-                                    placeholder={lang === 'en' ? 'Returned' : '返回日'}
-                                    style={{
-                                      flex: '1 1 100px', minWidth: 0,
-                                      fontSize: '11px', padding: '4px 6px',
-                                      border: '1px solid var(--gc-rule)', borderRadius: '3px',
-                                      background: 'var(--gc-surface)',
-                                    }}
-                                  />
+                                  <span style={{ flex: '1 1 110px', minWidth: 0, display: 'inline-block' }}>
+                                    <DateDropdown allowEmpty value={newTripTo}
+                                      onChange={(v) => setNewTripTo(v)}
+                                      placeholder={lang === 'en' ? 'Returned' : '返回日'}
+                                      triggerStyle={{ padding: '4px 6px', fontSize: '11px' }} />
+                                  </span>
                                   <button
                                     disabled={!newTripFrom || !newTripTo || newTripTo < newTripFrom}
                                     onClick={() => {
@@ -7317,9 +7349,8 @@ const CompareByCountry = ({ userCase }) => {
           <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
             {t.comparePD}
           </label>
-          <input type="date" value={comparePD} onChange={(e) => setComparePD(e.target.value)}
-            style={{ boxSizing: 'border-box', width: '100%', maxWidth: '100%' }}
-            className="px-2 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          <DateDropdown value={comparePD} onChange={(v) => setComparePD(v)}
+            triggerStyle={{ padding: '7px 9px', fontSize: '12px' }} />
         </div>
       </div>
 
