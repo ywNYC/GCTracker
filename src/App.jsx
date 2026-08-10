@@ -5723,19 +5723,9 @@ const AboutTab = () => {
               ? '全美房屋貸款：自住與投資、購房與重貸。要安家置業，歡迎聊聊。'
               : '全美房屋贷款：自住与投资、购房与重贷。要安家置业，欢迎聊聊。'}
         </p>
-        <div className="flex" style={{ gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <div className="flex" style={{ gap: '8px', flexWrap: 'wrap', flex: '1 1 190px', minWidth: 0 }}>
-            <CopyChip label={lang === 'en' ? 'WeChat' : '微信'} value="yiaccount" />
-            <CopyChip label={lang === 'en' ? 'XHS ID' : '小红书号'} value="49330048750" />
-          </div>
-          <div style={{ textAlign: 'center', flexShrink: 0 }}>
-            <img src="/jack-xhs-qr.png" alt="小红书二维码"
-              onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
-              style={{ width: '96px', height: '96px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: '#fff', display: 'block' }} />
-            <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '4px', lineHeight: 1.4 }}>
-              {lang === 'en' ? <>Long-press to save,<br />scan in XHS</> : lang === 'tw' ? <>長按儲存，<br />用小紅書掃碼</> : <>长按保存，<br />用小红书扫码</>}
-            </div>
-          </div>
+        <div className="flex" style={{ gap: '8px', flexWrap: 'wrap' }}>
+          <CopyChip label={lang === 'en' ? 'WeChat' : '微信'} value="yiaccount" />
+          <CopyChip label={lang === 'en' ? 'XHS ID' : '小红书号'} value="49330048750" />
         </div>
         <p style={{ fontSize: '10px', color: 'var(--gc-muted)', margin: '8px 0 0' }}>
           {lang === 'en' ? 'Mortgage services are independent of this site\'s bulletin data. Not financial advice.' : lang === 'tw' ? '貸款服務與本站排期資料相互獨立，不構成金融建議。' : '贷款服务与本站排期数据相互独立，不构成金融建议。'}
