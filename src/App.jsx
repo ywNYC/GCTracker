@@ -5610,6 +5610,61 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 // ============================================================
 // Monthly Update
 // ============================================================
+// CopyChip — tap-to-copy contact chip. WeChat/XHS in-app browsers often lack
+// navigator.clipboard (non-secure context), so fall back to a hidden textarea +
+// execCommand; if even that fails the chip selects its text so a long-press copy
+// still works. Confirmation is inline — no toast layer to maintain.
+const CopyChip = ({ label, value, hint }) => {
+  const { lang } = useLang();
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+        ok = true;
+      }
+    } catch { /* fall through */ }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:absolute;left:-9999px;top:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, value.length);
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch { /* noop */ }
+    }
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    }
+  };
+  return (
+    <button type="button" onClick={copy}
+      className="flex items-center gc-mono"
+      style={{
+        gap: '7px', fontSize: '11px', cursor: 'pointer', textAlign: 'left',
+        border: `1px solid ${copied ? 'var(--gc-green)' : 'var(--gc-green-border)'}`,
+        background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)',
+        borderRadius: '3px', padding: '7px 10px',
+      }}>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ color: 'var(--gc-muted)' }}>{label}</span>{' '}
+        <b style={{ userSelect: 'all' }}>{value}</b>
+      </span>
+      <span style={{ flexShrink: 0, fontWeight: 700, fontSize: '10px', color: 'var(--gc-green)' }}>
+        {copied
+          ? (lang === 'en' ? 'COPIED ✓' : lang === 'tw' ? '已複製 ✓' : '已复制 ✓')
+          : (hint || (lang === 'en' ? 'COPY' : lang === 'tw' ? '複製' : '复制'))}
+      </span>
+    </button>
+  );
+};
+
 // ============================================================
 // AboutTab — what this site is, where the data comes from, and the placeholder for
 // the future partners/sponsorship slot (mortgage / immigration-attorney referrals).
@@ -5668,18 +5723,54 @@ const AboutTab = () => {
               ? '全美房屋貸款：自住與投資、購房與重貸。要安家置業，歡迎聊聊。'
               : '全美房屋贷款：自住与投资、购房与重贷。要安家置业，欢迎聊聊。'}
         </p>
-        <div className="flex" style={{ gap: '8px', flexWrap: 'wrap' }}>
-          <span className="gc-mono" style={{ fontSize: '11px', border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)', borderRadius: '3px', padding: '6px 10px' }}>
-            小红书 Jack｜全美房贷 MLO · 号 49330048750
-          </span>
-          <span className="gc-mono" style={{ fontSize: '11px', border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)', borderRadius: '3px', padding: '6px 10px' }}>
-            微信 yiaccount
-          </span>
+        <div className="flex" style={{ gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div className="flex" style={{ gap: '8px', flexWrap: 'wrap', flex: '1 1 190px', minWidth: 0 }}>
+            <CopyChip label={lang === 'en' ? 'WeChat' : '微信'} value="yiaccount" />
+            <CopyChip label={lang === 'en' ? 'XHS ID' : '小红书号'} value="49330048750" />
+          </div>
+          <div style={{ textAlign: 'center', flexShrink: 0 }}>
+            <img src="/jack-xhs-qr.png" alt="小红书二维码"
+              onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
+              style={{ width: '96px', height: '96px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: '#fff', display: 'block' }} />
+            <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '4px', lineHeight: 1.4 }}>
+              {lang === 'en' ? <>Long-press to save,<br />scan in XHS</> : lang === 'tw' ? <>長按儲存，<br />用小紅書掃碼</> : <>长按保存，<br />用小红书扫码</>}
+            </div>
+          </div>
         </div>
         <p style={{ fontSize: '10px', color: 'var(--gc-muted)', margin: '8px 0 0' }}>
           {lang === 'en' ? 'Mortgage services are independent of this site\'s bulletin data. Not financial advice.' : lang === 'tw' ? '貸款服務與本站排期資料相互獨立，不構成金融建議。' : '贷款服务与本站排期数据相互独立，不构成金融建议。'}
         </p>
       </div>
+      {/* Sister site — same builder, adjacent need (rates decide the mortgage you'll
+          carry once the wait ends). Keeps traffic inside the JMJ family. */}
+      <a href="https://rate.jmjvc.us" target="_blank" rel="noopener noreferrer"
+        style={{ ...card, display: 'block', textDecoration: 'none', background: 'var(--gc-paper-soft)' }}>
+        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'Also by the builder' : lang === 'tw' ? '站長的其他作品' : '站长的其他作品'}</div>
+        <div className="flex items-center justify-between" style={{ gap: '10px' }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="gc-serif" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+              {lang === 'en' ? 'Rate Navigator' : lang === 'tw' ? '利率導航 · Rate Navigator' : '利率导航 · Rate Navigator'}
+            </div>
+            <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-green)', marginTop: '2px' }}>
+              rate.jmjvc.us →
+            </div>
+          </div>
+          <span className="gc-mono flex-shrink-0" style={{
+            fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em',
+            border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)',
+            color: 'var(--gc-green-ink)', borderRadius: '11px', padding: '4px 10px',
+          }}>
+            {lang === 'en' ? 'FREE TOOL' : lang === 'tw' ? '免費工具' : '免费工具'}
+          </span>
+        </div>
+        <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: '8px 0 0' }}>
+          {lang === 'en'
+            ? 'Another free tool by the same builder — U.S. interest rates on one page. The wait and the rate are linked: whatever the rate is when your date arrives decides the payment you carry for the next 30 years.'
+            : lang === 'tw'
+              ? '同一個作者做的另一個免費工具：把美國利率放在一頁看清楚。等排期與看利率其實是同一件事——排期到了要買房，那時的利率決定你之後 30 年的月供。'
+              : '同一个作者做的另一个免费工具：把美国利率放在一页看清楚。等排期与看利率其实是同一件事——排期到了要买房，那时的利率决定你之后 30 年的月供。'}
+        </p>
+      </a>
       <div style={{ ...card, borderStyle: 'dashed', background: 'var(--gc-paper-soft)' }}>
         <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'Partner slots · open' : lang === 'tw' ? '合作欄位 · 長期招募' : '合作栏位 · 长期招募'}</div>
         <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: 0 }}>
