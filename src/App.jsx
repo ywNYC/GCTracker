@@ -3363,29 +3363,52 @@ const ActionCenter = ({ userCase }) => {
     try { window.localStorage.setItem('gc_packChecklist', JSON.stringify(next)); } catch { /* noop */ }
   };
 
-  // ---- crowd progress ----
+  // ---- crowd timeline + RFE ----
   const [crowdOpen, setCrowdOpen] = useState(false);
-  const [agg, setAgg] = useState(null);
-  const [repMonth, setRepMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [repMilestone, setRepMilestone] = useState('filed');
-  const [repState, setRepState] = useState(''); // '' | 'loading' | 'done' | 'error'
+  const [tlAgg, setTlAgg] = useState(null);
+  const [rfeAgg, setRfeAgg] = useState(null);
+  const [tlDates, setTlDates] = useState({ filed: '', receipt: '', biometrics: '', ead: '', interview: '', approved: '' });
+  const [tlCenter, setTlCenter] = useState('unknown');
+  const [tlState, setTlState] = useState(''); // '' | 'loading' | 'done' | 'error'
+  const [rfeGot, setRfeGot] = useState(null); // null | false | true
+  const [rfeType, setRfeType] = useState(null);
+  const [rfeDone, setRfeDone] = useState(() => {
+    try { return !!window.localStorage.getItem('gc_cd_rfe'); } catch { return false; }
+  });
   useEffect(() => {
-    if (!crowdOpen || agg) return;
-    fetch(`/api/progress?cat=${userCase.category}`)
-      .then((r) => r.json()).then(setAgg).catch(() => setAgg({ total: 0, byMilestone: {} }));
+    if (!crowdOpen || tlAgg) return;
+    fetch(`/api/community?type=timeline&cat=${userCase.category}`)
+      .then((r) => r.json()).then(setTlAgg).catch(() => setTlAgg({ total: 0 }));
+    fetch(`/api/community?type=rfe&cat=${userCase.category}`)
+      .then((r) => r.json()).then(setRfeAgg).catch(() => {});
   }, [crowdOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-  const submitReport = async () => {
-    setRepState('loading');
+  const submitTimeline = async () => {
+    if (!tlDates.filed) return;
+    setTlState('loading');
     try {
-      const r = await fetch('/api/progress', {
+      const dates = {};
+      Object.entries(tlDates).forEach(([k, v]) => { if (v) dates[k] = v; });
+      const r = await fetch('/api/community', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cat: userCase.category, country: userCase.country, filedMonth: repMonth, milestone: repMilestone }),
+        body: JSON.stringify({ type: 'timeline', cat: userCase.category, country: userCase.country, path: inUS ? 'aos' : 'cp', center: tlCenter, dates }),
       });
       if (!r.ok) throw new Error();
-      setRepState('done');
-      try { window.localStorage.setItem('gc_progressReported', JSON.stringify({ m: repMonth, ms: repMilestone, at: Date.now() })); } catch { /* noop */ }
-      setAgg(null); // refetch on next open
-    } catch { setRepState('error'); setTimeout(() => setRepState(''), 2500); }
+      setTlState('done');
+      try { window.localStorage.setItem('gc_cd_timeline', '1'); } catch { /* noop */ }
+      setTlAgg(null); // refetch
+    } catch { setTlState('error'); setTimeout(() => setTlState(''), 2500); }
+  };
+  const submitRfe = async (got, type2) => {
+    try {
+      const r = await fetch('/api/community', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'rfe', cat: userCase.category, country: userCase.country, got, rfeType: type2 }),
+      });
+      if (r.ok) {
+        setRfeDone(true);
+        try { window.localStorage.setItem('gc_cd_rfe', '1'); } catch { /* noop */ }
+      }
+    } catch { /* noop */ }
   };
 
   const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' };
@@ -3578,76 +3601,123 @@ const ActionCenter = ({ userCase }) => {
         )}
       </div>
 
-      {/* ④ Crowd progress (minimal v1) */}
+      {/* ④ Crowd timeline + RFE — the dataset nobody else has in Chinese */}
       <div style={card}>
         <button type="button" onClick={() => setCrowdOpen((v) => !v)}
           className="flex items-center justify-between"
           style={{ width: '100%', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
           <span className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
-            {L('递件互助进度（匿名）', '遞件互助進度（匿名）', 'CROWD PROGRESS (ANONYMOUS)')}
+            {L('真实时间线互助（匿名）', '真實時間線互助（匿名）', 'REAL TIMELINES (ANONYMOUS)')}
+            {tlAgg && tlAgg.total > 0 && (
+              <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--gc-green)', letterSpacing: 0, textTransform: 'none' }}>
+                {tlAgg.total}
+              </span>
+            )}
           </span>
           <span style={{ fontSize: '9px', color: 'var(--gc-muted)', transform: crowdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
         </button>
         {crowdOpen && (
           <div style={{ padding: '0 14px 12px' }}>
-            <div style={{ fontSize: '11px', lineHeight: 1.6, color: 'var(--gc-ink-soft)', marginBottom: '8px' }}>
-              {L('报一下你的递件月份和进展（完全匿名，不留邮箱不留案号），帮同类别的后来人看清真实时间线。',
-                 '報一下你的遞件月份和進展（完全匿名），幫同類別的後來人看清真實時間線。',
-                 'Report your filing month and stage — fully anonymous — so others in your category can see real timelines.')}
-            </div>
-            <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <input type="month" value={repMonth} min="2020-01" max={new Date().toISOString().slice(0, 7)}
-                onChange={(e) => setRepMonth(e.target.value)}
-                className="gc-mono"
-                style={{ fontSize: '11px', padding: '5px 7px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-surface)', color: 'var(--gc-ink)' }} />
-              <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden', flexWrap: 'wrap' }}>
-                {AC_MILESTONES.map((m, mi) => (
-                  <button key={m.id} type="button" onClick={() => setRepMilestone(m.id)}
-                    style={{
-                      fontSize: '10px', fontWeight: 700, padding: '5px 8px', border: 'none', cursor: 'pointer',
-                      borderLeft: mi === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                      background: repMilestone === m.id ? 'var(--gc-green)' : 'var(--gc-surface)',
-                      color: repMilestone === m.id ? 'var(--gc-paper)' : 'var(--gc-muted)',
-                    }}>
-                    {lang === 'en' ? m.en : lang === 'tw' ? m.tw : m.zh}
+            {/* aggregates first — give before you ask */}
+            {tlAgg && tlAgg.total >= 3 ? (
+              <div style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--gc-green-soft)', borderRadius: '3px' }}>
+                <div style={{ fontSize: '10.5px', color: 'var(--gc-green-ink)', fontWeight: 700, marginBottom: '3px' }}>
+                  {L(`${userCase.category} · ${tlAgg.total} 份真实时间线`, `${userCase.category} · ${tlAgg.total} 份真實時間線`, `${userCase.category} · ${tlAgg.total} real timelines`)}
+                </div>
+                <div className="gc-mono" style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', lineHeight: 1.7 }}>
+                  {tlAgg.medians?.receipt !== null && tlAgg.counts?.receipt >= 3 && <div>{L('递件→收据 中位 ', '遞件→收據 中位 ', 'filed→receipt median ')}{tlAgg.medians.receipt}{L(' 天', ' 天', 'd')}</div>}
+                  {tlAgg.medians?.ead !== null && tlAgg.counts?.ead >= 3 && <div>{L('递件→EAD 中位 ', '遞件→EAD 中位 ', 'filed→EAD median ')}{tlAgg.medians.ead}{L(' 天', ' 天', 'd')}</div>}
+                  {tlAgg.medians?.approved !== null && tlAgg.counts?.approved >= 3 && <div>{L('递件→批准 中位 ', '遞件→批准 中位 ', 'filed→approved median ')}{tlAgg.medians.approved}{L(' 天', ' 天', 'd')}</div>}
+                </div>
+              </div>
+            ) : tlAgg ? (
+              <div style={{ marginBottom: '10px', fontSize: '10.5px', color: 'var(--gc-muted)' }}>
+                {L(`${userCase.category} 已收集 ${tlAgg.total || 0} 份时间线，满 3 份后显示中位耗时。`,
+                   `${userCase.category} 已收集 ${tlAgg.total || 0} 份時間線，滿 3 份後顯示中位耗時。`,
+                   `${tlAgg.total || 0} timeline(s) so far — medians appear at 3+.`)}
+              </div>
+            ) : null}
+
+            {tlState === 'done' ? (
+              <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 600, marginBottom: '8px' }}>
+                {L('时间线已提交 ✓ 谢谢你帮到了后来人', '時間線已提交 ✓ 謝謝', 'Timeline submitted ✓')}
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', marginBottom: '7px', lineHeight: 1.55 }}>
+                  {L('报你的关键日期（记得几个填几个，完全匿名），后来人就能看到真实的处理耗时：',
+                     '報你的關鍵日期（記得幾個填幾個，完全匿名）：',
+                     'Report the dates you know — fully anonymous:')}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '7px' }}>
+                  {[['filed', L('递件日 *', '遞件日 *', 'Filed *')], ['receipt', L('收据', '收據', 'Receipt')],
+                    ['biometrics', L('打指模', '打指模', 'Biometrics')], ['ead', L('EAD 到手', 'EAD 到手', 'EAD')],
+                    ['interview', L('面试', '面試', 'Interview')], ['approved', L('批准', '批准', 'Approved')]].map(([k, label]) => (
+                    <label key={k} style={{ fontSize: '9.5px', color: 'var(--gc-muted)' }}>
+                      {label}
+                      <input type="date" value={tlDates[k]}
+                        onChange={(e) => setTlDates({ ...tlDates, [k]: e.target.value })}
+                        className="gc-mono"
+                        style={{ display: 'block', width: '100%', boxSizing: 'border-box', fontSize: '11px', padding: '4px 6px', marginTop: '2px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-surface)', color: 'var(--gc-ink)' }} />
+                    </label>
+                  ))}
+                </div>
+                <div className="flex items-center" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{inUS ? L('服务中心', '服務中心', 'Service center') : L('领事馆', '領事館', 'Consulate')}</span>
+                  <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden', flexWrap: 'wrap' }}>
+                    {(inUS
+                      ? [['unknown', L('不确定', '不確定', 'N/A')], ['NSC', 'NSC'], ['TSC', 'TSC'], ['Potomac', 'Potomac'], ['MSC', 'MSC'], ['other-center', L('其他', '其他', 'Other')]]
+                      : [['guangzhou', L('广州', '廣州', 'Guangzhou')], ['other-consulate', L('其他', '其他', 'Other')]]
+                    ).map(([id, label], ci) => (
+                      <button key={id} type="button" onClick={() => setTlCenter(id)}
+                        style={{
+                          fontSize: '10px', fontWeight: 700, padding: '4px 8px', border: 'none', cursor: 'pointer',
+                          borderLeft: ci === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                          background: tlCenter === id ? 'var(--gc-green)' : 'var(--gc-surface)',
+                          color: tlCenter === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                        }}>{label}</button>
+                    ))}
+                  </span>
+                  <button type="button" onClick={submitTimeline} disabled={!tlDates.filed || tlState === 'loading'}
+                    style={{ fontSize: '11px', fontWeight: 700, padding: '6px 12px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: tlDates.filed ? 'var(--gc-green)' : 'var(--gc-rule)', color: 'var(--gc-paper)' }}>
+                    {tlState === 'loading' ? '…' : L('匿名提交', '匿名提交', 'Submit')}
                   </button>
-                ))}
-              </span>
-              <button type="button" onClick={submitReport} disabled={repState === 'loading' || repState === 'done'}
-                style={{ fontSize: '11px', fontWeight: 700, padding: '6px 12px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: repState === 'done' ? 'var(--gc-green-soft)' : 'var(--gc-green)', color: repState === 'done' ? 'var(--gc-green-ink)' : 'var(--gc-paper)' }}>
-                {repState === 'done' ? L('已提交 ✓', '已提交 ✓', 'Sent ✓') : repState === 'loading' ? '…' : L('匿名提交', '匿名提交', 'Submit')}
-              </button>
-            </div>
-            {repState === 'error' && (
-              <div style={{ fontSize: '10px', color: 'var(--gc-red)', marginTop: '4px' }}>{L('提交失败，稍后再试', '提交失敗，稍後再試', 'Failed — try again later')}</div>
+                </div>
+                {tlState === 'error' && (
+                  <div style={{ fontSize: '10px', color: 'var(--gc-red)', marginBottom: '6px' }}>{L('提交失败，检查递件日是否早于其他日期', '提交失敗', 'Failed — check that filed is the earliest date')}</div>
+                )}
+              </>
             )}
-            <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--gc-rule-soft)' }}>
-              {agg === null ? (
-                <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>…</div>
-              ) : agg.total < 5 ? (
-                <div style={{ fontSize: '10.5px', lineHeight: 1.6, color: 'var(--gc-muted)' }}>
-                  {L(`${userCase.category} 已收集 ${agg.total} 份进度，满 5 份后这里会显示各阶段分布。`,
-                     `${userCase.category} 已收集 ${agg.total} 份進度，滿 5 份後這裡會顯示各階段分佈。`,
-                     `${agg.total} report(s) so far for ${userCase.category} — distribution appears at 5+.`)}
+
+            {/* RFE mini-survey */}
+            <div style={{ paddingTop: '8px', borderTop: '1px solid var(--gc-rule-soft)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
+                {L('收到过补件（RFE）吗？', '收到過補件（RFE）嗎？', 'Ever received an RFE?')}
+                {rfeAgg && rfeAgg.total >= 3 && (
+                  <span style={{ fontWeight: 400, fontSize: '10px', color: 'var(--gc-muted)', marginLeft: '7px' }}>
+                    {L(`${rfeAgg.total} 份中 ${rfeAgg.gotRfe} 份收到过`, `${rfeAgg.total} 份中 ${rfeAgg.gotRfe} 份收到過`, `${rfeAgg.gotRfe}/${rfeAgg.total} did`)}
+                  </span>
+                )}
+              </div>
+              {rfeDone ? (
+                <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 600 }}>{L('已记录 ✓', '已記錄 ✓', 'Recorded ✓')}</div>
+              ) : rfeGot === true ? (
+                <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                  {[['medical', L('体检相关', '體檢相關', 'Medical')], ['financial', L('资金/担保', '資金/擔保', 'Financial')], ['relationship', L('关系证明', '關係證明', 'Relationship')], ['other', L('其他', '其他', 'Other')]].map(([id, label]) => (
+                    <button key={id} type="button" onClick={() => { setRfeType(id); submitRfe(true, id); }}
+                      style={{ fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', border: '1px solid var(--gc-rule)', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-surface)', color: 'var(--gc-ink-soft)' }}>{label}</button>
+                  ))}
                 </div>
               ) : (
-                <div>
-                  <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '5px' }}>
-                    {L(`${userCase.category} 共 ${agg.total} 份匿名进度：`, `${userCase.category} 共 ${agg.total} 份匿名進度：`, `${agg.total} anonymous reports for ${userCase.category}:`)}
-                  </div>
-                  {AC_MILESTONES.map((m) => {
-                    const n = agg.byMilestone?.[m.id] || 0;
-                    const pct = agg.total ? Math.round((n / agg.total) * 100) : 0;
-                    return (
-                      <div key={m.id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
-                        <span style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', width: '64px', flexShrink: 0 }}>{lang === 'en' ? m.en : lang === 'tw' ? m.tw : m.zh}</span>
-                        <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
-                        </span>
-                        <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '30px', textAlign: 'right' }}>{n}</span>
-                      </div>
-                    );
-                  })}
+                <div className="flex" style={{ gap: '6px' }}>
+                  <button type="button" onClick={() => submitRfe(false, null)}
+                    style={{ fontSize: '10.5px', fontWeight: 700, padding: '5px 12px', border: '1px solid var(--gc-rule)', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-surface)', color: 'var(--gc-ink-soft)' }}>
+                    {L('没有', '沒有', 'No')}
+                  </button>
+                  <button type="button" onClick={() => setRfeGot(true)}
+                    style={{ fontSize: '10.5px', fontWeight: 700, padding: '5px 12px', border: '1px solid var(--gc-amber-border)', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-amber-soft)', color: 'var(--gc-amber-ink)' }}>
+                    {L('收到过', '收到過', 'Yes')}
+                  </button>
                 </div>
               )}
             </div>
@@ -3655,6 +3725,263 @@ const ActionCenter = ({ userCase }) => {
         )}
       </div>
     </>
+  );
+};
+
+// ============================================================
+// CommunityHub — the always-on interaction card: monthly one-tap poll, the
+// milestone wall, and the surveys/question box. Every submission is anonymous
+// (see /api/community); localStorage only guards against double-submits.
+// ============================================================
+const CURRENT_POLL = {
+  id: 'poll-2026-09-bulletin',
+  q: { zh: '9 月排期，你觉得你的类别会怎么走？', tw: '9 月排期，你覺得你的類別會怎麼走？', en: 'Your call for the September bulletin:' },
+  options: [
+    { id: 'advance', zh: '会前进', tw: '會前進', en: 'Advances' },
+    { id: 'flat', zh: '原地不动', tw: '原地不動', en: 'Flat' },
+    { id: 'retro', zh: '会回调', tw: '會回調', en: 'Retrogresses' },
+  ],
+};
+
+const CommunityHub = ({ userCase }) => {
+  const { lang } = useLang();
+  const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
+  const isEB = !userCase.category?.startsWith('F');
+  const [tab, setTab] = useState('poll'); // poll | wall | survey
+  const [busy, setBusy] = useState('');
+
+  const post = async (payload, doneKey) => {
+    setBusy(doneKey);
+    try {
+      const r = await fetch('/api/community', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, cat: userCase.category, country: userCase.country }),
+      });
+      if (!r.ok) throw new Error();
+      try { window.localStorage.setItem(`gc_cd_${doneKey}`, '1'); } catch { /* noop */ }
+      setBusy('');
+      return true;
+    } catch { setBusy(''); return false; }
+  };
+  const done = (k) => { try { return !!window.localStorage.getItem(`gc_cd_${k}`); } catch { return false; } };
+
+  // poll
+  const pollKey = CURRENT_POLL.id;
+  const [pollAgg, setPollAgg] = useState(null);
+  const [voted, setVoted] = useState(() => done(pollKey));
+  useEffect(() => {
+    if (tab === 'poll' && voted && !pollAgg) {
+      fetch(`/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json()).then(setPollAgg).catch(() => {});
+    }
+  }, [tab, voted]); // eslint-disable-line react-hooks/exhaustive-deps
+  const vote = async (choice) => {
+    if (await post({ type: 'poll', pollId: pollKey, choice }, pollKey)) {
+      setVoted(true);
+      fetch(`/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json()).then(setPollAgg).catch(() => {});
+    }
+  };
+
+  // wall
+  const pdD2 = userCase.priorityDate ? new Date(userCase.priorityDate + 'T00:00:00') : null;
+  const myDays = pdD2 ? Math.max(0, Math.round((Date.now() - pdD2.getTime()) / 86400000)) : null;
+  const [wallMsg, setWallMsg] = useState('');
+  const [wall, setWall] = useState(null);
+  const [walled, setWalled] = useState(() => done('wall'));
+  useEffect(() => {
+    if (tab === 'wall' && !wall) {
+      fetch('/api/community?type=wall').then((r) => r.json()).then(setWall).catch(() => {});
+    }
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  const checkIn = async () => {
+    if (myDays === null) return;
+    if (await post({ type: 'wall', days: myDays, message: wallMsg }, 'wall')) {
+      setWalled(true);
+      setWall(null);
+      fetch('/api/community?type=wall').then((r) => r.json()).then(setWall).catch(() => {});
+    }
+  };
+
+  // surveys
+  const [swAction, setSwAction] = useState(null);
+  const [swOutcome, setSwOutcome] = useState(null);
+  const [swDone, setSwDone] = useState(() => done('switch'));
+  const [costDone, setCostDone] = useState(() => done('cost'));
+  const [qText, setQText] = useState('');
+  const [qDone, setQDone] = useState(() => done('question'));
+
+  const chip = (active) => ({
+    fontSize: '10.5px', fontWeight: 700, padding: '6px 10px', border: `1px solid ${active ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
+    borderRadius: '3px', cursor: 'pointer', background: active ? 'var(--gc-green)' : 'var(--gc-surface)',
+    color: active ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
+  });
+  const submitBtn = { fontSize: '11px', fontWeight: 700, padding: '6px 14px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-green)', color: 'var(--gc-paper)' };
+  const doneNote = (txt) => (
+    <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 600 }}>{txt}</div>
+  );
+
+  return (
+    <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' }}>
+      <div className="flex items-center justify-between" style={{ padding: '11px 14px 0' }}>
+        <span className="gc-eyebrow" style={{ fontSize: '9px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-muted)' }}>
+          {L('同路人', '同路人', 'COMMUNITY')}
+        </span>
+        <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
+          {[['poll', L('每月一题', '每月一題', 'Poll')], ['wall', L('打卡墙', '打卡牆', 'Wall')], ['survey', L('调查·提问', '調查·提問', 'Surveys')]].map(([id, label], i) => (
+            <button key={id} type="button" onClick={() => setTab(id)}
+              style={{
+                fontSize: '10px', fontWeight: 700, padding: '3px 9px', border: 'none', cursor: 'pointer',
+                borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                background: tab === id ? 'var(--gc-green)' : 'var(--gc-surface)',
+                color: tab === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
+              }}>{label}</button>
+          ))}
+        </span>
+      </div>
+
+      <div style={{ padding: '10px 14px 13px' }}>
+        {tab === 'poll' && (
+          <div>
+            <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>
+              {CURRENT_POLL.q[lang] || CURRENT_POLL.q.zh}
+            </div>
+            {!voted ? (
+              <div className="flex" style={{ gap: '8px', flexWrap: 'wrap' }}>
+                {CURRENT_POLL.options.map((o) => (
+                  <button key={o.id} type="button" disabled={busy === pollKey} onClick={() => vote(o.id)} style={chip(false)}>
+                    {o[lang] || o.zh}
+                  </button>
+                ))}
+              </div>
+            ) : pollAgg ? (
+              <div>
+                {CURRENT_POLL.options.map((o) => {
+                  const n = pollAgg.choices?.[o.id] || 0;
+                  const pct = pollAgg.total ? Math.round((n / pollAgg.total) * 100) : 0;
+                  return (
+                    <div key={o.id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', width: '72px', flexShrink: 0 }}>{o[lang] || o.zh}</span>
+                      <span style={{ flex: 1, height: '8px', background: 'var(--gc-rule-soft)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
+                      </span>
+                      <span className="gc-mono" style={{ fontSize: '10.5px', color: 'var(--gc-muted)', width: '42px', textAlign: 'right' }}>{pct}%</span>
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '5px' }}>
+                  {L(`已投 ${pollAgg.total} 票 · 匿名`, `已投 ${pollAgg.total} 票 · 匿名`, `${pollAgg.total} votes · anonymous`)}
+                </div>
+              </div>
+            ) : doneNote(L('已投票 ✓', '已投票 ✓', 'Voted ✓'))}
+          </div>
+        )}
+
+        {tab === 'wall' && (
+          <div>
+            {myDays !== null && (
+              <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', marginBottom: '7px' }}>
+                {L(`你已等待 `, `你已等待 `, `You've waited `)}
+                <b className="gc-mono" style={{ color: 'var(--gc-green-ink)' }}>{myDays.toLocaleString('en-US')}</b>
+                {L(' 天', ' 天', ' days')}
+              </div>
+            )}
+            {!walled ? (
+              <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                <input value={wallMsg} onChange={(e) => setWallMsg(e.target.value.slice(0, 40))}
+                  placeholder={L('说一句（可留空，40 字内）', '說一句（可留空）', 'One line (optional)')}
+                  style={{ flex: '1 1 180px', minWidth: 0, fontSize: '11.5px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
+                <button type="button" onClick={checkIn} disabled={busy === 'wall' || myDays === null} style={submitBtn}>
+                  {L('打卡', '打卡', 'Check in')}
+                </button>
+              </div>
+            ) : doneNote(L('已打卡 ✓', '已打卡 ✓', 'Checked in ✓'))}
+            <div style={{ marginTop: '9px', paddingTop: '8px', borderTop: '1px solid var(--gc-rule-soft)' }}>
+              {wall === null ? (
+                <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>…</div>
+              ) : wall.entries?.length ? (
+                wall.entries.map((e, i) => (
+                  <div key={i} className="flex items-baseline" style={{ gap: '8px', padding: '3px 0', borderBottom: i < wall.entries.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none' }}>
+                    <span className="gc-mono" style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-green-ink)', flexShrink: 0 }}>
+                      {Number(e.days).toLocaleString('en-US')}{L('天', '天', 'd')}
+                    </span>
+                    {e.cat && <span className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', flexShrink: 0 }}>{e.cat}</span>}
+                    <span style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', minWidth: 0 }}>{e.message || L('……', '……', '…')}</span>
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>
+                  {L('还没有人打卡——做第一个。', '還沒有人打卡——做第一個。', 'No check-ins yet — be the first.')}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'survey' && (
+          <div>
+            {isEB && (
+              <div style={{ marginBottom: '11px' }}>
+                <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
+                  {L('你为缩短等待做过什么？', '你為縮短等待做過什麼？', 'Have you tried to shorten the wait?')}
+                </div>
+                {!swDone ? (
+                  <>
+                    <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '5px' }}>
+                      {[['downgrade', L('降级 EB-3', '降級 EB-3', 'Downgrade EB-3')], ['porting', L('换雇主', '換雇主', 'Changed employer')], ['premium', L('用过加急', '用過加急', 'Premium processing')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => (
+                        <button key={id} type="button" onClick={() => { setSwAction(id); if (id === 'none') setSwOutcome(null); }} style={chip(swAction === id)}>{label}</button>
+                      ))}
+                    </div>
+                    {swAction && swAction !== 'none' && (
+                      <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '5px' }}>
+                        {[['faster', L('确实快了', '確實快了', 'Faster')], ['same', L('差不多', '差不多', 'Same')], ['regret', L('后悔了', '後悔了', 'Regret it')], ['pending', L('还在等结果', '還在等結果', 'Pending')]].map(([id, label]) => (
+                          <button key={id} type="button" onClick={() => setSwOutcome(id)} style={chip(swOutcome === id)}>{label}</button>
+                        ))}
+                      </div>
+                    )}
+                    {swAction && (swAction === 'none' || swOutcome) && (
+                      <button type="button" style={submitBtn} disabled={busy === 'switch'}
+                        onClick={async () => { if (await post({ type: 'switch', action: swAction, outcome: swOutcome }, 'switch')) setSwDone(true); }}>
+                        {L('匿名提交', '匿名提交', 'Submit')}
+                      </button>
+                    )}
+                  </>
+                ) : doneNote(L('已提交 ✓ 谢谢', '已提交 ✓ 謝謝', 'Submitted ✓'))}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '11px' }}>
+              <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
+                {L('整个流程的律师费＋官费，大概花了多少？', '整個流程的律師費＋官費，大概花了多少？', 'Total attorney + filing fees so far?')}
+              </div>
+              {!costDone ? (
+                <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                  {[['lt5k', '< $5k'], ['b5to10k', '$5-10k'], ['b10to15k', '$10-15k'], ['gt15k', '> $15k']].map(([id, label]) => (
+                    <button key={id} type="button" disabled={busy === 'cost'} style={chip(false)}
+                      onClick={async () => { if (await post({ type: 'cost', bracket: id }, 'cost')) setCostDone(true); }}>{label}</button>
+                  ))}
+                </div>
+              ) : doneNote(L('已提交 ✓ 谢谢', '已提交 ✓ 謝謝', 'Submitted ✓'))}
+            </div>
+
+            <div>
+              <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
+                {L('关于排期，你最想搞懂什么？', '關於排期，你最想搞懂什麼？', 'What do you most want explained?')}
+              </div>
+              {!qDone ? (
+                <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                  <input value={qText} onChange={(e) => setQText(e.target.value.slice(0, 200))}
+                    placeholder={L('写一句，会变成后续内容选题', '寫一句，會變成後續內容選題', 'One line — it shapes what we write next')}
+                    style={{ flex: '1 1 200px', minWidth: 0, fontSize: '11.5px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
+                  <button type="button" style={submitBtn} disabled={busy === 'question' || qText.trim().length < 4}
+                    onClick={async () => { if (await post({ type: 'question', text: qText }, 'question')) setQDone(true); }}>
+                    {L('提交', '提交', 'Send')}
+                  </button>
+                </div>
+              ) : doneNote(L('已收到 ✓ 谢谢', '已收到 ✓ 謝謝', 'Received ✓'))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -5420,6 +5747,43 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                         )}
                       </div>
 
+                      {/* Post-GC plans — one-tap anonymous survey; the aggregate is
+                          both content material and the mortgage-lead signal. */}
+                      {(() => {
+                        let pgDone = false;
+                        try { pgDone = !!window.localStorage.getItem('gc_cd_postgc'); } catch { /* noop */ }
+                        if (pgDone) return null;
+                        const send = async (plan) => {
+                          try {
+                            await fetch('/api/community', {
+                              method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ type: 'postgc', plan, cat: userCase.category, country: userCase.country }),
+                            });
+                            try { window.localStorage.setItem('gc_cd_postgc', '1'); } catch { /* noop */ }
+                            setGreenCardInfo({ ...greenCardInfo });
+                          } catch { /* noop */ }
+                        };
+                        return (
+                          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
+                            <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', letterSpacing: '0.12em', marginBottom: '6px' }}>
+                              {lang === 'en' ? 'NEXT 12 MONTHS (ANONYMOUS)' : lang === 'tw' ? '接下來 12 個月（匿名）' : '接下来 12 个月（匿名）'}
+                            </div>
+                            <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                              {[['buy-home', lang === 'en' ? 'Buy a home' : lang === 'tw' ? '買房' : '买房'],
+                                ['change-job', lang === 'en' ? 'Change job' : lang === 'tw' ? '換工作' : '换工作'],
+                                ['move-state', lang === 'en' ? 'Move states' : lang === 'tw' ? '搬州' : '搬州'],
+                                ['naturalize', lang === 'en' ? 'Start the citizenship clock' : lang === 'tw' ? '開始攢入籍' : '开始攒入籍'],
+                                ['none', lang === 'en' ? 'Not sure yet' : lang === 'tw' ? '還沒想' : '还没想']].map(([id, label]) => (
+                                <button key={id} type="button" onClick={() => send(id)}
+                                  style={{ fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', border: '1px solid var(--gc-green-border)', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-surface)', color: 'var(--gc-green-ink)' }}>
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* I-751 countdown — only if conditional */}
                       {greenCardInfo.isConditional && approvalDate && (
                         <div style={{
@@ -5945,6 +6309,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           </div>
         );
       })()}
+
+      {/* Community — poll, milestone wall, surveys. All users, all statuses. */}
+      <CommunityHub userCase={userCase} />
 
       {/* Status share modal (#11) — a self-contained, screenshot-friendly card:
           brand + month + case + hero estimate. No canvas export; the card IS the

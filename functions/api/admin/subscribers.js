@@ -50,6 +50,7 @@ export async function onRequestGet(context) {
         if (keyInfo.name.startsWith('an:')) continue; // analytics beacons
         if (keyInfo.name.startsWith('ev:') || keyInfo.name.startsWith('es:')) continue; // email events
         if (keyInfo.name.startsWith('pr:') || keyInfo.name.startsWith('prl:')) continue; // progress reports
+        if (keyInfo.name.startsWith('cd:') || keyInfo.name.startsWith('crl:')) continue; // community data
         const raw = await env.SUBSCRIBERS.get(keyInfo.name);
         if (!raw) continue;
         try {
