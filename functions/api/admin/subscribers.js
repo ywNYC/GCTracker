@@ -48,6 +48,7 @@ export async function onRequestGet(context) {
         // on JSON.parse happening to throw.
         if (keyInfo.name.startsWith('rl:')) continue;
         if (keyInfo.name.startsWith('an:')) continue; // analytics beacons
+        if (keyInfo.name.startsWith('ev:') || keyInfo.name.startsWith('es:')) continue; // email events
         const raw = await env.SUBSCRIBERS.get(keyInfo.name);
         if (!raw) continue;
         try {

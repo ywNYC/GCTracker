@@ -132,6 +132,7 @@ export async function onRequestPost(context) {
     for (const keyInfo of list.keys) {
       if (keyInfo.name.startsWith('rl:')) continue; // rate-limit counters, not subscribers
       if (keyInfo.name.startsWith('an:')) continue; // analytics beacons, not subscribers
+      if (keyInfo.name.startsWith('ev:') || keyInfo.name.startsWith('es:')) continue; // email events
       if (only && keyInfo.name.toLowerCase().indexOf(only) === -1) continue; // test valve
       const raw = await env.SUBSCRIBERS.get(keyInfo.name);
       if (!raw) continue;
