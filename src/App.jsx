@@ -12805,9 +12805,9 @@ const PATHWAYS = [
   {
     id: 'emp-eb4',
     group: 'employment', category: 'EB-4', waitStatus: 'long', goesTo: null,
-    en: { name: 'EB-4 Special Immigrant (religious workers, etc.)', summary: 'Religious workers, certain UN employees, Special Immigrant Juveniles', steps: ['Petition filed per specific EB-4 category', 'I-485 when current'], timeline: 'Varies', caveat: 'Niche category. Recent retrogression — currently long wait. Most users won\'t qualify.' },
-    zh: { name: 'EB-4 特殊移民(宗教工作者等)', summary: '宗教工作者、联合国特定员工、特殊少年移民等', steps: ['按具体 EB-4 小类递件', '排期 current 递 I-485'], timeline: '视情况', caveat: '小众类别。近期倒退,等待较长。大部分用户不符合。' },
-    tw: { name: 'EB-4 特殊移民(宗教工作者等)', summary: '宗教工作者、聯合國特定員工、特殊少年移民等', steps: ['按具體 EB-4 小類遞件', '排期 current 遞 I-485'], timeline: '視情況', caveat: '小眾類別。近期倒退,等待較長。大部分用戶不符合。' }
+    en: { name: 'EB-4 Special Immigrant (religious workers, etc.)', summary: 'Religious workers, certain UN employees (SIJS has its own card below)', steps: ['Petition filed per specific EB-4 category', 'I-485 when current'], timeline: 'Varies', caveat: 'Niche category. Recent retrogression — currently long wait. Most users won\'t qualify.' },
+    zh: { name: 'EB-4 特殊移民(宗教工作者等)', summary: '宗教工作者、联合国特定员工等(特殊少年移民 SIJS 见下方专条)', steps: ['按具体 EB-4 小类递件', '排期 current 递 I-485'], timeline: '视情况', caveat: '小众类别。近期倒退,等待较长。大部分用户不符合。' },
+    tw: { name: 'EB-4 特殊移民(宗教工作者等)', summary: '宗教工作者、聯合國特定員工等(特殊少年移民 SIJS 見下方專條)', steps: ['按具體 EB-4 小類遞件', '排期 current 遞 I-485'], timeline: '視情況', caveat: '小眾類別。近期倒退,等待較長。大部分用戶不符合。' }
   },
   {
     id: 'emp-eb5-direct',
@@ -12933,6 +12933,34 @@ const PATHWAYS = [
     en: { name: 'VAWA (abused spouse/child/parent)', summary: 'Self-petition if abused by USC/LPR family member', steps: ['File I-360 confidentially (no notice to abuser)', 'If approved, file I-485 (IR or F2A equivalent)', 'Can include certain children'], timeline: '~2-4 years', caveat: 'Confidential — abuser is NOT notified. Strong evidence of abuse required.' },
     zh: { name: 'VAWA(受虐配偶/子女/父母)', summary: '被公民/绿卡家属虐待,可自我申请', steps: ['保密递 I-360(施虐者不通知)', '批准后递 I-485(等同 IR 或 F2A)', '可包括特定子女'], timeline: '约 2-4 年', caveat: '保密 — 施虐者不会被通知。需强力证据:警察报告、医疗记录、证人陈述。' },
     tw: { name: 'VAWA(受虐配偶/子女/父母)', summary: '被公民/綠卡家屬虐待,可自我申請', steps: ['保密遞 I-360(施虐者不通知)', '批准後遞 I-485(等同 IR 或 F2A)', '可包括特定子女'], timeline: '約 2-4 年', caveat: '保密 — 施虐者不會被通知。需強力證據。' }
+  },
+  {
+    id: 'sp-sijs',
+    group: 'special', category: 'SIJS (EB-4)', waitStatus: 'long', goesTo: 'EB4', needsLawyer: true,
+    en: { name: 'SIJS — Special Immigrant Juvenile', summary: 'Under 21, unmarried, in the U.S., cannot reunite with a parent due to abuse, neglect or abandonment', steps: ['State family/juvenile court makes the required findings', 'File I-360 with USCIS', 'File I-485 when the EB-4 date is current', 'Work permit and SSN available while waiting'], timeline: 'Court 3-9 mo → I-360 3-8 mo → EB-4 wait 1-3 yr', caveat: 'Court findings must come BEFORE the 21st birthday (state age limits vary). EB-4 retrogressed — the wait after approval is real. A petition through SIJS never confers status on the abusive parent.' },
+    zh: { name: 'SIJS 特殊青少年移民', summary: '未满 21 岁、未婚、人在美国境内,因虐待/忽视/遗弃无法与父母团聚', steps: ['先由州家事/少年法院做出认定', '向 USCIS 递 I-360', 'EB-4 排期到后递 I-485', '等待期间可申请工卡与 SSN'], timeline: '法院 3-9 月 → I-360 3-8 月 → EB-4 排期 1-3 年', caveat: '法院认定必须在 21 岁生日前完成(各州年龄上限不同)。EB-4 近期倒退,批准后仍要等排期。通过 SIJS 拿身份的孩子,不能再为施虐的父母申请。' },
+    tw: { name: 'SIJS 特殊青少年移民', summary: '未滿 21 歲、未婚、人在美國境內,因虐待/忽視/遺棄無法與父母團聚', steps: ['先由州家事/少年法院做出認定', '向 USCIS 遞 I-360', 'EB-4 排期到後遞 I-485', '等待期間可申請工卡與 SSN'], timeline: '法院 3-9 月 → I-360 3-8 月 → EB-4 排期 1-3 年', caveat: '法院認定必須在 21 歲生日前完成(各州年齡上限不同)。EB-4 近期倒退,批准後仍要等排期。透過 SIJS 拿身份的孩子,不能再為施虐的父母申請。' }
+  },
+  {
+    id: 'sp-t-visa',
+    group: 'special', category: 'T Visa', waitStatus: 'medium', goesTo: null, needsLawyer: true,
+    en: { name: 'T Visa (trafficking victim)', summary: 'For victims of labor or sex trafficking who cooperate with law enforcement', steps: ['File I-914 (+ I-914B law-enforcement declaration if available)', 'Work permit with approval', 'Apply for the green card after 3 years of T status'], timeline: '~2-3 yr to T status, green card after 3 more', caveat: 'The annual cap is rarely hit, so the wait is shorter than U visa. Law-enforcement certification helps but is not strictly required.' },
+    zh: { name: 'T 签证(人口贩运受害者)', summary: '劳工或性剥削贩运的受害者,配合执法即可申请', steps: ['递 I-914(如能取得,附 I-914B 执法声明)', '批准即获工卡', 'T 身份满 3 年后申请绿卡'], timeline: '约 2-3 年拿 T 身份,再 3 年拿绿卡', caveat: '年配额很少用满,等待明显短于 U 签证。执法证明有帮助但非硬性要求。与 U 签证的差别常被混淆,先咨询律师再选。' },
+    tw: { name: 'T 簽證(人口販運受害者)', summary: '勞工或性剝削販運的受害者,配合執法即可申請', steps: ['遞 I-914(如能取得,附 I-914B 執法聲明)', '批准即獲工卡', 'T 身份滿 3 年後申請綠卡'], timeline: '約 2-3 年拿 T 身份,再 3 年拿綠卡', caveat: '年配額很少用滿,等待明顯短於 U 簽證。執法證明有幫助但非硬性要求。' }
+  },
+  {
+    id: 'sp-widow',
+    group: 'special', category: 'Widow(er) I-360', waitStatus: 'none', goesTo: null,
+    en: { name: 'Widow(er) of a U.S. citizen (self-petition)', summary: 'Your USC spouse died before the green card came through — you can still self-petition', steps: ['File I-360 within 2 years of the death', 'File I-485 (or consular process) — immediate-relative, no quota', 'Remarriage before approval ends eligibility'], timeline: 'No priority-date wait; processing only', caveat: 'The 2-year deadline is hard. A pending I-130 filed by the deceased spouse automatically converts to an I-360 — many people refile unnecessarily.' },
+    zh: { name: '美国公民的丧偶配偶(自我申请)', summary: '公民配偶在绿卡下来前去世,你仍可自己申请', steps: ['去世后 2 年内递 I-360', '递 I-485 或走领事馆 — 属直系亲属,无配额', '批准前再婚即失去资格'], timeline: '无排期,只等审理', caveat: '2 年期限是硬的。已故配偶生前递交、尚未批准的 I-130 会自动转为 I-360 — 很多人不知道,白重递一次。' },
+    tw: { name: '美國公民的喪偶配偶(自我申請)', summary: '公民配偶在綠卡下來前去世,你仍可自己申請', steps: ['去世後 2 年內遞 I-360', '遞 I-485 或走領事館 — 屬直系親屬,無配額', '批准前再婚即失去資格'], timeline: '無排期,只等審理', caveat: '2 年期限是硬的。已故配偶生前遞交、尚未批准的 I-130 會自動轉為 I-360 — 很多人白重遞一次。' }
+  },
+  {
+    id: 'sp-cancellation',
+    group: 'special', category: 'Cancellation of Removal', waitStatus: 'long', goesTo: null, needsLawyer: true,
+    en: { name: 'Cancellation of removal (non-LPR)', summary: 'Only available to someone already in removal proceedings before an immigration judge', steps: ['Be in removal proceedings (this is a defense, not an application you file on your own)', 'Show 10+ years continuous presence, good moral character', 'Show exceptional and extremely unusual hardship to a USC/LPR spouse, parent or child', 'Judge grants — green card issued directly'], timeline: 'Court backlog years; 4,000 grants per year nationwide', caveat: 'You cannot apply for this affirmatively — it exists only as a defense in court. The hardship standard is very high and the annual cap creates its own queue. Never enter proceedings on purpose to try for it.' },
+    zh: { name: '取消遣返(非绿卡持有者)', summary: '只有已经在移民法庭遣返程序中的人才能申请', steps: ['人已在遣返程序中(这是抗辩手段,不是自己主动递的申请)', '证明连续居住满 10 年、品行良好', '证明遣返会给公民/绿卡的配偶、父母或子女造成"异常且极不寻常的困难"', '法官批准即直接发绿卡'], timeline: '法庭积压数年;全美每年仅 4,000 个名额', caveat: '不能主动申请,只能在法庭上作为抗辩。困难标准极高(远超"经济困难"),名额上限自成一条队。绝不要为了争取它而故意进入遣返程序。' },
+    tw: { name: '取消遣返(非綠卡持有者)', summary: '只有已經在移民法庭遣返程序中的人才能申請', steps: ['人已在遣返程序中(這是抗辯手段,不是自己主動遞的申請)', '證明連續居住滿 10 年、品行良好', '證明遣返會給公民/綠卡的配偶、父母或子女造成「異常且極不尋常的困難」', '法官批准即直接發綠卡'], timeline: '法庭積壓數年;全美每年僅 4,000 個名額', caveat: '不能主動申請,只能在法庭上作為抗辯。困難標準極高,名額上限自成一條隊。絕不要為了爭取它而故意進入遣返程序。' }
   },
   {
     id: 'sp-u-visa',
@@ -13273,10 +13301,10 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase }) =
         </h2>
         <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: 0 }}>
           {lang === 'en' 
-            ? 'Answer a few questions, or browse all 35+ documented paths to US permanent residence.' 
+            ? `Answer a few questions, or browse all ${PATHWAYS.length} documented paths to US permanent residence.` 
             : lang === 'tw' 
-              ? '回答幾個問題,或瀏覽全部 35+ 條已整理的美國綠卡路徑。'
-              : '回答几个问题,或浏览全部 35+ 条已整理的美国绿卡路径。'}
+              ? `回答幾個問題,或瀏覽全部 ${PATHWAYS.length} 條已整理的美國綠卡路徑。`
+              : `回答几个问题,或浏览全部 ${PATHWAYS.length} 条已整理的美国绿卡路径。`}
         </p>
       </div>
 
