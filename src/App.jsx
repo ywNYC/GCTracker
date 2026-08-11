@@ -3431,21 +3431,21 @@ const ActionCenter = ({ userCase }) => {
     ? (lang === 'en' ? [
         ['Medical exam (I-693)', 'See a USCIS-designated civil surgeon; keep the sealed envelope sealed.', '1-2 wk'],
         ['Assemble your packet', 'Use the checklist below — missing items are the #1 cause of rejection.', '1-2 wk'],
-        ['File I-485', 'Add I-765 (work permit) and I-131 (travel permit) in the same package — no extra fee.', 'day 0'],
+        ['File I-485', 'Optionally add I-765 (work permit, $260) and I-131 (travel permit, $630) — separate fees since Apr 2024, no longer free.', 'day 0'],
         ['Receipt (I-797) & biometrics', 'Receipt in ~2-6 weeks, fingerprint appointment in ~1-2 months.', '1-2 mo'],
         ['EAD / AP arrive; possible RFE', 'Work & travel cards typically 2-6 months; answer any RFE fully and on time.', '2-6 mo'],
         ['Interview or waiver → approval', 'After filing, track each step with the I-485 progress card below.', 'varies'],
       ] : lang === 'tw' ? [
         ['體檢 I-693', '找 USCIS 認證的 civil surgeon，密封信封不要拆。', '1-2 週'],
         ['備齊材料包', '用下方清單逐項勾——缺件是被退件的頭號原因。', '1-2 週'],
-        ['遞交 I-485', '同包附上 I-765（工卡）與 I-131（回美證），免額外費用。', '第 0 天'],
+        ['遞交 I-485', '可同包附上 I-765（工卡，$260）與 I-131（回美證，$630）——2024 年 4 月起需分別繳費，不再免費。', '第 0 天'],
         ['收據 I-797 與打指模', '收據約 2-6 週，指模預約約 1-2 個月。', '1-2 月'],
         ['EAD／回美證下發；可能補件', '工卡回美證一般 2-6 個月；收到 RFE 按時完整回覆。', '2-6 月'],
         ['面試或免面試 → 批准', '遞交後用下方「I-485 流程進度」逐步打勾。', '不定'],
       ] : [
         ['体检 I-693', '找 USCIS 认证的 civil surgeon，密封信封不要拆。', '1-2 周'],
         ['备齐材料包', '用下方清单逐项勾——缺件是被退件的头号原因。', '1-2 周'],
-        ['递交 I-485', '同包附上 I-765（工卡）与 I-131（回美证），免额外费用。', '第 0 天'],
+        ['递交 I-485', '可同包附上 I-765（工卡，$260）与 I-131（回美证，$630）——2024 年 4 月起需分别缴费，不再免费。', '第 0 天'],
         ['收据 I-797 与打指模', '收据约 2-6 周，指模预约约 1-2 个月。', '1-2 月'],
         ['EAD／回美证下发；可能补件', '工卡回美证一般 2-6 个月；收到 RFE 按时完整回复。', '2-6 月'],
         ['面试或免面试 → 批准', '递交后用下方「I-485 流程进度」逐步打勾。', '不定'],
@@ -3506,7 +3506,7 @@ const ActionCenter = ({ userCase }) => {
       items: [
         ['i693', L('I-693 体检密封件（civil surgeon）', 'I-693 體檢密封件', 'Sealed I-693 medical (civil surgeon)'), ],
         ['i94', L('I-94 与当前身份文件（I-797/I-20 等）', 'I-94 與當前身份文件', 'I-94 & current status documents')],
-        ['combo', L('I-765 + I-131 组合递交（免费拿工卡与回美证）', 'I-765 + I-131 組合遞交', 'I-765 + I-131 combo (free with I-485)')],
+        ['combo', L('I-765 + I-131 组合递交（各自缴费 $260/$630，2024-04 起不再免费）', 'I-765 + I-131 組合遞交（各自繳費 $260/$630，不再免費）', 'I-765 + I-131 combo ($260/$630 since Apr 2024, no longer free)')],
       ],
     } : {
       title: L('境外领事馆（CP）', '境外領事館（CP）', 'Consular processing'),
