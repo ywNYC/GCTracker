@@ -6558,63 +6558,43 @@ const AboutTab = () => {
           {lang === 'en' ? 'Mortgage services are independent of this site\'s bulletin data. Not financial advice.' : lang === 'tw' ? '貸款服務與本站排期資料相互獨立，不構成金融建議。' : '贷款服务与本站排期数据相互独立，不构成金融建议。'}
         </p>
       </div>
-      {/* Paid partner slot #1 — Wu Law (SIJS). Deliberately built on the same
-          skeleton as the builder card above: same 52px avatar circle, same
-          two-line title, same body/chips/disclaimer rhythm. An ad that looks
-          like a foreign object gets skipped; one that reads like the rest of
-          the page gets read. */}
+      {/* Paid partner slot #1 — Wu Law (SIJS). Halved from the builder-card
+          skeleton: 40px logo, one qualifying sentence, timings folded into the
+          chip row, contact inline. An ad the reader scrolls past costs the same
+          as no ad — but one that eats half the page costs trust. */}
       <div style={{ ...card, borderLeft: '3px solid var(--gc-blue)' }}>
-        <div className="gc-eyebrow" style={eyebrow}>
-          {lang === 'en' ? 'Partner · immigration law' : lang === 'tw' ? '合作欄位 · 移民法律服務' : '合作栏位 · 移民法律服务'}
-        </div>
-        <div className="flex items-center" style={{ gap: '12px', marginBottom: '8px' }}>
-          <img src="/wulaw-logo.png" alt={lang === 'en' ? 'Wu Law Office' : '吴律师事务所'} width="52" height="52"
-            style={{ width: '52px', height: '52px', borderRadius: '50%', border: '2px solid var(--gc-rule)', flexShrink: 0, objectFit: 'cover' }} />
-          <div style={{ minWidth: 0 }}>
-            <div className="gc-serif" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gc-ink)' }}>
-              {lang === 'en' ? 'Wu Law Office ｜ SIJS' : lang === 'tw' ? '吳律師事務所 ｜ SIJS' : '吴律师事务所 ｜ SIJS'}
+        <div className="flex items-center" style={{ gap: '10px' }}>
+          <img src="/wulaw-logo.png" alt={lang === 'en' ? 'Wu Law Office' : '吴律师事务所'} width="40" height="40"
+            style={{ width: '40px', height: '40px', borderRadius: '50%', border: '1.5px solid var(--gc-rule)', flexShrink: 0, objectFit: 'cover' }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="gc-eyebrow" style={{ ...eyebrow, marginBottom: '1px' }}>
+              {lang === 'en' ? 'Partner · immigration law' : lang === 'tw' ? '合作欄位 · 移民法律服務' : '合作栏位 · 移民法律服务'}
             </div>
-            <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>
-              {lang === 'en' ? 'NY-licensed · immigration courts nationwide' : lang === 'tw' ? '紐約州執業 · 准予在所有移民法庭執業' : '纽约州执业 · 准予在所有移民法庭执业'}
+            <div className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', lineHeight: 1.3 }}>
+              {lang === 'en' ? 'Wu Law Office ｜ SIJS' : lang === 'tw' ? '吳律師事務所 ｜ SIJS' : '吴律师事务所 ｜ SIJS'}
             </div>
           </div>
         </div>
-        <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: '0 0 8px' }}>
+        <p style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', margin: '7px 0 6px' }}>
           {lang === 'en'
-            ? 'Special Immigrant Juvenile Status: for a child under 21, unmarried and inside the U.S., who cannot reunite with one or both parents because of abuse, neglect or abandonment. Family court first, then the immigration petition.'
+            ? 'SIJS — for a child under 21, unmarried, inside the U.S., who cannot reunite with a parent due to abuse, neglect or abandonment. Work permit, SSN and a license while the case runs.'
             : lang === 'tw'
-              ? 'SIJS 特殊青少年移民身份：未滿 21 歲、未婚、人在美國境內，因虐待、忽視或遺棄無法與一方或雙方父母團聚的孩子，可先由家事法院認定，再遞交移民申請。'
-              : 'SIJS 特殊青少年移民身份：未满 21 岁、未婚、人在美国境内，因虐待、忽视或遗弃无法与一方或双方父母团聚的孩子，可先由家事法院认定，再递交移民申请。'}
+              ? 'SIJS 特殊青少年身份：未滿 21 歲、未婚、人在美國境內，因虐待／忽視／遺棄無法與父母團聚者。等待期間可拿工卡、SSN、駕照。'
+              : 'SIJS 特殊青少年身份：未满 21 岁、未婚、人在美国境内，因虐待／忽视／遗弃无法与父母团聚者。等待期间可拿工卡、SSN、驾照。'}
         </p>
-        <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
-          {[
-            lang === 'en' ? 'Family court 3-9 mo' : lang === 'tw' ? '家事法院 3-9 個月' : '家事法院 3-9 个月',
-            lang === 'en' ? 'Petition 3-8 mo' : lang === 'tw' ? '移民申請 3-8 個月' : '移民申请 3-8 个月',
-            lang === 'en' ? 'Green card 1-3 yr' : lang === 'tw' ? '等排期 1-3 年' : '等排期 1-3 年',
-          ].map((t) => (
-            <span key={t} className="gc-mono" style={{
-              fontSize: '9.5px', padding: '3px 7px', borderRadius: '10px',
-              border: '1px solid var(--gc-rule)', color: 'var(--gc-muted)', whiteSpace: 'nowrap',
-            }}>{t}</span>
-          ))}
-        </div>
-        <p style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', margin: '0 0 10px' }}>
-          {lang === 'en'
-            ? 'While the case is pending: protection from removal, work authorization, SSN and a driver\u2019s license.'
-            : lang === 'tw'
-              ? '等待期間可申請：防止被遣解出境、工作許可與合法工作、社會安全號碼（SSN）、駕照。'
-              : '等待期间可申请：防止被遣解出境、工作许可与合法工作、社会安全号码（SSN）、驾照。'}
-        </p>
-        <div className="flex" style={{ gap: '8px', flexWrap: 'wrap' }}>
+        <div className="flex items-center" style={{ gap: '6px', flexWrap: 'wrap' }}>
+          <span className="gc-mono" style={{
+            fontSize: '9.5px', padding: '3px 7px', borderRadius: '10px',
+            border: '1px solid var(--gc-rule)', color: 'var(--gc-muted)', whiteSpace: 'nowrap',
+          }}>{lang === 'en' ? 'Court 3-9mo · petition 3-8mo · GC 1-3yr' : lang === 'tw' ? '家事法院 3-9 月 · 移民申請 3-8 月 · 排期 1-3 年' : '家事法院 3-9 月 · 移民申请 3-8 月 · 排期 1-3 年'}</span>
           <CopyChip label={lang === 'en' ? 'Phone' : '电话'} value="718-567-5566" />
-          <CopyChip label={lang === 'en' ? 'Flushing NY' : '法拉盛'} value={lang === 'en' ? '133-32 41 Rd 3A' : '41 路 133-32 号 3A'} />
         </div>
-        <p style={{ fontSize: '10px', color: 'var(--gc-muted)', margin: '8px 0 0' }}>
+        <p style={{ fontSize: '9.5px', color: 'var(--gc-muted)', margin: '7px 0 0' }}>
           {lang === 'en'
-            ? 'Paid partner slot. This site is not a law firm and takes no part in the case; timelines above are the firm\u2019s own reference figures.'
+            ? 'Paid slot · Flushing NY 133-32 41 Rd 3A · this site is not a law firm; timings are the firm\u2019s own figures.'
             : lang === 'tw'
-              ? '付費合作欄位。本站非律師事務所、不參與案件；上列時長為該所提供的參考值。'
-              : '付费合作栏位。本站非律师事务所、不参与案件；上列时长为该所提供的参考值。'}
+              ? '付費欄位 · 法拉盛 41 路 133-32 號 3A · 本站非律師事務所，時長為該所提供的參考值。'
+              : '付费栏位 · 法拉盛 41 路 133-32 号 3A · 本站非律师事务所，时长为该所提供的参考值。'}
         </p>
       </div>
       <div style={{ ...card, borderStyle: 'dashed', borderColor: 'var(--gc-green-border)', background: 'var(--gc-green-soft)' }}>
