@@ -4269,7 +4269,16 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
                     <div style={{ width: '100%', maxWidth: '12px', height: '2px', background: 'var(--gc-subtle)', opacity: manual && !isSel ? 0.4 : 1 }} />
                   )}
                   {p.days === null && (p.cutoff === 'C' ? (
-                    <span className="gc-mono" style={{ fontSize: '8px', lineHeight: '9px', fontWeight: 700, color: 'var(--gc-green)', opacity: manual && !isSel ? 0.4 : 0.85 }}>C</span>
+                    <div className="flex items-center justify-center" style={{
+                      width: '100%', maxWidth: '18px', height: `${Math.round(plotH * 0.55)}px`,
+                      background: 'var(--gc-green-soft)',
+                      border: '1px dashed var(--gc-green-border)',
+                      borderBottom: 'none',
+                      borderRadius: '2px 2px 0 0',
+                      opacity: manual && !isSel ? 0.4 : 1,
+                    }}>
+                      <span className="gc-mono" style={{ fontSize: '9px', lineHeight: 1, fontWeight: 700, color: 'var(--gc-green)' }}>C</span>
+                    </div>
                   ) : (
                     <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid var(--gc-subtle)', marginBottom: '-1px' }} />
                   ))}
@@ -4347,8 +4356,11 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
         )}
         {points.some((p) => p.cutoff === 'C') && (
           <span className="inline-flex items-center gap-1">
-            <span className="gc-mono" style={{ fontWeight: 700, color: 'var(--gc-green)' }}>C</span>
-            {lang === 'en' ? 'current, no queue' : lang === 'tw' ? '無需排隊' : '无需排队'}
+            <span style={{
+              width: '7px', height: '7px', display: 'inline-block',
+              background: 'var(--gc-green-soft)', border: '1px dashed var(--gc-green-border)', borderRadius: '1px',
+            }} />
+            {lang === 'en' ? 'C · current, no queue' : lang === 'tw' ? 'C · 無需排隊' : 'C · 无需排队'}
           </span>
         )}
       </div>
