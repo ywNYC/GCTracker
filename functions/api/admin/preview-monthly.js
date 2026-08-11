@@ -177,6 +177,12 @@ export async function onRequestPost(context) {
   }
   const data = await resp.json();
 
+  // ?returnHtml=1 hands the rendered body back so it can be eyeballed in a
+  // browser without waiting for the mail to land.
+  if (url.searchParams.get('returnHtml') === '1') {
+    return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  }
+
   return json({
     ok: true,
     sentTo: to,
@@ -190,7 +196,9 @@ export async function onRequestPost(context) {
       case: { cat, country, priorityDate },
       finalAction: `${update.finalAction.previous} → ${update.finalAction.current}`,
       filing: `${update.filing.previous} → ${update.filing.current}`,
-      forecast: update.forecast?.etaLabel || null,
+      forecastMonths: update.forecast
+        ? { fast: update.forecast.fastMonths, slow: update.forecast.slowMonths }
+        : null,
     },
     note: 'Synthetic月份，仅用于版面评审：数字由当前公告按各表近 12 个月实际速度外推，不是真实公告。未写入 KV，未影响任何订阅者。',
   });
