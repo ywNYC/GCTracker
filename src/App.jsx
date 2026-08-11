@@ -6576,9 +6576,16 @@ const AboutTab = () => {
             <div className="gc-eyebrow" style={{ ...eyebrow, marginBottom: '1px' }}>
               {lang === 'en' ? 'Partner · immigration law' : lang === 'tw' ? '合作欄位 · 移民法律服務' : '合作栏位 · 移民法律服务'}
             </div>
-            <div className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', lineHeight: 1.3 }}>
+            <a href="https://www.robertwulaw.com" target="_blank" rel="noopener noreferrer sponsored"
+              className="gc-serif" style={{
+                fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', lineHeight: 1.3,
+                textDecoration: 'none', display: 'inline-flex', alignItems: 'baseline', gap: '5px',
+              }}>
               {lang === 'en' ? 'Wu Law Office ｜ SIJS' : lang === 'tw' ? '吳律師事務所 ｜ SIJS' : '吴律师事务所 ｜ SIJS'}
-            </div>
+              <span className="gc-mono" style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--gc-green)' }}>
+                robertwulaw.com ↗
+              </span>
+            </a>
           </div>
         </div>
         <p style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', margin: '7px 0 6px' }}>
@@ -12814,9 +12821,9 @@ const PATHWAYS = [
   {
     id: 'emp-eb4',
     group: 'employment', category: 'EB-4', waitStatus: 'long', goesTo: null,
-    en: { name: 'EB-4 Special Immigrant (religious workers, etc.)', summary: 'Religious workers, certain UN employees (SIJS has its own card below)', steps: ['Petition filed per specific EB-4 category', 'I-485 when current'], timeline: 'Varies', caveat: 'Niche category. Recent retrogression — currently long wait. Most users won\'t qualify.' },
-    zh: { name: 'EB-4 特殊移民(宗教工作者等)', summary: '宗教工作者、联合国特定员工等(特殊少年移民 SIJS 见下方专条)', steps: ['按具体 EB-4 小类递件', '排期 current 递 I-485'], timeline: '视情况', caveat: '小众类别。近期倒退,等待较长。大部分用户不符合。' },
-    tw: { name: 'EB-4 特殊移民(宗教工作者等)', summary: '宗教工作者、聯合國特定員工等(特殊少年移民 SIJS 見下方專條)', steps: ['按具體 EB-4 小類遞件', '排期 current 遞 I-485'], timeline: '視情況', caveat: '小眾類別。近期倒退,等待較長。大部分用戶不符合。' }
+    en: { name: 'EB-4 Special Immigrant (religious workers, etc.)', summary: 'Certain UN employees (religious workers SR and SIJS each have their own card)', steps: ['Petition filed per specific EB-4 category', 'I-485 when current'], timeline: 'Varies', caveat: 'Niche category. Recent retrogression — currently long wait. Most users won\'t qualify.' },
+    zh: { name: 'EB-4 特殊移民(宗教工作者等)', summary: '联合国特定员工等(宗教工作者 SR、特殊少年移民 SIJS 各有专条)', steps: ['按具体 EB-4 小类递件', '排期 current 递 I-485'], timeline: '视情况', caveat: '小众类别。近期倒退,等待较长。大部分用户不符合。' },
+    tw: { name: 'EB-4 特殊移民(宗教工作者等)', summary: '聯合國特定員工等(宗教工作者 SR、特殊少年移民 SIJS 各有專條)', steps: ['按具體 EB-4 小類遞件', '排期 current 遞 I-485'], timeline: '視情況', caveat: '小眾類別。近期倒退,等待較長。大部分用戶不符合。' }
   },
   {
     id: 'emp-eb5-direct',
@@ -12942,6 +12949,13 @@ const PATHWAYS = [
     en: { name: 'VAWA (abused spouse/child/parent)', summary: 'Self-petition if abused by USC/LPR family member', steps: ['File I-360 confidentially (no notice to abuser)', 'If approved, file I-485 (IR or F2A equivalent)', 'Can include certain children'], timeline: '~2-4 years', caveat: 'Confidential — abuser is NOT notified. Strong evidence of abuse required.' },
     zh: { name: 'VAWA(受虐配偶/子女/父母)', summary: '被公民/绿卡家属虐待,可自我申请', steps: ['保密递 I-360(施虐者不通知)', '批准后递 I-485(等同 IR 或 F2A)', '可包括特定子女'], timeline: '约 2-4 年', caveat: '保密 — 施虐者不会被通知。需强力证据:警察报告、医疗记录、证人陈述。' },
     tw: { name: 'VAWA(受虐配偶/子女/父母)', summary: '被公民/綠卡家屬虐待,可自我申請', steps: ['保密遞 I-360(施虐者不通知)', '批准後遞 I-485(等同 IR 或 F2A)', '可包括特定子女'], timeline: '約 2-4 年', caveat: '保密 — 施虐者不會被通知。需強力證據。' }
+  },
+  {
+    id: 'emp-sr-religious',
+    group: 'employment', category: 'SR (EB-4 religious)', waitStatus: 'long', goesTo: 'SR',
+    en: { name: 'SR — Religious worker (EB-4)', summary: 'Ministers and non-minister religious workers sponsored by a bona fide U.S. religious organization', steps: ['2+ years of continuous membership and religious work', 'Employer files I-360 (ministers may self-petition in limited cases)', 'I-485 or consular processing when the SR date is current'], timeline: 'I-360 6-12 mo + SR priority-date wait', caveat: 'The non-minister SR program runs on a sunset clause Congress must keep renewing — it has lapsed before. Ministers are NOT subject to that sunset. SR shares the EB-4 numbers and moves on its own line in the bulletin.' },
+    zh: { name: 'SR 宗教工作者(EB-4)', summary: '由正当美国宗教组织担保的神职人员与非神职宗教工作者', steps: ['先满足连续 2 年以上的会籍与宗教工作经历', '雇主递 I-360(神职人员在特定情形下可自我申请)', 'SR 排期到后递 I-485 或走领事馆'], timeline: 'I-360 约 6-12 个月 + SR 排期', caveat: '非神职的 SR 类别带日落条款,需要国会一次次续期,历史上真的失效过;神职人员不受该条款限制。SR 与 EB-4 共用名额,但在公告里是单独一行,不能照抄 EB-4 的截止日。' },
+    tw: { name: 'SR 宗教工作者(EB-4)', summary: '由正當美國宗教組織擔保的神職人員與非神職宗教工作者', steps: ['先滿足連續 2 年以上的會籍與宗教工作經歷', '雇主遞 I-360(神職人員在特定情形下可自我申請)', 'SR 排期到後遞 I-485 或走領事館'], timeline: 'I-360 約 6-12 個月 + SR 排期', caveat: '非神職的 SR 類別帶日落條款,需要國會一次次續期,歷史上真的失效過;神職人員不受該條款限制。SR 與 EB-4 共用名額,但在公告裡是單獨一行,不能照抄 EB-4 的截止日。' }
   },
   {
     id: 'sp-sijs',
