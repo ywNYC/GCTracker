@@ -6442,7 +6442,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
 // navigator.clipboard (non-secure context), so fall back to a hidden textarea +
 // execCommand; if even that fails the chip selects its text so a long-press copy
 // still works. Confirmation is inline — no toast layer to maintain.
-const CopyChip = ({ label, value, hint }) => {
+const CopyChip = ({ label, value, hint, compact = false }) => {
   const { lang } = useLang();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -6475,21 +6475,23 @@ const CopyChip = ({ label, value, hint }) => {
     <button type="button" onClick={copy}
       className="flex items-center gc-mono"
       style={{
-        gap: '7px', fontSize: '11px', cursor: 'pointer', textAlign: 'left',
+        gap: compact ? '5px' : '7px', fontSize: compact ? '10px' : '11px',
+        cursor: 'pointer', textAlign: 'left',
         border: `1px solid ${copied ? 'var(--gc-green)' : 'var(--gc-green-border)'}`,
         background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)',
-        borderRadius: '3px', padding: '7px 10px',
+        borderRadius: '3px', padding: compact ? '5px 7px' : '7px 10px',
+        minWidth: 0,
       }}>
       <span style={{ minWidth: 0 }}>
         <span style={{ color: 'var(--gc-muted)' }}>{label}</span>{' '}
         <b style={{ userSelect: 'all' }}>{value}</b>
       </span>
       <span style={{
-        flexShrink: 0, fontWeight: 700, fontSize: '9.5px', letterSpacing: '0.04em',
+        flexShrink: 0, fontWeight: 700, fontSize: compact ? '8.5px' : '9.5px', letterSpacing: '0.04em',
         color: copied ? 'var(--gc-paper)' : 'var(--gc-green-ink)',
         background: copied ? 'var(--gc-green)' : 'var(--gc-surface)',
         border: `1px solid ${copied ? 'var(--gc-green)' : 'var(--gc-green-border)'}`,
-        borderRadius: '2px', padding: '2.5px 6px', lineHeight: 1.2,
+        borderRadius: '2px', padding: compact ? '2px 4px' : '2.5px 6px', lineHeight: 1.2,
       }}>
         {copied
           ? (lang === 'en' ? 'COPIED ✓' : lang === 'tw' ? '已複製 ✓' : '已复制 ✓')
@@ -6601,9 +6603,9 @@ const AboutTab = () => {
             border: '1px solid var(--gc-rule)', color: 'var(--gc-muted)', whiteSpace: 'nowrap',
           }}>{lang === 'en' ? 'Court 3-9mo · petition 3-8mo · GC 1-3yr' : lang === 'tw' ? '家事法院 3-9 月 · 移民申請 3-8 月 · 排期 1-3 年' : '家事法院 3-9 月 · 移民申请 3-8 月 · 排期 1-3 年'}</span>
         </div>
-        <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
-          <CopyChip label={lang === 'en' ? 'Phone' : '电话'} value="718-567-5566" />
-          <CopyChip label={lang === 'en' ? 'Email' : '邮箱'} value="info@robertwulaw.com" />
+        <div className="flex" style={{ gap: '5px', flexWrap: 'nowrap', marginTop: '6px' }}>
+          <CopyChip compact label={lang === 'en' ? 'Tel' : '电话'} value="718-567-5566" />
+          <CopyChip compact value="info@robertwulaw.com" />
         </div>
         <p style={{ fontSize: '9.5px', color: 'var(--gc-muted)', margin: '7px 0 0' }}>
           {lang === 'en'
