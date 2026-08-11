@@ -6510,24 +6510,23 @@ const AboutTab = () => {
           {lang === 'en' ? 'About Green Card Tracker' : lang === 'tw' ? '關於綠卡晴雨表' : '关于绿卡晴雨表'}
         </h2>
       </div>
+      {/* One intro card, not two — "什么" 与 "边界" 合并后正文各收一句，
+          省下的高度让下方的服务卡上移进首屏。 */}
       <div style={card}>
-        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'What this is' : lang === 'tw' ? '這是什麼' : '这是什么'}</div>
+        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'What this is · data & limits' : lang === 'tw' ? '這是什麼 · 資料與邊界' : '这是什么 · 数据与边界'}</div>
         <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: 0 }}>
           {lang === 'en'
-            ? 'Green Card Tracker turns the State Department\'s monthly Visa Bulletin into an answer you can actually use: how long is MY wait, how fast is my line moving, and what changed this month. Free, in Simplified / Traditional Chinese and English, updated automatically every month.'
+            ? 'Green Card Tracker turns the monthly Visa Bulletin into an answer you can use: how long is MY wait, and what changed this month. Free, in Chinese and English, updated automatically.'
             : lang === 'tw'
-              ? '綠卡晴雨表把國務院每月的簽證公告，變成你真正需要的答案：我還要等多久、我的隊伍每月走多快、這個月發生了什麼。免費使用，簡體／繁體／英文，每月自動更新。'
-              : '绿卡晴雨表把国务院每月的签证公告，变成你真正需要的答案：我还要等多久、我的队伍每月走多快、这个月发生了什么。免费使用，简体／繁体／英文，每月自动更新。'}
+              ? '綠卡晴雨表把國務院每月的簽證公告，變成你真正需要的答案：我還要等多久、這個月發生了什麼。免費，簡繁英三語，每月自動更新。'
+              : '绿卡晴雨表把国务院每月的签证公告，变成你真正需要的答案：我还要等多久、这个月发生了什么。免费，简繁英三语，每月自动更新。'}
         </p>
-      </div>
-      <div style={card}>
-        <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'Data & limits' : lang === 'tw' ? '資料與邊界' : '数据与边界'}</div>
-        <p style={{ fontSize: '12.5px', lineHeight: 1.75, color: 'var(--gc-ink-soft)', margin: 0 }}>
+        <p style={{ fontSize: '11.5px', lineHeight: 1.7, color: 'var(--gc-muted)', margin: '7px 0 0' }}>
           {lang === 'en'
-            ? 'All cutoff dates come from the official Visa Bulletin (travel.state.gov). Wait estimates are model projections from real historical pace — the bulletin can speed up, slow down, or retrogress. Nothing here is legal advice; consult a licensed immigration attorney for decisions.'
+            ? 'Cutoffs come from travel.state.gov; wait estimates are projections from real historical pace and can speed up, slow down or retrogress. Not legal advice.'
             : lang === 'tw'
-              ? '所有截止日均來自官方簽證公告（travel.state.gov）。等待預計是按真實歷史速度的模型推算——排期可能加速、放緩或倒退。本站內容不構成法律意見，重大決定請諮詢持牌移民律師。'
-              : '所有截止日均来自官方签证公告（travel.state.gov）。等待预计是按真实历史速度的模型推算——排期可能加速、放缓或倒退。本站内容不构成法律意见，重大决定请咨询持牌移民律师。'}
+              ? '截止日來自 travel.state.gov；等待預計按真實歷史速度推算，排期可能加速、放緩或倒退。本站不構成法律意見。'
+              : '截止日来自 travel.state.gov；等待预计按真实历史速度推算，排期可能加速、放缓或倒退。本站不构成法律意见。'}
         </p>
       </div>
       <div style={{ ...card, borderLeft: '3px solid var(--gc-green)' }}>
