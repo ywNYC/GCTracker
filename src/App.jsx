@@ -4247,7 +4247,8 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
                 aria-label={readout}
                 style={{
                   flex: '1 1 0', minWidth: 0, padding: 0, border: 'none', cursor: 'pointer',
-                  background: 'transparent',
+                  background: manual && isSel ? 'var(--gc-paper-soft)' : 'transparent',
+                  borderRadius: '3px 3px 0 0',
                 }}>
                 <div style={{ height: `${UP_PX}px`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                   {p.days > 0 && (
@@ -4269,15 +4270,15 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
                     <div style={{ width: '100%', maxWidth: '12px', height: '2px', background: 'var(--gc-subtle)', opacity: manual && !isSel ? 0.4 : 1 }} />
                   )}
                   {p.days === null && (p.cutoff === 'C' ? (
-                    <div className="flex items-center justify-center" style={{
-                      width: '100%', maxWidth: '18px', height: `${Math.round(plotH * 0.55)}px`,
+                    <div className="flex items-start justify-center" style={{
+                      width: '100%', maxWidth: '18px', height: `${Math.round(plotH)}px`,
                       background: 'var(--gc-green-soft)',
                       border: '1px dashed var(--gc-green-border)',
                       borderBottom: 'none',
                       borderRadius: '2px 2px 0 0',
                       opacity: manual && !isSel ? 0.4 : 1,
                     }}>
-                      <span className="gc-mono" style={{ fontSize: '9px', lineHeight: 1, fontWeight: 700, color: 'var(--gc-green)' }}>C</span>
+                      <span className="gc-mono" style={{ fontSize: '9px', lineHeight: 1, fontWeight: 700, color: 'var(--gc-green)', marginTop: '3px' }}>C</span>
                     </div>
                   ) : (
                     <div style={{ width: '4px', height: '4px', borderRadius: '50%', border: '1px solid var(--gc-subtle)', marginBottom: '-1px' }} />
@@ -4332,7 +4333,17 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
       </div>
 
       {/* Readout for the tapped column (defaults to the latest month) */}
-      <div className="gc-mono" style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--gc-ink-soft)', marginTop: '6px' }}>
+      <div className="gc-mono" style={{
+        fontSize: '10.5px', fontWeight: manual ? 700 : 600,
+        color: manual ? 'var(--gc-ink)' : 'var(--gc-ink-soft)',
+        marginTop: '6px',
+        borderLeft: manual ? `3px solid ${selPt.days > 0 ? 'var(--gc-blue)' : selPt.days < 0 ? 'var(--gc-red)' : 'var(--gc-green)'}` : 'none',
+        paddingLeft: manual ? '6px' : 0,
+        background: manual ? 'var(--gc-paper-soft)' : 'transparent',
+        paddingTop: manual ? '3px' : 0, paddingBottom: manual ? '3px' : 0,
+        borderRadius: manual ? '0 3px 3px 0' : 0,
+        transition: 'background 120ms',
+      }}>
         {readout}
       </div>
 
@@ -15848,7 +15859,7 @@ export default function App() {
           </div>
             );
           })()}
-          <div className="mt-8" style={{ padding: '14px 12px 16px' }}>
+          <div className="mt-3" style={{ padding: '6px 12px 16px' }}>
             {/* ONE compact fine-print line: source + month + disclaimer + copyright +
                 theme picker. Vol/No dropped — it forced a second wrapped line. */}
             <div style={{
@@ -15877,10 +15888,10 @@ export default function App() {
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '5px',
-                        padding: '3px 6px 3px 5px',
+                        gap: '6px',
+                        padding: '5px 9px 5px 8px',
                         border: '1px solid var(--gc-rule)',
-                        borderRadius: '2px',
+                        borderRadius: '3px',
                         background: 'transparent',
                         cursor: 'pointer',
                         fontSize: '10px',
@@ -15905,7 +15916,7 @@ export default function App() {
                           background: current.swatch[1],
                         }}></span>
                       </span>
-                      <span className="gc-serif">{current.name}</span>
+                      <span className="gc-serif" style={{ fontSize: '11px' }}>{current.name}</span>
                       <svg width="7" height="4" viewBox="0 0 8 5" style={{ opacity: 0.5 }}>
                         <path d="M0 0 L4 4 L8 0" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
@@ -15991,12 +16002,12 @@ export default function App() {
                   }}
                   title={lang === 'en' ? 'Reset all saved data' : '清除所有本地数据'}
                   style={{
-                    padding: '3px 6px',
+                    padding: '5px 10px',
                     border: '1px solid var(--gc-rule)',
-                    borderRadius: '2px',
+                    borderRadius: '3px',
                     background: 'transparent',
                     cursor: 'pointer',
-                    fontSize: '10px',
+                    fontSize: '11px',
                     color: 'var(--gc-muted)',
                     lineHeight: 1,
                     letterSpacing: '0.02em',
