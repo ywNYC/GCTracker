@@ -4154,10 +4154,12 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
   const readout = selPt.days === null
     ? (lang === 'en' ? `${fmtMonth(selPt.month)} · cutoff ${cutText}` : `${fmtMonth(selPt.month)} · 截止日 ${cutText}`)
     : selPt.days === 0
-      ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no movement · cutoff ${cutText}` : `${fmtMonth(selPt.month)} · 没有变化 · 停在 ${cutText}`)
+      ? (lang === 'en' ? `${fmtMonth(selPt.month)} · no movement · cutoff ${cutText}` : lang === 'tw' ? `${fmtMonth(selPt.month)} · 沒有變化 · 停在 ${cutText}` : `${fmtMonth(selPt.month)} · 没有变化 · 停在 ${cutText}`)
       : (lang === 'en'
           ? `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? 'advanced' : 'retrogressed'} ${Math.abs(selPt.days)} days · cutoff ${cutText}`
-          : `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? '前进' : '倒退'} ${Math.abs(selPt.days)} 天 · ${selPt.days > 0 ? '排到' : '回到'} ${cutText}`);
+          : lang === 'tw'
+            ? `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? '前進' : '倒退'} ${Math.abs(selPt.days)} 天 · ${selPt.days > 0 ? '排到' : '回到'} ${cutText}`
+            : `${fmtMonth(selPt.month)} · ${selPt.days > 0 ? '前进' : '倒退'} ${Math.abs(selPt.days)} 天 · ${selPt.days > 0 ? '排到' : '回到'} ${cutText}`);
 
   const hasNegative = maxDown > 0;
   const manual = sel !== null;
@@ -4167,7 +4169,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
       {/* Header: eyebrow + chart (A/B) and window (12/24) toggles */}
       <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
         <span className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', minWidth: 0 }}>
-          {lang === 'en' ? 'Bulletin movement' : '排期推进'}
+          {lang === 'en' ? 'Bulletin movement' : lang === 'tw' ? '排期推進' : '排期推进'}
           <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', marginLeft: '5px', color: 'var(--gc-muted-soft)' }}>
             {chartSel === 'A'
               ? (lang === 'en' ? '— approval pace (Chart A)' : lang === 'tw' ? '—— 獲批口徑（表A）' : '—— 获批口径（表A）')
@@ -4351,7 +4353,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
       <div className="flex items-center gap-3" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginTop: '4px', flexWrap: 'wrap' }}>
         <span className="inline-flex items-center gap-1">
           <span style={{ width: '7px', height: '7px', background: 'var(--gc-blue)', borderRadius: '1px', display: 'inline-block' }} />
-          {lang === 'en' ? 'Monthly advance' : '单月前进'}
+          {lang === 'en' ? 'Monthly advance' : lang === 'tw' ? '單月前進' : '单月前进'}
         </span>
         {hasNegative && (
           <span className="inline-flex items-center gap-1">
@@ -4362,7 +4364,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
         {showLine && (
           <span className="inline-flex items-center gap-1">
             <span style={{ width: '10px', height: '2px', background: 'var(--gc-green)', display: 'inline-block' }} />
-            {lang === 'en' ? `${windowMonths}-mo cumulative (own scale)` : `${windowMonths}个月累计（独立比例）`}
+            {lang === 'en' ? `${windowMonths}-mo cumulative (own scale)` : lang === 'tw' ? `${windowMonths}個月累計（獨立比例）` : `${windowMonths}个月累计（独立比例）`}
           </span>
         )}
         {points.some((p) => p.cutoff === 'C') && (
