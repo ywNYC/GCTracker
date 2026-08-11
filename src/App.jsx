@@ -1797,6 +1797,79 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
 };
 
 // ============================================================
+// CATEGORY_SUBTYPES — the identification layer under each bulletin category.
+// Bulletin dates never differ INSIDE a parent category: the rows that do move
+// independently (SR, EW, EB-5 set-asides) are already top-level options. So the
+// subtype is stored purely to know who the user is — analytics, email
+// segmentation, future personalization — and the UI says so out loud.
+const CATEGORY_SUBTYPES = {
+  EB1: [
+    ['eb1a', 'EB-1A 杰出人才', 'EB-1A 傑出人才', 'EB-1A extraordinary'],
+    ['eb1b', 'EB-1B 教授/研究员', 'EB-1B 教授/研究員', 'EB-1B researcher'],
+    ['eb1c', 'EB-1C 跨国高管', 'EB-1C 跨國高管', 'EB-1C executive'],
+  ],
+  EB2: [
+    ['perm', '雇主担保 PERM', '雇主擔保 PERM', 'PERM sponsored'],
+    ['niw', 'NIW 自我申请', 'NIW 自我申請', 'NIW self-petition'],
+    ['scha', 'Schedule A 护士/理疗', 'Schedule A 護士/理療', 'Schedule A'],
+  ],
+  EB3: [
+    ['prof', '专业人员(本科)', '專業人員(本科)', 'Professional'],
+    ['skilled', '技术工(≥2年经验)', '技術工(≥2年經驗)', 'Skilled worker'],
+  ],
+  EB4: [
+    ['sijs', 'SIJS 特殊青少年', 'SIJS 特殊青少年', 'SIJS'],
+    ['un', '联合国/国际组织', '聯合國/國際組織', "UN / int'l org"],
+    ['other4', '其他特殊移民', '其他特殊移民', 'Other special'],
+  ],
+  EB5: [
+    ['direct', '直接投资', '直接投資', 'Direct investment'],
+    ['rc', '区域中心', '區域中心', 'Regional Center'],
+  ],
+};
+
+const subtypeLabel = (cat, id, lang) => {
+  const row = (CATEGORY_SUBTYPES[cat] || []).find((o) => o[0] === id);
+  if (!row) return null;
+  return lang === 'en' ? row[3] : lang === 'tw' ? row[2] : row[1];
+};
+
+// SubtypeChips — optional single-select pills under the category picker.
+// Tapping the active chip clears it; changing category resets it upstream.
+const SubtypeChips = ({ userCase, setUserCase }) => {
+  const { lang } = useLang();
+  const opts = CATEGORY_SUBTYPES[userCase.category];
+  if (!opts) return null;
+  return (
+    <div style={{ marginTop: '7px' }}>
+      <span className="gc-label" style={{ fontSize: '9px', color: 'var(--gc-muted)' }}>
+        {lang === 'en' ? 'SUBTYPE · optional, same cutoff dates'
+          : lang === 'tw' ? '細分 · 可選，不影響排期計算'
+          : '细分 · 可选，不影响排期计算'}
+      </span>
+      <div className="flex" style={{ gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
+        {opts.map(([id, zh, tw, en]) => {
+          const on = userCase.subtype === id;
+          return (
+            <button key={id} type="button"
+              onClick={() => setUserCase({ ...userCase, subtype: on ? null : id })}
+              style={{
+                padding: '4px 9px', fontSize: '10.5px', fontWeight: on ? 700 : 500,
+                border: `1px solid ${on ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
+                borderRadius: '11px',
+                background: on ? 'var(--gc-green)' : 'var(--gc-surface)',
+                color: on ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
+                cursor: 'pointer', transition: 'all 120ms',
+              }}>
+              {lang === 'en' ? en : lang === 'tw' ? tw : zh}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // DateDropdown — themed priority-date picker. The native date input opens the OS
 // wheel (system UI, unstylable); this draws the picker in-page instead: a year
 // stepper (tap the year for a full tappable grid — no scrolling), a 12-month grid,
@@ -2087,7 +2160,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
                 let newPetitioner = userCase.petitionerStatus;
                 if (newCat === 'F2A' || newCat === 'F2B') newPetitioner = 'LPR';
                 else if (newCat === 'F1' || newCat === 'F3' || newCat === 'F4') newPetitioner = 'USC';
-                setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner });
+                setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner, subtype: null });
               }} />
           </div>
 
@@ -2126,6 +2199,8 @@ const InputPanel = ({ userCase, setUserCase }) => {
             </button>
           </div>
         </div>
+
+        <SubtypeChips userCase={userCase} setUserCase={setUserCase} />
 
         {/* Petitioner Status — ONLY for F categories */}
         {userCase.category.startsWith('F') && (() => {
@@ -2388,7 +2463,7 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
                 let newPetitioner = userCase.petitionerStatus;
                 if (newCat === 'F2A' || newCat === 'F2B') newPetitioner = 'LPR';
                 else if (newCat === 'F1' || newCat === 'F3' || newCat === 'F4') newPetitioner = 'USC';
-                setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner });
+                setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner, subtype: null });
               }} />
 
             {/* Priority Date */}
@@ -2431,6 +2506,8 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
               </div>
             )}
           </div>
+
+          <SubtypeChips userCase={userCase} setUserCase={setUserCase} />
 
           {/* F-category mismatch hint — compact */}
           {mismatch && (
@@ -14883,6 +14960,7 @@ export default function App() {
       priorityDate: pd,
       inUS: params.get('in') !== '0',
       petitionerStatus: params.get('ps') || (c.startsWith('F') && (c === 'F2A' || c === 'F2B') ? 'LPR' : 'USC'),
+      subtype: params.get('st') || null,
     };
   };
   const writeUserCaseToURL = (uc) => {
