@@ -6484,7 +6484,13 @@ const CopyChip = ({ label, value, hint }) => {
         <span style={{ color: 'var(--gc-muted)' }}>{label}</span>{' '}
         <b style={{ userSelect: 'all' }}>{value}</b>
       </span>
-      <span style={{ flexShrink: 0, fontWeight: 700, fontSize: '10px', color: 'var(--gc-green)' }}>
+      <span style={{
+        flexShrink: 0, fontWeight: 700, fontSize: '9.5px', letterSpacing: '0.04em',
+        color: copied ? 'var(--gc-paper)' : 'var(--gc-green-ink)',
+        background: copied ? 'var(--gc-green)' : 'var(--gc-surface)',
+        border: `1px solid ${copied ? 'var(--gc-green)' : 'var(--gc-green-border)'}`,
+        borderRadius: '2px', padding: '2.5px 6px', lineHeight: 1.2,
+      }}>
         {copied
           ? (lang === 'en' ? 'COPIED ✓' : lang === 'tw' ? '已複製 ✓' : '已复制 ✓')
           : (hint || (lang === 'en' ? 'COPY' : lang === 'tw' ? '複製' : '复制'))}
@@ -6587,7 +6593,10 @@ const AboutTab = () => {
             fontSize: '9.5px', padding: '3px 7px', borderRadius: '10px',
             border: '1px solid var(--gc-rule)', color: 'var(--gc-muted)', whiteSpace: 'nowrap',
           }}>{lang === 'en' ? 'Court 3-9mo · petition 3-8mo · GC 1-3yr' : lang === 'tw' ? '家事法院 3-9 月 · 移民申請 3-8 月 · 排期 1-3 年' : '家事法院 3-9 月 · 移民申请 3-8 月 · 排期 1-3 年'}</span>
+        </div>
+        <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
           <CopyChip label={lang === 'en' ? 'Phone' : '电话'} value="718-567-5566" />
+          <CopyChip label={lang === 'en' ? 'Email' : '邮箱'} value="info@robertwulaw.com" />
         </div>
         <p style={{ fontSize: '9.5px', color: 'var(--gc-muted)', margin: '7px 0 0' }}>
           {lang === 'en'
