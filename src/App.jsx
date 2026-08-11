@@ -6543,7 +6543,7 @@ const AboutTab = () => {
       <div style={{ ...card, borderLeft: '3px solid var(--gc-green)' }}>
         <div className="gc-eyebrow" style={eyebrow}>{lang === 'en' ? 'From the builder · U.S. mortgage' : lang === 'tw' ? '站長服務 · 全美房屋貸款' : '站长服务 · 全美房屋贷款'}</div>
         <div className="flex items-center" style={{ gap: '12px', marginBottom: '8px' }}>
-          <img src="/jack-avatar.png" alt="Jack" width="52" height="52"
+          <img src="/jack-avatar.png?v=2" alt="Jack" width="52" height="52"
             style={{ width: '52px', height: '52px', borderRadius: '50%', border: '2px solid var(--gc-green-border)', flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
             <div className="gc-serif" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gc-ink)' }}>
