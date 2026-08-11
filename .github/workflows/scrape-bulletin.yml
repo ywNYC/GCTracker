@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: scrape-bulletin
@@ -58,6 +59,7 @@ jobs:
       # The scrapers write into public/ — Vite serves public/ at the site root,
       # so these become /bulletin.json and /uscis-charts.json after a Pages build.
       - name: Commit if changed
+        id: commit
         run: |
           if git diff --quiet -- public/bulletin.json public/uscis-charts.json; then
             echo "No change to scraped data — nothing to commit."
@@ -69,6 +71,21 @@ jobs:
           git commit -m "chore: auto-update visa bulletin"
           git push
           echo "Pushed updated bulletin — Cloudflare Pages will redeploy."
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+
+      # Zero-cost owner notification: a new bulletin opens an assigned issue, and
+      # GitHub's own push/email delivers it. No polling loop anywhere has to burn
+      # tokens or requests just to ask "is it out yet?".
+      - name: Notify owner via issue
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MONTH=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/bulletin.json','utf8')).current.month)")
+          gh issue create \
+            --title "新排期公告已抓取上线：$MONTH" \
+            --assignee ywNYC \
+            --body "$(printf '%s 公告已自动抓取并部署。\n\n月度清单：\n- [ ] 核对 USCIS 采用哪张表（uscis-charts.json 会晚约一周，期间站内用通用说明）\n- [ ] node scripts/backfill-history.mjs 更新 history.json（站内速度/图表依赖它）\n- [ ] 翻译公告 D 节以后的 notices 进 notice-translations.json\n- [ ] 站内一致性检查（总结页/动态页/邮件预览）\n- [ ] 群发：POST /api/admin/send-monthly（当前 60 人，不带 only=）\n\n此 issue 由 scrape-bulletin workflow 自动创建。' "$MONTH")"
 
       - name: Summary
         if: always()
