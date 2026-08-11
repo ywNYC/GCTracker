@@ -6480,10 +6480,13 @@ const CopyChip = ({ label, value, hint, compact = false }) => {
         border: `1px solid ${copied ? 'var(--gc-green)' : 'var(--gc-green-border)'}`,
         background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)',
         borderRadius: '3px', padding: compact ? '5px 7px' : '7px 10px',
-        minWidth: 0,
+        minWidth: 0, flex: '0 1 auto', overflow: 'hidden',
       }}>
-      <span style={{ minWidth: 0 }}>
-        <span style={{ color: 'var(--gc-muted)' }}>{label}</span>{' '}
+      {/* Never wraps to a second line: the value truncates with an ellipsis
+          instead. The copy button still puts the FULL value on the clipboard,
+          so a clipped email is readable the moment it's pasted. */}
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {label && <><span style={{ color: 'var(--gc-muted)' }}>{label}</span>{' '}</>}
         <b style={{ userSelect: 'all' }}>{value}</b>
       </span>
       <span style={{
