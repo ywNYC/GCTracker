@@ -83,7 +83,11 @@ export const daysBetween = (a, b) => Math.round((a - b) / (1000 * 60 * 60 * 24))
 
 export const computeStatus = (priorityDate, cutoff) => {
   if (cutoff === 'C') return { status: 'current', days: 0 };
-  if (!cutoff || cutoff === 'U') return { status: 'notCurrent', days: null };
+  // null/'U' = the bulletin printed no cutoff (no visas this month) — distinct from
+  // "notCurrent" (a real cutoff exists, PD just hasn't reached it). Was wrongly
+  // 'notCurrent' here, out of sync with the 'unavailable' src/App.jsx already used —
+  // send-monthly's emails were mislabeling U months. Fixed to match (2026-08-12 dedup pass).
+  if (!cutoff || cutoff === 'U') return { status: 'unavailable', days: null };
   const pd = parseDate(priorityDate);
   const co = parseDate(cutoff);
   if (!pd) return { status: 'notCurrent', days: null };

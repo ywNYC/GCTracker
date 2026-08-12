@@ -56,22 +56,73 @@ jobs:
       - name: Scrape USCIS chart designation
         run: node scripts/scrape-uscis-chart.mjs || true
 
+      # Cheap, network-free upsert of the just-scraped month into history.json
+      # (the frontend's speed/forecast archive). Reuses data scrape-bulletin.mjs
+      # already fetched — does NOT refetch older months (that's
+      # backfill-history.mjs, for filling archive gaps, still manual).
+      # No-ops (no write) when the month is already up to date, so it never
+      # causes a spurious commit on days nothing changed.
+      - name: Append current month to history.json
+        run: node scripts/append-current-to-history.mjs
+
       # The scrapers write into public/ — Vite serves public/ at the site root,
-      # so these become /bulletin.json and /uscis-charts.json after a Pages build.
+      # so these become /bulletin.json, /uscis-charts.json and /history.json
+      # after a Pages build.
       - name: Commit if changed
         id: commit
         run: |
-          if git diff --quiet -- public/bulletin.json public/uscis-charts.json; then
+          if git diff --quiet -- public/bulletin.json public/uscis-charts.json public/history.json; then
             echo "No change to scraped data — nothing to commit."
             exit 0
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/bulletin.json public/uscis-charts.json
+          git add public/bulletin.json public/uscis-charts.json public/history.json
           git commit -m "chore: auto-update visa bulletin"
           git push
           echo "Pushed updated bulletin — Cloudflare Pages will redeploy."
           echo "committed=true" >> "$GITHUB_OUTPUT"
+
+      # send-monthly reads history.json/bulletin.json/uscis-charts.json straight
+      # off the LIVE site (see functions/api/admin/send-monthly.js), not from
+      # this checkout, so it has to wait for the Pages redeploy triggered by the
+      # push above to actually go live before it's safe to call.
+      - name: Wait for Cloudflare Pages redeploy
+        id: wait_deploy
+        if: steps.commit.outputs.committed == 'true'
+        run: |
+          WANT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/history.json','utf8')).latest)")
+          for i in $(seq 1 30); do
+            LIVE=$(curl -fsS "https://gc.jmjvc.us/history.json" 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{process.stdout.write(JSON.parse(d).latest||'')}catch{}})" || echo "")
+            if [ "$LIVE" = "$WANT" ]; then
+              echo "Live site now serving $WANT (attempt $i)."
+              echo "ready=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Waiting for Pages redeploy... live=$LIVE want=$WANT (attempt $i/30)"
+            sleep 10
+          done
+          echo "::warning::Timed out waiting for Cloudflare Pages redeploy after 5 minutes — skipping send-monthly this run, next scheduled run will pick up the KV idempotency gate correctly."
+
+      # Idempotent by design (functions/api/admin/send-monthly.js stamps
+      # lastNotifiedMonth per subscriber after a successful send), so calling
+      # this more than once for the same month is safe — already-notified
+      # subscribers are skipped, not double-mailed.
+      - name: Trigger monthly subscriber emails
+        if: steps.commit.outputs.committed == 'true' && steps.wait_deploy.outputs.ready == 'true'
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          if [ -z "$ADMIN_TOKEN" ]; then
+            echo "::warning::ADMIN_TOKEN secret not set — skipping send-monthly trigger. Run it manually."
+            exit 0
+          fi
+          curl -fsS -X POST "https://gc.jmjvc.us/api/admin/send-monthly" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -o send-monthly-result.json -w "HTTP %{http_code}\n"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat send-monthly-result.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       # Zero-cost owner notification: a new bulletin opens an assigned issue, and
       # GitHub's own push/email delivers it. No polling loop anywhere has to burn
@@ -85,7 +136,7 @@ jobs:
           gh issue create \
             --title "新排期公告已抓取上线：$MONTH" \
             --assignee ywNYC \
-            --body "$(printf '%s 公告已自动抓取并部署。\n\n月度清单：\n- [ ] 核对 USCIS 采用哪张表（uscis-charts.json 会晚约一周，期间站内用通用说明）\n- [ ] node scripts/backfill-history.mjs 更新 history.json（站内速度/图表依赖它）\n- [ ] 翻译公告 D 节以后的 notices 进 notice-translations.json\n- [ ] 站内一致性检查（总结页/动态页/邮件预览）\n- [ ] 群发：POST /api/admin/send-monthly（当前 60 人，不带 only=）\n\n此 issue 由 scrape-bulletin workflow 自动创建。' "$MONTH")"
+            --body "$(printf '%s 公告已自动抓取并部署。history.json 已自动同步，send-monthly 已自动触发（结果见本次 workflow run 的 Summary）。\n\n还需要人工做的：\n- [ ] 核对 USCIS 采用哪张表（uscis-charts.json 会晚约一周，期间站内用通用说明）\n- [ ] 翻译公告 D 节以后的 notices 进 notice-translations.json\n- [ ] 站内一致性检查（总结页/动态页/邮件预览）\n- [ ] 去 workflow run 的 Summary 确认 send-monthly 是否成功发出（如失败或 ADMIN_TOKEN 未配置需手动补发）\n\n此 issue 由 scrape-bulletin workflow 自动创建。' "$MONTH")"
 
       - name: Summary
         if: always()
