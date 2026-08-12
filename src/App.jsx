@@ -1644,12 +1644,7 @@ const SubtypeChips = ({ userCase, setUserCase, required = false, error = false }
   if (!opts) return null;
   return (
     <div style={{ marginTop: '7px' }}>
-      <span className="gc-label" style={{ fontSize: '9px', color: error ? 'var(--gc-red)' : 'var(--gc-muted)' }}>
-        {lang === 'en' ? 'SUBTYPE · optional, same cutoff dates'
-          : lang === 'tw' ? '細分 · 可選，不影響排期計算'
-          : '细分 · 可选，不影响排期计算'}
-      </span>
-      <div className="flex" style={{ gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
+      <div className="flex" style={{ gap: '5px', flexWrap: 'wrap' }}>
         {opts.map(([id, zh, tw, en]) => {
           const on = userCase.subtype === id;
           return (
@@ -14217,7 +14212,7 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
               {lang === 'en' ? 'Track this case by email' : lang === 'tw' ? '訂閱這個案子的排期' : '订阅这个案子的排期'}
             </div>
             <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '10px' }}>
-              {userCase.category} · {userCase.country} · {lang === 'en' ? 'PD ' : '优先日 '}{pdLabel}
+              {userCase.category}{subtypeLabel(userCase.category, userCase.subtype, lang) ? ` (${subtypeLabel(userCase.category, userCase.subtype, lang)})` : ''} · {userCase.country} · {lang === 'en' ? 'PD ' : '优先日 '}{pdLabel}
             </div>
             <input
               type="email" value={email} onChange={(e) => setEmail(e.target.value)}
