@@ -3919,8 +3919,22 @@ const CommunityHub = ({ userCase }) => {
     }
   }, [tab, swDone]); // eslint-disable-line react-hooks/exhaustive-deps
   const [costDone, setCostDone] = useState(() => done('cost'));
+  const [costAgg, setCostAgg] = useState(null);
+  useEffect(() => {
+    if (tab === 'survey' && costDone && !costAgg) {
+      fetch(`/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json()).then(setCostAgg).catch(() => {});
+    }
+  }, [tab, costDone]); // eslint-disable-line react-hooks/exhaustive-deps
   const [qText, setQText] = useState('');
   const [qDone, setQDone] = useState(() => done('question'));
+
+  // The "switched category" option only makes sense worded toward whatever direction
+  // is actually reachable from THIS user's category (EB2 goes down to EB-3, EB3 goes
+  // up to EB-2) — a fixed "降级 EB-3" label was nonsensical for an EB-2 or EB-1 reader.
+  const switchOpt = {
+    EB2: { id: 'downgrade', label: L('降级到 EB-3', '降級到 EB-3', 'Downgraded to EB-3') },
+    EB3: { id: 'upgrade', label: L('升级到 EB-2', '升級到 EB-2', 'Upgraded to EB-2') },
+  }[userCase.category] || { id: 'switched', label: L('换过类别', '換過類別', 'Switched category') };
 
   const chip = (active) => ({
     fontSize: '10.5px', fontWeight: 700, padding: '6px 10px', border: `1px solid ${active ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
@@ -4041,7 +4055,7 @@ const CommunityHub = ({ userCase }) => {
                 {!swDone ? (
                   <>
                     <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '5px' }}>
-                      {[['downgrade', L('降级 EB-3', '降級 EB-3', 'Downgrade EB-3')], ['porting', L('换雇主', '換雇主', 'Changed employer')], ['premium', L('用过加急', '用過加急', 'Premium processing')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => (
+                      {[[switchOpt.id, switchOpt.label], ['porting', L('换雇主', '換雇主', 'Changed employer')], ['premium', L('用过加急', '用過加急', 'Premium processing')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => (
                         <button key={id} type="button" onClick={() => { setSwAction(id); if (id === 'none') setSwOutcome(null); }} style={chip(swAction === id)}>{label}</button>
                       ))}
                     </div>
@@ -4075,7 +4089,7 @@ const CommunityHub = ({ userCase }) => {
                     {doneNote(L('已提交 ✓', '已提交 ✓', 'Submitted ✓'))}
                     {swAgg && swAgg.total > 0 && (
                       <div style={{ marginTop: '5px' }}>
-                        {[['downgrade', L('降级 EB-3', '降級 EB-3', 'Downgrade')], ['porting', L('换雇主', '換雇主', 'Port')], ['premium', L('加急', '加急', 'Premium')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => {
+                        {[[switchOpt.id, switchOpt.label], ['porting', L('换雇主', '換雇主', 'Port')], ['premium', L('加急', '加急', 'Premium')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => {
                           const n = swAgg.actions?.[id] || 0;
                           const pct = swAgg.total ? Math.round((n / swAgg.total) * 100) : 0;
                           return (
@@ -4106,10 +4120,45 @@ const CommunityHub = ({ userCase }) => {
                 <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
                   {[['lt5k', '< $5k'], ['b5to10k', '$5-10k'], ['b10to15k', '$10-15k'], ['gt15k', '> $15k']].map(([id, label]) => (
                     <button key={id} type="button" disabled={busy === 'cost'} style={chip(false)}
-                      onClick={async () => { if (await post({ type: 'cost', bracket: id }, 'cost')) setCostDone(true); }}>{label}</button>
+                      onClick={async () => {
+                        if (await post({ type: 'cost', bracket: id }, 'cost')) {
+                          setCostDone(true);
+                          setCostAgg((prev) => {
+                            const base = prev || { total: 0, brackets: {} };
+                            return { total: base.total + 1, brackets: { ...base.brackets, [id]: (base.brackets[id] || 0) + 1 } };
+                          });
+                          fetch(`/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json())
+                            .then((data) => setCostAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
+                            .catch(() => {});
+                        }
+                      }}>{label}</button>
                   ))}
                 </div>
-              ) : doneNote(L('已提交 ✓ 谢谢', '已提交 ✓ 謝謝', 'Submitted ✓'))}
+              ) : (
+                <div>
+                  {doneNote(L('已提交 ✓ 谢谢', '已提交 ✓ 謝謝', 'Submitted ✓'))}
+                  {costAgg && costAgg.total > 0 && (
+                    <div style={{ marginTop: '5px' }}>
+                      {[['lt5k', '< $5k'], ['b5to10k', '$5-10k'], ['b10to15k', '$10-15k'], ['gt15k', '> $15k']].map(([id, label]) => {
+                        const n = costAgg.brackets?.[id] || 0;
+                        const pct = costAgg.total ? Math.round((n / costAgg.total) * 100) : 0;
+                        return (
+                          <div key={id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
+                            <span style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
+                            <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
+                              <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
+                            </span>
+                            <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
+                          </div>
+                        );
+                      })}
+                      <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '3px' }}>
+                        {L(`${costAgg.total} 份 · 匿名`, `${costAgg.total} 份 · 匿名`, `${costAgg.total} responses`)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
