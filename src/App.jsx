@@ -13816,25 +13816,9 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     priorityDate: '2024-07-15',
     inUS: true,
     petitionerStatus: 'USC',
+    subtype: null,
   });
 
-  const categories = [
-    { v: 'EB1', en: 'EB-1', zh: 'EB-1', tw: 'EB-1' },
-    { v: 'EB2', en: 'EB-2', zh: 'EB-2', tw: 'EB-2' },
-    { v: 'EB3', en: 'EB-3', zh: 'EB-3', tw: 'EB-3' },
-    { v: 'EW',  en: 'EB-3 Other', zh: 'EB-3非技术', tw: 'EB-3非技術' },
-    { v: 'EB4', en: 'EB-4 / SIJ', zh: 'EB-4特殊移民', tw: 'EB-4特殊移民' },
-    { v: 'SR',  en: 'EB-4 Religious', zh: 'EB-4宗教', tw: 'EB-4宗教' },
-    { v: 'EB5', en: 'EB-5', zh: 'EB-5投资', tw: 'EB-5投資' },
-    { v: 'EB5R', en: 'EB-5 Rural', zh: 'EB-5乡村', tw: 'EB-5鄉村' },
-    { v: 'EB5H', en: 'EB-5 High-Unemp.', zh: 'EB-5高失业', tw: 'EB-5高失業' },
-    { v: 'EB5I', en: 'EB-5 Infra.', zh: 'EB-5基建', tw: 'EB-5基建' },
-    { v: 'F1',  en: 'F1',   zh: 'F1',   tw: 'F1' },
-    { v: 'F2A', en: 'F2A',  zh: 'F2A',  tw: 'F2A' },
-    { v: 'F2B', en: 'F2B',  zh: 'F2B',  tw: 'F2B' },
-    { v: 'F3',  en: 'F3',   zh: 'F3',   tw: 'F3' },
-    { v: 'F4',  en: 'F4',   zh: 'F4',   tw: 'F4' },
-  ];
   const countries = [
     { v: 'Taiwan',      en: 'TWN / HK / ROW', zh: '台湾/港澳/全球', tw: '台灣/港澳/全球' },
     { v: 'China',       en: 'China',          zh: '中国大陆',       tw: '中國大陸' },
@@ -14161,28 +14145,14 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
             {/* Category */}
             <div>
               <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.category}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
-                {categories.map(c => {
-                  const active = form.category === c.v;
-                  const isF2C = c.v === 'F2A' || c.v === 'F2B';
+              <CategoryDropdown value={form.category}
+                triggerStyle={{ padding: '9px 9px', background: 'var(--gc-paper-soft)' }}
+                onChange={(newCat) => {
+                  const isF2C = newCat === 'F2A' || newCat === 'F2B';
                   const newPetitioner = isF2C ? 'LPR' : 'USC';
-                  return (
-                    <button key={c.v}
-                      onClick={() => setForm({ ...form, category: c.v, petitionerStatus: c.v.startsWith('F') ? newPetitioner : form.petitionerStatus })}
-                      style={{
-                        padding: '7px 4px',
-                        fontSize: '11px', fontWeight: 700,
-                        background: active ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
-                        color: active ? 'var(--gc-paper)' : 'var(--gc-ink)',
-                        border: active ? 'none' : '1px solid var(--gc-rule)',
-                        borderRadius: 'var(--gc-radius-sm)',
-                        cursor: 'pointer', transition: 'all 120ms',
-                      }}>
-                      {c[lang] || c.en}
-                    </button>
-                  );
-                })}
-              </div>
+                  setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: null });
+                }} />
+              <SubtypeChips userCase={form} setUserCase={setForm} />
             </div>
 
             {/* Priority Date — same themed picker as the case bar, not the OS sheet */}
