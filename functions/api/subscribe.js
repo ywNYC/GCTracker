@@ -92,6 +92,13 @@ export async function buildConfirmToken(email, env) {
   return signEmail(`confirm:${email}`, env.UNSUBSCRIBE_SECRET);
 }
 
+// Lets the monthly-update email carry a deep link that can write back to this one
+// subscriber's record (filling in a missing category subtype) without a login system.
+// Same domain-separation reasoning as buildConfirmToken.
+export async function buildSubtypeToken(email, env) {
+  return signEmail(`subtype:${email}`, env.UNSUBSCRIBE_SECRET);
+}
+
 async function buildConfirmUrl(email, env) {
   const siteUrl = (env.SITE_URL || 'https://gc.jmjvc.us').replace(/\/+$/, '');
   const token = await buildConfirmToken(email, env);

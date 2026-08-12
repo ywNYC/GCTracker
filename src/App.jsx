@@ -14279,6 +14279,80 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
   );
 };
 
+// SubtypeUpdateModal — one-time prompt for subscribers whose EB1-EB5 record predates
+// the subtype field. Only ever shown when the page was opened via the monthly-update
+// email's special link (see buildCaseUrl/buildSubtypeToken) — App() gates on that,
+// this component just renders the ask and posts the answer. Dismissible: skipping
+// costs nothing, the app works fine without a subtype on file.
+// ============================================================
+const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone, onClose }) => {
+  const { lang } = useLang();
+  const [pick, setPick] = useState(userCase.subtype || null);
+  const [status, setStatus] = useState(''); // '' | 'loading' | 'error'
+
+  const opts = CATEGORY_SUBTYPES[userCase.category];
+  if (!opts) return null;
+
+  const save = async () => {
+    if (!pick) return;
+    setStatus('loading');
+    try {
+      const resp = await fetch('/api/update-subtype', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, token, subtype: pick }),
+      });
+      const result = await resp.json().catch(() => ({ success: false }));
+      if (resp.ok && result.success) {
+        onDone(pick);
+      } else {
+        setStatus('error');
+      }
+    } catch {
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div className="visa-root" data-theme={theme}
+      style={{ position: 'fixed', inset: 0, zIndex: 950, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'rgba(15,20,25,0.5)' }}
+      onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        position: 'relative', width: '100%', maxWidth: '360px',
+        background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderTop: '3px solid var(--gc-green)',
+        borderRadius: '6px', padding: '16px 18px 14px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+      }}>
+        <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '6px' }}>
+          {lang === 'en' ? 'One quick thing' : lang === 'tw' ? '補充一個小資訊' : '补充一个小信息'}
+        </div>
+        <div style={{ fontSize: '12.5px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', marginBottom: '4px' }}>
+          {lang === 'en'
+            ? <>This question didn't exist when you subscribed. Which <b>{userCase.category}</b> subtype is your case?</>
+            : lang === 'tw'
+              ? <>你訂閱的時候還沒有這道題。你的 <b>{userCase.category}</b> 屬於哪個細分？</>
+              : <>你订阅的时候还没有这道题。你的 <b>{userCase.category}</b> 属于哪个细分？</>}
+        </div>
+        <SubtypeChips userCase={{ ...userCase, subtype: pick }} setUserCase={(uc) => setPick(uc.subtype)} required />
+        {status === 'error' && (
+          <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '6px' }}>
+            {lang === 'en' ? 'Something went wrong — try again.' : lang === 'tw' ? '出錯了，再試一次。' : '出错了，再试一次。'}
+          </div>
+        )}
+        <div className="flex items-center justify-end" style={{ marginTop: '12px' }}>
+          <button type="button" onClick={save} disabled={!pick || status === 'loading'}
+            style={{
+              border: 'none', borderRadius: '4px', background: 'var(--gc-green)', color: 'var(--gc-paper)',
+              padding: '8px 16px', cursor: pick ? 'pointer' : 'default', fontSize: '12px', fontWeight: 700,
+              opacity: !pick || status === 'loading' ? 0.5 : 1,
+            }}>
+            {status === 'loading' ? '…' : (lang === 'en' ? 'Save' : lang === 'tw' ? '儲存' : '保存')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ============================================================
 // InlineSubscribeCTA — one-row subscribe entry embedded where intent peaks (under
 // the hero number, at the end of the monthly recap). Hidden entirely once the
@@ -14789,6 +14863,17 @@ export default function App() {
       subtype: params.get('st') || null,
     };
   };
+  // se/stk: the one-time email + signed token pair the monthly-update email attaches
+  // to the case link ONLY when this subscriber's EB1-EB5 record predates the subtype
+  // field (see buildCaseUrl in _emailTemplates.js). Kept separate from userCase — it's
+  // link-auth, not case data.
+  const parseSubtypePromptFromURL = () => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const se = params.get('se'), stk = params.get('stk');
+    if (!se || !stk) return null;
+    return { email: se, token: stk };
+  };
   const writeUserCaseToURL = (uc) => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams();
@@ -14805,6 +14890,19 @@ export default function App() {
   // URL params win so shared links always load that case (not your own).
   // localStorage means "your last session's case" survives refresh.
   const urlCase = parseUserCaseFromURL();
+  const subtypePromptFromURL = parseSubtypePromptFromURL();
+  const [subtypePrompt, setSubtypePrompt] = useState(subtypePromptFromURL);
+  useEffect(() => {
+    if (!subtypePromptFromURL || typeof window === 'undefined') return;
+    // Strip se/stk right after reading them — they're one-time link credentials,
+    // no reason for them to linger visibly in the address bar/history.
+    const params = new URLSearchParams(window.location.search);
+    params.delete('se');
+    params.delete('stk');
+    const qs = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${qs ? '?' + qs : ''}${window.location.hash}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [userCase, setUserCase] = useState(() => {
     if (urlCase) return urlCase;
     if (typeof window !== 'undefined') {
@@ -14968,6 +15066,16 @@ export default function App() {
         />
       )}
       <SubscribeModal show={showSubModal} onClose={() => setShowSubModal(false)} userCase={userCase} theme={theme} />
+      {subtypePrompt && hasOnboarded && CATEGORY_SUBTYPES[userCase.category] && !userCase.subtype && (
+        <SubtypeUpdateModal
+          userCase={userCase}
+          email={subtypePrompt.email}
+          token={subtypePrompt.token}
+          theme={theme}
+          onDone={(subtype) => { setUserCase({ ...userCase, subtype }); setSubtypePrompt(null); }}
+          onClose={() => setSubtypePrompt(null)}
+        />
+      )}
       <style>{`
         /* Monocle theme fonts load ASYNCHRONOUSLY via a JS-injected <link> (see the
            theme effect) — never as a CSS @import. fonts.googleapis.com is blocked in

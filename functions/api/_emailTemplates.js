@@ -679,7 +679,16 @@ const renderBulletinFigure = (cutPoints, series, lang, chartCode = 'A') => {
 // App.jsx reads the case off the query string (c/ct/pd/in/ps) and — importantly —
 // treats a URL case as "already onboarded", so this link lands the subscriber on their
 // own numbers instead of the first-run category picker.
-const buildCaseUrl = (siteUrl, userCase) => {
+// Categories where App.jsx's SubtypeChips blocks onboarding until one is picked.
+// Mirrored here (ids only, not labels) so the email link only carries the
+// subtype-update params when they'd actually resolve to something showable.
+const SUBTYPE_CATEGORIES = new Set(['EB1', 'EB2', 'EB3', 'EB4', 'EB5']);
+
+// `email`/`subtypeToken` are only set when the caller wants this link to double as
+// a "fill in your missing subtype" prompt (see admin/send-monthly.js) — they're
+// omitted whenever the subscriber already has one, so old records that predate the
+// subtype field are the only ones that ever see the extra params.
+const buildCaseUrl = (siteUrl, userCase, { email, subtypeToken } = {}) => {
   const base = String(siteUrl || '').replace(/\/+$/, '');
   if (!userCase?.category || !userCase?.country || !userCase?.priorityDate) return base;
   const p = new URLSearchParams();
@@ -688,12 +697,17 @@ const buildCaseUrl = (siteUrl, userCase) => {
   p.set('pd', userCase.priorityDate);
   if (userCase.inUS === false) p.set('in', '0');
   if (userCase.petitionerStatus) p.set('ps', userCase.petitionerStatus);
+  if (userCase.subtype) p.set('st', userCase.subtype);
+  if (!userCase.subtype && email && subtypeToken && SUBTYPE_CATEGORIES.has(userCase.category)) {
+    p.set('se', email);
+    p.set('stk', subtypeToken);
+  }
   return `${base}/?${p.toString()}`;
 };
 
-export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, notices, noticeI18n, bulletinMonthLabel, language, siteUrl, unsubscribeUrl }) => {
+export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, notices, noticeI18n, bulletinMonthLabel, language, siteUrl, unsubscribeUrl, subtypeToken }) => {
   const lang = language === 'en' ? 'en' : 'zh';
-  const caseUrl = buildCaseUrl(siteUrl, userCase);
+  const caseUrl = buildCaseUrl(siteUrl, userCase, { email, subtypeToken });
 
   const category = formatCategory(userCase?.category);
   const country = formatCountry(userCase?.country);

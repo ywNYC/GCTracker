@@ -16,7 +16,7 @@
 // after one bulletin does not double-send.
 
 import { renderMonthlyUpdateEmail } from '../_emailTemplates.js';
-import { buildUnsubscribeUrl } from '../subscribe.js';
+import { buildUnsubscribeUrl, buildSubtypeToken } from '../subscribe.js';
 import { applyRecentRateOverride, computeCaseUpdate } from '../_gcMath.js';
 
 const json = (data, status = 200) =>
@@ -169,6 +169,7 @@ export async function onRequestPost(context) {
 
       try {
         const unsubscribeUrl = await buildUnsubscribeUrl(record.email, env);
+        const subtypeToken = await buildSubtypeToken(record.email, env);
         const { subject, html, text } = renderMonthlyUpdateEmail({
           email: record.email,
           userCase: uc,
@@ -180,6 +181,7 @@ export async function onRequestPost(context) {
           language: record.language,
           siteUrl,
           unsubscribeUrl,
+          subtypeToken,
         });
 
         const resp = await fetch('https://api.resend.com/emails', {
