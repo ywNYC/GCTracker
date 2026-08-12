@@ -1645,13 +1645,9 @@ const SubtypeChips = ({ userCase, setUserCase, required = false, error = false }
   return (
     <div style={{ marginTop: '7px' }}>
       <span className="gc-label" style={{ fontSize: '9px', color: error ? 'var(--gc-red)' : 'var(--gc-muted)' }}>
-        {required
-          ? (lang === 'en' ? 'SUBTYPE · required, same cutoff dates'
-            : lang === 'tw' ? '細分 · 必選，不影響排期計算'
-            : '细分 · 必选，不影响排期计算')
-          : (lang === 'en' ? 'SUBTYPE · optional, same cutoff dates'
-            : lang === 'tw' ? '細分 · 可選，不影響排期計算'
-            : '细分 · 可选，不影响排期计算')}
+        {lang === 'en' ? 'SUBTYPE · optional, same cutoff dates'
+          : lang === 'tw' ? '細分 · 可選，不影響排期計算'
+          : '细分 · 可选，不影响排期计算'}
       </span>
       <div className="flex" style={{ gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
         {opts.map(([id, zh, tw, en]) => {

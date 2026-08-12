@@ -94,7 +94,7 @@ export async function onRequestGet(context) {
 
 function toCSV(records) {
   const headers = [
-    'email', 'name', 'country', 'category', 'priorityDate', 'inUS', 'petitionerStatus',
+    'email', 'name', 'country', 'category', 'subtype', 'priorityDate', 'inUS', 'petitionerStatus',
     'language', 'whenCurrent', 'whenEligible', 'monthlyUpdates', 'retrogression',
     'subscribedAt', 'lastUpdated', 'subscriberCountry',
   ];
@@ -111,6 +111,7 @@ function toCSV(records) {
     escape(r.name),
     escape(r.userCase?.country),
     escape(r.userCase?.category),
+    escape(r.userCase?.subtype),
     escape(r.userCase?.priorityDate),
     escape(r.userCase?.inUS),
     escape(r.userCase?.petitionerStatus),
