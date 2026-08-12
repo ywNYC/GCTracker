@@ -1,6 +1,21 @@
 import React, { useState, useMemo, useCallback, memo, createContext, useContext, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Globe, Calendar, MapPin, Briefcase, Home, TrendingUp, TrendingDown, Minus, AlertCircle, AlertTriangle, CheckCircle2, Clock, Info, FileText, Zap, Shield, Users, Target, Database, RefreshCw, ExternalLink, Sparkles, Eye, Bell, BarChart3, Mail, Download, History, HelpCircle, DollarSign, Scale, Plane, Activity, Ruler, Dot, ClipboardList, Share2 } from 'lucide-react';
+// Shared with the Cloudflare Pages Functions email pipeline (functions/api/admin/send-monthly.js)
+// so the site and the monthly emails can't silently diverge — see _gcMath.js's own header
+// comment for what still can't be shared (parseDate's 'U' handling differs on purpose;
+// nothing in this file calls it with 'U' as an argument, but keep that in mind before adding one).
+import {
+  FILING_AUTHORIZED,
+  resolveCountry,
+  RATES_DB,
+  getRates,
+  getLongTermRate,
+  computeStatus,
+  computeMovement,
+  computeHybridAdvance,
+  estimateMonthsToReachPD,
+} from '../functions/api/_gcMath.js';
 
 // ============================================================
 // i18n — Translation dictionaries (EN / Simplified / Traditional)
@@ -839,11 +854,6 @@ const bulletinAnchorDate = (day = 1) => {
 
 // USCIS announced for May 2026: EB uses Final Action Dates (Chart A),
 // Family categories continue to use Dates for Filing (Chart B)
-const FILING_AUTHORIZED = {
-  EB1: false, EB2: false, EB3: false, EW: false, EB4: false, SR: false, EB5: false, EB5R: false, EB5H: false, EB5I: false,
-  F1: true, F2A: true, F2B: true, F3: true, F4: true,
-};
-
 // Country flags mapping
 const COUNTRY_FLAGS = {
   'China': '🇨🇳',
@@ -902,12 +912,6 @@ const CountryFlag = ({ country, size = 20 }) => {
     ),
   };
   return flags[country] || <span></span>;
-};
-
-const resolveCountry = (country) => {
-  // Taiwan (ROW/HK/TW/MO), Mexico, Philippines all use "Other" pool for visa bulletin purposes
-  if (['Taiwan', 'Mexico', 'Philippines'].includes(country)) return 'Other';
-  return country;
 };
 
 // Passport-style 3-letter country codes (ISO 3166-1 alpha-3)
@@ -1117,72 +1121,14 @@ const HISTORICAL_DATA = {
   },
 };
 
-// RATES_DB - Derived from 6-anchor HISTORICAL_DATA regression (26 years: 2000-2026)
-// Three-layer rates: {long: 26yr, mid: 11yr from 2015, recent: 6yr from 2020} - all in days/year
-// Computed using linear regression on real anchor data
-const RATES_DB = {
-  // Family categories (Other = all countries before China/India separated out)
-  'F1-Other': {long: 258, mid: 316, recent: 219},
-  'F1-China': {long: 258, mid: 316, recent: 219},
-  'F1-India': {long: 258, mid: 316, recent: 219},
-  'F1-Mexico': {long: 201, mid: 438, recent: 617},
-  'F1-Philippines': {long: 348, mid: 269, recent: 248},
-  'F2A-Other': {long: 428, mid: 428, recent: 428},
-  'F2A-China': {long: 428, mid: 428, recent: 428},
-  'F2A-India': {long: 428, mid: 428, recent: 428},
-  'F2A-Mexico': {long: 455, mid: 455, recent: 455},
-  'F2A-Philippines': {long: 428, mid: 428, recent: 428},
-  'F2B-Other': {long: 343, mid: 302, recent: 173},
-  'F2B-China': {long: 343, mid: 302, recent: 173},
-  'F2B-India': {long: 343, mid: 302, recent: 173},
-  'F2B-Mexico': {long: 199, mid: 360, recent: 425},
-  'F2B-Philippines': {long: 287, mid: 306, recent: 259},
-  'F3-Other': {long: 225, mid: 258, recent: 237},
-  'F3-China': {long: 225, mid: 258, recent: 237},
-  'F3-India': {long: 225, mid: 258, recent: 237},
-  'F3-Mexico': {long: 132, mid: 227, recent: 279},
-  'F3-Philippines': {long: 245, mid: 387, recent: 377},
-  'F4-Other': {long: 277, mid: 209, recent: 94},   // User's category - severe slowdown
-  'F4-China': {long: 277, mid: 209, recent: 94},
-  'F4-India': {long: 272, mid: 149, recent: 114},
-  'F4-Mexico': {long: 172, mid: 127, recent: 181},
-  'F4-Philippines': {long: 382, mid: 501, recent: 457},
-  // Employment categories
-  'EB1-Other': {long: 365, mid: 365, recent: 365},
-  'EB1-China': {long: 338, mid: 338, recent: 338},
-  'EB1-India': {long: 300, mid: 300, recent: 300},  // Capped from 476 (data too volatile)
-  'EB1-Mexico': {long: 365, mid: 365, recent: 365},
-  'EB1-Philippines': {long: 365, mid: 365, recent: 365},
-  'EB2-Other': {long: 365, mid: 365, recent: 365},
-  'EB2-China': {long: 365, mid: 373, recent: 356},
-  'EB2-India': {long: 212, mid: 303, recent: 298},
-  'EB2-Mexico': {long: 365, mid: 365, recent: 365},
-  'EB2-Philippines': {long: 365, mid: 365, recent: 365},
-  'EB3-Other': {long: 400, mid: 324, recent: 250},  // Slowing recently
-  'EB3-China': {long: 333, mid: 332, recent: 320},
-  'EB3-India': {long: 203, mid: 320, recent: 281},
-  'EB3-Mexico': {long: 400, mid: 324, recent: 250},
-  'EB3-Philippines': {long: 370, mid: 328, recent: 310},
-  // EB4/SR/EB5: neutral anchors — observed 12-month pace carries the forecast.
-  'EB4-Other': {long: 365, mid: 365, recent: 365},
-  'SR-Other': {long: 365, mid: 365, recent: 365},
-  'EB5-Other': {long: 365, mid: 365, recent: 365},
-  'EB5R-Other': {long: 365, mid: 365, recent: 365},
-  'EB5H-Other': {long: 365, mid: 365, recent: 365},
-  'EB5I-Other': {long: 365, mid: 365, recent: 365},
-};
-
-// Get 3-layer rates for a category+country
-const getRates = (cat, country) => {
-  const key = `${cat}-${country}`;
-  return RATES_DB[key] || RATES_DB[`${cat}-Other`] || {long: 200, mid: 200, recent: 200};
-};
-
-// Backward compat: simple long-term rate accessor (used by old code paths)
+// RATES_DB / FILING_AUTHORIZED / resolveCountry / getRates / getLongTermRate / computeStatus /
+// computeMovement / computeHybridAdvance / estimateMonthsToReachPD now live in
+// functions/api/_gcMath.js (imported above) — that's the send-monthly email pipeline's copy
+// of this same math, and the two had drifted (computeStatus disagreed on U-cutoff months
+// until the 2026-08-12 dedup pass). Backward compat: simple long-term rate accessor.
 const LONG_TERM_RATES = Object.fromEntries(
   Object.entries(RATES_DB).map(([k, v]) => [k, v.long])
 );
-const getLongTermRate = (cat, country) => getRates(cat, country).long;
 
 // Observed month-over-month pace (days/month) for one category+country, averaged across
 // the trailing window of REAL bulletins in BULLETIN_ARCHIVE.
@@ -1290,107 +1236,8 @@ const paceEtaFlooredToB = (cat, country, gapDaysA) => {
   return floor !== null && floor > raw;
 };
 
-// ==============================================================
-// AI HYBRID PREDICTION MODEL
-// Blends 4 time horizons:
-//   Months 1-12:   100% user's recent observed trend
-//   Months 12-36:  Blend recent → mid-term 10y rate
-//   Months 36-120: Blend mid-term → long-term 21y rate  
-//   Months 120+:   Weighted average of mid & long (stable projection)
-// This prevents over-optimism for backlogged categories where
-// recent years show significant slowdown vs historical average.
-// ==============================================================
-const computeHybridAdvance = (recentDaysPerMonth, longTermDaysPerYear, monthsAhead, catCountryKey) => {
-  if (monthsAhead <= 0) return 0;
-  
-  // Look up 3-layer rates if available
-  let midRate = longTermDaysPerYear;
-  let longRate = longTermDaysPerYear;
-  let recentRate = longTermDaysPerYear;
-  if (catCountryKey && RATES_DB[catCountryKey]) {
-    midRate = RATES_DB[catCountryKey].mid;
-    longRate = RATES_DB[catCountryKey].long;
-    recentRate = RATES_DB[catCountryKey].recent;
-  }
-  
-  const recentDpm = recentDaysPerMonth;             // User's observed recent trend
-  const midDpm = midRate / 12;                      // 10-year average
-  const longDpm = longRate / 12;                    // 21-year average
-  const policyDpm = recentRate / 12;                // Most recent 5 years (strictest)
-  
-  // Compute the rate for month m (1-indexed)
-  const rateForMonth = (m) => {
-    if (m <= 12) {
-      // Near-term (0-12 mo): 3-way weighted blend.
-      // Even short-term forecasts should be anchored by long-term reality —
-      // a single slow/fast quarter shouldn't dominate the forecast.
-      //   55% observed recent (current pace is most representative)
-      //   20% policy-era 5y  (smooths recent-month noise)
-      //   25% long-term 21y  (sanity floor/ceiling against anomalies)
-      return 0.55 * recentDpm + 0.20 * policyDpm + 0.25 * longDpm;
-    } else if (m <= 36) {
-      // 1-3 years out: transition from near-term blend toward mid-term
-      const w = (m - 12) / 24; // 0 → 1 over months 12-36
-      const nearBlend = 0.55 * recentDpm + 0.20 * policyDpm + 0.25 * longDpm;
-      return (1 - w) * nearBlend + w * midDpm;
-    } else if (m <= 120) {
-      // 3-10 years: mid-term rate, gradually shifting to long-term
-      const w = (m - 36) / 84; // 0 → 1 over months 36-120
-      return (1 - w) * midDpm + w * (0.6 * longDpm + 0.4 * midDpm);
-    } else {
-      // Beyond 10 years: stable long-term baseline
-      return 0.6 * longDpm + 0.4 * midDpm;
-    }
-  };
-
-  // IMPORTANT: Must accumulate fractional months too, otherwise binary search
-  // for monthsToReach snaps to integer months and effectiveRate = gap / integer
-  // always rounds to "recent12"-looking numbers. Previously this made the blend
-  // invisible — 混合速率 displayed equal to 近12月.
-  let totalDays = 0;
-  const wholeMonths = Math.floor(monthsAhead);
-  for (let m = 1; m <= wholeMonths; m++) {
-    totalDays += rateForMonth(m);
-  }
-  const fractional = monthsAhead - wholeMonths;
-  if (fractional > 0) {
-    // Partial month at the end — use rate of the NEXT month, scaled by fraction
-    totalDays += rateForMonth(wholeMonths + 1) * fractional;
-  }
-  return totalDays;
-};
-
-// Estimate months needed for cutoff to reach a target PD
-// Uses binary search on the hybrid advance function
-// cat/country optional - if provided, uses 3-layer rates from RATES_DB
-const estimateMonthsToReachPD = (currentCutoff, targetPD, recentDaysPerMonth, longTermRate, cat, country) => {
-  if (!currentCutoff || !targetPD) return null;
-  if (currentCutoff === 'C') return 0;
-  const co = new Date(currentCutoff + 'T00:00:00');
-  const pd = new Date(targetPD + 'T00:00:00');
-  if (isNaN(co.getTime()) || isNaN(pd.getTime())) return null;
-  
-  const gapDays = (pd.getTime() - co.getTime()) / (24 * 60 * 60 * 1000);
-  if (gapDays <= 0) return 0; // Already eligible
-  
-  // Build catCountryKey for 3-layer rate lookup
-  const catCountryKey = (cat && country) ? `${cat}-${country}` : null;
-  
-  // Binary search for months where advance >= gap
-  let lo = 0, hi = 720; // Max 60 years search range
-  // Check if even 60 years is enough
-  const maxAdvance = computeHybridAdvance(recentDaysPerMonth, longTermRate, 720, catCountryKey);
-  if (maxAdvance < gapDays) return null; // Won't reach in 60 years
-  
-  for (let iter = 0; iter < 40; iter++) {
-    const mid = (lo + hi) / 2;
-    const advance = computeHybridAdvance(recentDaysPerMonth, longTermRate, mid, catCountryKey);
-    if (advance < gapDays) lo = mid;
-    else hi = mid;
-    if (hi - lo < 0.5) break;
-  }
-  return (lo + hi) / 2;
-};
+// AI HYBRID PREDICTION MODEL (computeHybridAdvance, estimateMonthsToReachPD) — now imported
+// from _gcMath.js above; see that file for the blending rationale.
 
 // Legacy table (kept for backward compat; days-per-month for short-term estimates)
 const historicalMovement = {
@@ -1442,55 +1289,7 @@ const formatDateShort = (s, lang) => {
   if (lang === 'zh' || lang === 'tw') return `${d.getFullYear().toString().slice(-2)}年${d.getMonth() + 1}月`;
   return d.toLocaleDateString('en-US', { year: '2-digit', month: 'short' });
 };
-const computeStatus = (priorityDate, cutoff) => {
-  if (cutoff === 'C') return { status: 'current', days: 0 };
-  // null is what the scraper emits for the bulletin's "U" (and bare dashes) — see
-  // parseDate in scrape-bulletin.mjs. The four-chart parse is a hard contract, so a
-  // null cell means the bulletin itself printed no cutoff: no visas this month.
-  // That is NOT the same as "排期未到" — there is no queue position to measure.
-  if (!cutoff || cutoff === 'U') return { status: 'unavailable', days: null };
-  const pd = parseDate(priorityDate);
-  const co = parseDate(cutoff);
-  if (!pd) return { status: 'notCurrent', days: null };
-  const diff = daysBetween(co, pd);
-  
-  // Sanity check: if PD is unreasonably far in the past (>10 years before cutoff)
-  // it's likely a data entry error or an abandoned/approved case
-  if (diff > 3650) { // More than 10 years eligible - suspicious
-    return { status: 'suspicious', days: diff };
-  }
-  
-  // Fine-grained eligible sub-states based on how long PD has been past cutoff
-  // This gives more accurate messaging for different scenarios
-  if (diff > 730) { // PD cleared >2 years ago
-    return { status: 'overdue', days: diff };
-  }
-  if (diff > 0) return { status: 'eligible', days: diff };
-  if (diff === 0) return { status: 'eligible', days: 0 };
-  
-  // Also sanity check: if PD is unreasonably far in future (>50 years after cutoff)
-  if (Math.abs(diff) > 18250) {
-    return { status: 'suspicious', days: Math.abs(diff) };
-  }
-  
-  return { status: 'notCurrent', days: Math.abs(diff) };
-};
-const computeMovement = (current, previous) => {
-  if (current === 'C' && previous === 'C') return { type: 'none', days: 0, wasCurrent: true };
-  if (current === 'C' && previous !== 'C') return { type: 'current', days: null };
-  if (current !== 'C' && previous === 'C') return { type: 'retrogressed', days: null, fromCurrent: true };
-  // null/'U' = the bulletin printed no cutoff (U). Distinguish "went unavailable"
-  // (a de-facto retrogression to zero) from "resumed" (numbers came back) — both used
-  // to collapse into "no change", which is the opposite of what happened.
-  const noCut = (v) => !v || v === 'U';
-  if (noCut(current) && noCut(previous)) return { type: 'unavailable', days: null, still: true };
-  if (noCut(current)) return { type: 'unavailable', days: null, became: true };
-  if (noCut(previous)) return { type: 'resumed', days: null };
-  const d = daysBetween(parseDate(current), parseDate(previous));
-  if (d > 0) return { type: 'advanced', days: d };
-  if (d < 0) return { type: 'retrogressed', days: Math.abs(d) };
-  return { type: 'none', days: 0 };
-};
+// computeStatus / computeMovement — now imported from _gcMath.js above.
 
 // Forecast: probability + months-until-current (HYBRID model).
 // `paceBasis` picks which observed pace anchors the estimate: 'conservative' (trailing
@@ -1834,18 +1633,25 @@ const subtypeLabel = (cat, id, lang) => {
   return lang === 'en' ? row[3] : lang === 'tw' ? row[2] : row[1];
 };
 
-// SubtypeChips — optional single-select pills under the category picker.
-// Tapping the active chip clears it; changing category resets it upstream.
-const SubtypeChips = ({ userCase, setUserCase }) => {
+// SubtypeChips — single-select pills under the category picker. Required at
+// onboarding (blocks Start) so every case carries a subtype for reporting;
+// still doesn't affect cutoff-date math. `error` highlights the label red
+// after a blocked Start attempt. Tapping the active chip clears it; changing
+// category resets it upstream.
+const SubtypeChips = ({ userCase, setUserCase, required = false, error = false }) => {
   const { lang } = useLang();
   const opts = CATEGORY_SUBTYPES[userCase.category];
   if (!opts) return null;
   return (
     <div style={{ marginTop: '7px' }}>
-      <span className="gc-label" style={{ fontSize: '9px', color: 'var(--gc-muted)' }}>
-        {lang === 'en' ? 'SUBTYPE · optional, same cutoff dates'
-          : lang === 'tw' ? '細分 · 可選，不影響排期計算'
-          : '细分 · 可选，不影响排期计算'}
+      <span className="gc-label" style={{ fontSize: '9px', color: error ? 'var(--gc-red)' : 'var(--gc-muted)' }}>
+        {required
+          ? (lang === 'en' ? 'SUBTYPE · required, same cutoff dates'
+            : lang === 'tw' ? '細分 · 必選，不影響排期計算'
+            : '细分 · 必选，不影响排期计算')
+          : (lang === 'en' ? 'SUBTYPE · optional, same cutoff dates'
+            : lang === 'tw' ? '細分 · 可選，不影響排期計算'
+            : '细分 · 可选，不影响排期计算')}
       </span>
       <div className="flex" style={{ gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
         {opts.map(([id, zh, tw, en]) => {
@@ -1855,7 +1661,7 @@ const SubtypeChips = ({ userCase, setUserCase }) => {
               onClick={() => setUserCase({ ...userCase, subtype: on ? null : id })}
               style={{
                 padding: '4px 9px', fontSize: '10.5px', fontWeight: on ? 700 : 500,
-                border: `1px solid ${on ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
+                border: `1px solid ${on ? 'var(--gc-green)' : error ? 'var(--gc-red)' : 'var(--gc-rule)'}`,
                 borderRadius: '11px',
                 background: on ? 'var(--gc-green)' : 'var(--gc-surface)',
                 color: on ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
@@ -13810,6 +13616,7 @@ const HelpCenter = ({ initialSection = 'faq' }) => {
 const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', initialForm = null, onComplete, onExplore, onDemo, onThemeChange, onClose }) => {
   // Local state for the form (only used when user clicks "I have a case")
   const [mode, setMode] = useState(initialMode); // 'choose' | 'form'
+  const [subtypeAttempted, setSubtypeAttempted] = useState(false);
   const [form, setForm] = useState(initialForm || {
     country: 'Taiwan',
     category: 'EB3',
@@ -14151,8 +13958,11 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                   const isF2C = newCat === 'F2A' || newCat === 'F2B';
                   const newPetitioner = isF2C ? 'LPR' : 'USC';
                   setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: null });
+                  setSubtypeAttempted(false);
                 }} />
-              <SubtypeChips userCase={form} setUserCase={setForm} />
+              <SubtypeChips userCase={form} setUserCase={setForm}
+                required={!!CATEGORY_SUBTYPES[form.category]}
+                error={subtypeAttempted && !!CATEGORY_SUBTYPES[form.category] && !form.subtype} />
             </div>
 
             {/* Priority Date — same themed picker as the case bar, not the OS sheet */}
@@ -14225,7 +14035,13 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                 {t.back}
               </button>
               <button
-                onClick={() => onComplete(form)}
+                onClick={() => {
+                  if (CATEGORY_SUBTYPES[form.category] && !form.subtype) {
+                    setSubtypeAttempted(true);
+                    return;
+                  }
+                  onComplete(form);
+                }}
                 style={{
                   flex: 1, padding: '10px 14px', fontSize: '13px', fontWeight: 700,
                   background: 'var(--gc-green)', color: 'var(--gc-paper)',
