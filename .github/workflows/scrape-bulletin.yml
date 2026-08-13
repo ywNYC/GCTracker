@@ -41,13 +41,17 @@ jobs:
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
-      # Manual (workflow_dispatch) runs always proceed. Scheduled runs are gated on
-      # two conditions: not a weekend, and no successful bulletin commit yet this
-      # calendar month (checked via the GitHub API — no checkout needed).
-      - name: Weekend / already-done-this-month check
+      # Manual (workflow_dispatch) runs always proceed. Scheduled runs are gated only
+      # on weekend/weekday — NOT on "has bulletin.json already been touched this
+      # month", because that used to count ANY commit to the file (including manual
+      # feature/fix commits unrelated to the scrape), which falsely looked like "already
+      # done" and skipped the real scrape for the rest of the month. The scraper itself
+      # (scripts/scrape-bulletin.mjs) already has the correct idempotency check — it
+      # compares bulletin.json's stored current.month against the actual target month
+      # and no-ops if they already match, or if the target month isn't published yet
+      # (404). So this gate doesn't need to duplicate that logic, and shouldn't.
+      - name: Weekend check
         id: check
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" != "schedule" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
@@ -56,13 +60,6 @@ jobs:
           DOW=$(date -u +%u)  # 1=Mon .. 7=Sun
           if [ "$DOW" -ge 6 ]; then
             echo "Weekend (UTC day-of-week $DOW) — skipping."
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          SINCE=$(date -u +%Y-%m-01T00:00:00Z)
-          COUNT=$(gh api "repos/${{ github.repository }}/commits?since=$SINCE&path=public/bulletin.json" --jq 'length')
-          if [ "$COUNT" -gt 0 ]; then
-            echo "Bulletin already updated this month ($COUNT commit(s) since $SINCE) — skipping."
             echo "should_run=false" >> "$GITHUB_OUTPUT"
           else
             echo "should_run=true" >> "$GITHUB_OUTPUT"
@@ -164,19 +161,28 @@ jobs:
           cat send-monthly-result.json >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
-      # Zero-cost owner notification: a new bulletin opens an assigned issue, and
-      # GitHub's own push/email delivers it. No polling loop anywhere has to burn
-      # tokens or requests just to ask "is it out yet?".
+      # Owner notification on EVERY scheduled run (not just when a new bulletin lands),
+      # per explicit request: this is the first month running this pipeline, and a
+      # silent skip is indistinguishable from a silent failure, so every run — found a
+      # new bulletin, checked and found nothing new, or errored — opens its own issue.
+      # GitHub's own push/email delivers it, so no polling loop has to burn tokens.
       - name: Notify owner via issue
-        if: steps.commit.outputs.committed == 'true'
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          MONTH=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/bulletin.json','utf8')).current.month)")
-          gh issue create \
-            --title "新排期公告已抓取上线：$MONTH" \
-            --assignee ywNYC \
-            --body "$(printf '%s 公告已自动抓取并部署。history.json 已自动同步，send-monthly 已自动触发（结果见本次 workflow run 的 Summary）。\n\n还需要人工做的：\n- [ ] 核对 USCIS 采用哪张表（uscis-charts.json 会晚约一周，期间站内用通用说明）\n- [ ] 翻译公告 D 节以后的 notices 进 notice-translations.json\n- [ ] 站内一致性检查（总结页/动态页/邮件预览）\n- [ ] 去 workflow run 的 Summary 确认 send-monthly 是否成功发出（如失败或 ADMIN_TOKEN 未配置需手动补发）\n\n此 issue 由 scrape-bulletin workflow 自动创建。' "$MONTH")"
+          if [ "${{ steps.commit.outputs.committed }}" = "true" ]; then
+            MONTH=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/bulletin.json','utf8')).current.month)")
+            TITLE="新排期公告已抓取上线：$MONTH"
+            BODY="$(printf '%s 公告已自动抓取并部署。history.json 已自动同步，send-monthly 已自动触发（结果见本次 workflow run 的 Summary）。\n\n还需要人工做的：\n- [ ] 核对 USCIS 采用哪张表（uscis-charts.json 会晚约一周，期间站内用通用说明）\n- [ ] 翻译公告 D 节以后的 notices 进 notice-translations.json\n- [ ] 站内一致性检查（总结页/动态页/邮件预览）\n- [ ] 去 workflow run 的 Summary 确认 send-monthly 是否成功发出（如失败或 ADMIN_TOKEN 未配置需手动补发）\n\n此 issue 由 scrape-bulletin workflow 自动创建。' "$MONTH")"
+          elif [ "${{ steps.scrape.outcome }}" != "success" ]; then
+            TITLE="⚠️ 排期抓取本次运行未成功"
+            BODY="$(printf 'scrape-bulletin.mjs 本次运行的 outcome 是 %s（非 success），需要看一下这次 workflow run 的日志确认原因。\n\n注：exit 1 是网络类瞬时失败，脚本设计上明天同一时段会自动重试；exit 2 是解析器真的坏了，需要人工修。\n\n此 issue 由 scrape-bulletin workflow 自动创建。' "${{ steps.scrape.outcome }}")"
+          else
+            TITLE="✓ 已检查，暂无新公告"
+            BODY="$(printf '本次自动检查已正常完成，尚未发现新一期签证公告（bulletin.json 里存的月份还没变），无需处理。\n\n此 issue 由 scrape-bulletin workflow 自动创建。')"
+          fi
+          gh issue create --title "$TITLE" --assignee ywNYC --body "$BODY"
 
       - name: Summary
         if: always()
