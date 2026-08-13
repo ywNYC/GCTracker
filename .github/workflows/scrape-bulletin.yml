@@ -10,10 +10,16 @@ name: Auto-update Visa Bulletin
 # Visa Office sign-off date, roughly the 1st-5th, and reading it as the publication date
 # produces a window that misses every release.
 #
-# Twice daily so a bulletin is picked up within ~12h. 13:00/20:00 UTC = 09:00/16:00 ET.
+# Four times a day (9am/12pm/3pm/6pm ET = 13/16/19/22 UTC) so a bulletin is picked up
+# within ~3h. Weekdays only, and skipped for the rest of the month once a bulletin has
+# already been captured this month — but both of those live in the `gate` job below,
+# NOT in cron's day-of-week field. GitHub Actions cron uses OR semantics when both
+# day-of-month and day-of-week are restricted (fires if EITHER matches), so
+# '10-23 * 1-5' would actually run on every weekday of every month PLUS every day
+# 10-23 regardless of weekday — not the AND you'd expect.
 on:
   schedule:
-    - cron: '0 13,20 10-23 * *'
+    - cron: '0 13,16,19,22 10-23 * *'
   workflow_dispatch:
     inputs:
       seed:
@@ -30,7 +36,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      # Manual (workflow_dispatch) runs always proceed. Scheduled runs are gated on
+      # two conditions: not a weekend, and no successful bulletin commit yet this
+      # calendar month (checked via the GitHub API — no checkout needed).
+      - name: Weekend / already-done-this-month check
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          DOW=$(date -u +%u)  # 1=Mon .. 7=Sun
+          if [ "$DOW" -ge 6 ]; then
+            echo "Weekend (UTC day-of-week $DOW) — skipping."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          SINCE=$(date -u +%Y-%m-01T00:00:00Z)
+          COUNT=$(gh api "repos/${{ github.repository }}/commits?since=$SINCE&path=public/bulletin.json" --jq 'length')
+          if [ "$COUNT" -gt 0 ]; then
+            echo "Bulletin already updated this month ($COUNT commit(s) since $SINCE) — skipping."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   scrape:
+    needs: gate
+    if: needs.gate.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
