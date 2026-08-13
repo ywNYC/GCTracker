@@ -13602,6 +13602,107 @@ const HelpCenter = ({ initialSection = 'faq' }) => {
 };
 
 // ============================================================
+// LanguageGateModal — the very first screen on a truly fresh visit: pick a
+// language before anything else renders. Same card geometry as OnboardingModal
+// (380px, green top border, backdrop blur, fade+lift-in) so picking a language
+// and landing on OnboardingModal reads as one continuous surface rather than
+// a second, different-looking dialog.
+// ============================================================
+const LanguageGateModal = ({ theme = 'passport', onPick }) => {
+  const opts = [
+    { v: 'zh', label: '简体中文' },
+    { v: 'tw', label: '繁體中文' },
+    { v: 'en', label: 'English' },
+  ];
+  return (
+    <div className="visa-root" data-theme={theme} style={{
+      position: 'fixed', inset: 0, zIndex: 1001,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '16px',
+    }}>
+      <style>{`
+        @keyframes langGateBackdropIn {
+          from { opacity: 0; backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
+          to   { opacity: 1; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+        }
+        @keyframes langGateCardIn {
+          from { opacity: 0; transform: translateY(8px) scale(0.985); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .gc-langgate-backdrop, .gc-langgate-card { animation: none !important; }
+        }
+      `}</style>
+
+      {/* Backdrop — solid opaque dim + blur, fade-in (matches OnboardingModal) */}
+      <div className="gc-langgate-backdrop" style={{
+        position: 'absolute', inset: 0,
+        background: 'rgba(15, 20, 25, 0.55)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        animation: 'langGateBackdropIn 240ms ease-out both',
+      }} />
+
+      {/* Card — identical width/radius/shadow/animation to OnboardingModal's card,
+          so the swap between the two feels seamless rather than like a new window. */}
+      <div className="gc-langgate-card" style={{
+        position: 'relative',
+        background: 'var(--gc-surface)',
+        border: '1px solid var(--gc-rule)',
+        borderTop: '3px solid var(--gc-green)',
+        borderRadius: 'var(--gc-radius)',
+        width: '100%',
+        maxWidth: '380px',
+        maxHeight: '92vh',
+        overflowY: 'auto',
+        padding: '20px 18px 16px',
+        animation: 'langGateCardIn 260ms cubic-bezier(0.16, 1, 0.3, 1) both',
+        animationDelay: '60ms',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12)',
+        zIndex: 1,
+      }}>
+        {/* Header — no language picked yet, so every string is shown trilingually */}
+        <div style={{ textAlign: 'center', marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
+          <Globe size={20} style={{ color: 'var(--gc-green)', marginBottom: '6px' }} strokeWidth={1.6} />
+          <div className="gc-eyebrow" style={{ color: 'var(--gc-green)', marginBottom: '4px' }}>
+            GREEN CARD TRACKER
+          </div>
+          <h2 className="gc-serif" style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '-0.01em', margin: 0, lineHeight: 1.3, whiteSpace: 'nowrap' }}>
+            选择语言 · 選擇語言 · Choose a language
+          </h2>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {opts.map((o) => (
+            <button
+              key={o.v}
+              onClick={() => onPick(o.v)}
+              style={{
+                width: '100%',
+                textAlign: 'center',
+                padding: '16px 14px',
+                background: 'var(--gc-surface)',
+                border: '1px solid var(--gc-rule)',
+                borderLeft: '2px solid var(--gc-green)',
+                borderRadius: 'var(--gc-radius-sm)',
+                cursor: 'pointer',
+                transition: 'all 140ms',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gc-paper-soft)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--gc-surface)'; }}
+            >
+              <span className="gc-serif" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--gc-ink)' }}>
+                {o.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
 // OnboardingModal — first-time setup (choose: I have a case, or I'm exploring)
 // ============================================================
 const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', initialForm = null, onComplete, onExplore, onDemo, onThemeChange, onClose }) => {
@@ -14464,6 +14565,17 @@ export default function App() {
     try { window.localStorage.setItem('gc_lang', lang); }
     catch (e) { /* noop */ }
   }, [lang]);
+  // Language gate: shown once, before OnboardingModal, on a truly fresh visit
+  // only. Anyone who's already onboarded (or already made an explicit pick)
+  // skips straight past it — this isn't meant to interrupt returning users.
+  const [hasPickedLanguage, setHasPickedLanguage] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      if (window.localStorage.getItem('gc_lang_picked') === 'true') return true;
+      if (window.localStorage.getItem('gc_hasOnboarded') === 'true') return true;
+    } catch (e) { /* noop */ }
+    return false;
+  });
   // ?tab= deep link (e.g. ?tab=alerts to land on the subscription page from an email).
   // Read-only: switching tabs afterwards doesn't write back to the URL.
   const [tab, setTab] = useState(() => {
@@ -15023,7 +15135,17 @@ export default function App() {
 
   return (
     <LanguageContext.Provider value={{ lang, setLang, t }}>
-      {!hasOnboarded && (
+      {!hasPickedLanguage && (
+        <LanguageGateModal
+          theme={theme}
+          onPick={(v) => {
+            setLang(v);
+            try { window.localStorage.setItem('gc_lang_picked', 'true'); } catch (e) { /* noop */ }
+            setHasPickedLanguage(true);
+          }}
+        />
+      )}
+      {hasPickedLanguage && !hasOnboarded && (
         <OnboardingModal
           lang={lang}
           theme={theme}
