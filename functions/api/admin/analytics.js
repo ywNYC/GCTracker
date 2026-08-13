@@ -3,11 +3,14 @@
 // sessions, unique visitors, dwell-time distribution, language / case-configured /
 // subscribed splits. Same Bearer ADMIN_TOKEN auth as the other admin endpoints.
 //
-// Scans only the trailing `days` window (default 30, max 90 = full retention),
-// one list() per day, with gets inside each day batched via Promise.all. A prior
-// version listed the whole `an:` prefix and awaited get() one key at a time,
-// which was fine at "a few hundred keys" but started 524-ing on Cloudflare Pages
-// once accumulated beacon records passed roughly a thousand.
+// Reads straight off list()'s metadata field instead of get()-ing each key.
+// A prior version did one get() per key (either serially, or later batched
+// with Promise.all) — both blew past Workers' per-request subrequest cap once
+// beacon volume grew, either as a 524 (serial, too slow) or a thrown exception
+// (batched, too many subrequests). list() metadata costs nothing extra: it's
+// populated by beacon.js's put() and comes back inline with the key listing,
+// so the whole scan is just a handful of paginated list() calls. Records
+// written before this metadata change won't carry it and are skipped.
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -21,33 +24,21 @@ export async function onRequestGet(context) {
 
   const url = new URL(request.url);
   const windowDays = Math.min(Math.max(parseInt(url.searchParams.get('days'), 10) || 30, 1), 90);
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - windowDays);
+  const cutoffDay = cutoff.toISOString().slice(0, 10);
 
-  const dayList = [];
-  const today = new Date();
-  for (let i = 0; i < windowDays; i++) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
-    dayList.push(d.toISOString().slice(0, 10));
-  }
-
-  const GET_BATCH = 50;
   const bySid = [];
-  for (const day of dayList) {
-    let cursor;
-    do {
-      const list = await env.SUBSCRIBERS.list({ prefix: `an:${day}:`, cursor });
-      for (let i = 0; i < list.keys.length; i += GET_BATCH) {
-        const batch = list.keys.slice(i, i + GET_BATCH);
-        const vals = await Promise.all(batch.map((k) => env.SUBSCRIBERS.get(k.name)));
-        batch.forEach((k, idx) => {
-          let rec = null;
-          try { rec = JSON.parse(vals[idx]); } catch {}
-          if (rec) bySid.push({ day, sid: k.name.split(':')[2], ...rec });
-        });
-      }
-      cursor = list.list_complete ? null : list.cursor;
-    } while (cursor);
-  }
+  let cursor;
+  do {
+    const list = await env.SUBSCRIBERS.list({ prefix: 'an:', cursor });
+    for (const k of list.keys) {
+      const [, day, sid] = k.name.split(':');
+      if (day < cutoffDay || !k.metadata) continue;
+      bySid.push({ day, sid, ...k.metadata });
+    }
+    cursor = list.list_complete ? null : list.cursor;
+  } while (cursor);
 
   const days = {};
   for (const r of bySid) {

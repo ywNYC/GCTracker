@@ -45,11 +45,16 @@ export async function onRequestPost(context) {
   const subscribed = body.subscribed === true;
 
   const day = new Date().toISOString().slice(0, 10);
+  const rec = { vid, dwellMs, lang, hasCase, subscribed, ts: Date.now() };
   try {
+    // Mirrored into KV metadata too: list() returns metadata inline, so the
+    // admin analytics endpoint can read it straight off list() without an
+    // extra get() per key (that per-key get() was blowing Workers' subrequest
+    // cap once traffic grew).
     await env.SUBSCRIBERS.put(
       `an:${day}:${sid}`,
-      JSON.stringify({ vid, dwellMs, lang, hasCase, subscribed, ts: Date.now() }),
-      { expirationTtl: 90 * 24 * 3600 }
+      JSON.stringify(rec),
+      { expirationTtl: 90 * 24 * 3600, metadata: rec }
     );
   } catch {
     // Telemetry must never surface an error to the page.
