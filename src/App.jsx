@@ -7644,9 +7644,22 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
     n400Eligible: true,      // remind when N-400 eligibility is ~30 days away
   });
 
-  const [email, setEmail] = useState('');
-  const [emailStatus, setEmailStatus] = useState(''); // 'success', 'error', 'loading'
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  // Hydrate from the same persisted flag useSubscribed() reads elsewhere — otherwise a
+  // returning subscriber (new session, isSubscribed reset to false) sees the signup form
+  // again instead of their saved state, and the case/alert sync effect below never arms.
+  const [email, setEmail] = useState(() => {
+    try { return window.localStorage.getItem('gc_subscribedEmail') || ''; } catch { return ''; }
+  });
+  const [emailStatus, setEmailStatus] = useState(''); // 'success' | 'updated' | 'error' | 'invalid' | 'loading'
+  const [isSubscribed, setIsSubscribed] = useState(() => {
+    try { return !!window.localStorage.getItem('gc_subscribedEmail'); } catch { return false; }
+  });
+  // "Already a subscriber? Update here" — for a browser/device with no local
+  // gc_subscribedEmail flag (private window, different device, cleared storage).
+  // Doesn't change what gets submitted (same email+userCase POST works either way,
+  // /api/subscribe already upserts by email) — purely changes the copy so someone
+  // who IS already subscribed isn't afraid re-submitting will duplicate them.
+  const [updateMode, setUpdateMode] = useState(false);
 
   const toggleAlert = (key) => {
     setAlerts(prev => ({ ...prev, [key]: !prev[key] }));
@@ -7686,13 +7699,24 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
       const result = await response.json().catch(() => ({ success: false }));
 
       if (response.ok && result.success) {
-        setEmailStatus('success');
         setIsSubscribed(true);
-        setShowConfirmPrompt(true); // 双重确认漏斗的洞：明确告诉用户还差一步
         // Every other entry point keys off this to never bother an existing subscriber.
+        // Also what makes this browser recognize itself as subscribed going forward —
+        // the whole point of the "already a subscriber? update here" path below.
         try { window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase()); } catch {}
         announceSubscribed();
-        setTimeout(() => setEmailStatus(''), 3000);
+        if (result.confirmed) {
+          // Re-submitting the email of an already-confirmed subscriber (the "update
+          // my subscription" path, e.g. from a browser/device with no local flag) —
+          // server upserted the record, no confirmation mail was sent because none
+          // was needed. Showing the "check your inbox" prompt here would be a lie.
+          setEmailStatus('updated');
+          setTimeout(() => setEmailStatus(''), 3000);
+        } else {
+          setEmailStatus('success');
+          setShowConfirmPrompt(true); // 双重确认漏斗的洞：明确告诉用户还差一步
+          setTimeout(() => setEmailStatus(''), 3000);
+        }
       } else {
         console.error('Subscription failed:', result.error || response.statusText);
         setEmailStatus('error');
@@ -7705,16 +7729,18 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
     }
   };
 
-  // Persist alert toggles made AFTER subscribing.
-  // handleSubscribe is the only other place that POSTs and it fires solely from the
-  // subscribe button, so before this every post-subscribe toggle changed local state
-  // and was never sent — the switches were decorative once you'd subscribed.
-  // Debounced so flipping several in a row is a single request, which also keeps well
-  // clear of the per-IP rate limit on /api/subscribe.
+  // Persist alert toggles AND case edits (category/PD/country/subtype/...) made AFTER
+  // subscribing. handleSubscribe is the only other place that POSTs and it fires solely
+  // from the subscribe button, so before this every post-subscribe change to alerts or
+  // to userCase only touched local state and was never sent — editing your case on the
+  // case card silently drifted away from what the server had on file for your emails.
+  // Debounced so several changes in a row are one request, which also keeps well clear
+  // of the per-IP rate limit on /api/subscribe.
   const skipAlertSync = useRef(true);
+  const [syncToast, setSyncToast] = useState(false);
   useEffect(() => {
     // Not subscribed (or no usable address) — nothing to sync. Re-arm the skip so the
-    // first toggle after a future subscribe doesn't fire a redundant duplicate of the
+    // first change after a future subscribe doesn't fire a redundant duplicate of the
     // POST that handleSubscribe just made.
     if (!isSubscribed || !validateEmail(email)) {
       skipAlertSync.current = true;
@@ -7734,10 +7760,18 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
           alerts,
           language: lang,
         }),
-      }).catch((err) => console.error('Alert preference sync failed:', err));
+      })
+        .then((resp) => {
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          // Silent sync otherwise gives no sign the case edit actually reached the
+          // subscription — a brief toast is the only feedback this flow gets.
+          setSyncToast(true);
+          setTimeout(() => setSyncToast(false), 3000);
+        })
+        .catch((err) => console.error('Case/alert preference sync failed:', err));
     }, 800);
     return () => clearTimeout(timer);
-  }, [alerts, isSubscribed]);
+  }, [alerts, userCase, isSubscribed]);
 
   const handleUnsubscribe = async () => {
     // Fire-and-forget unsubscribe (user stays unsubscribed in UI regardless of API result)
@@ -7778,6 +7812,24 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
 
   return (
     <div className="space-y-2">
+      {/* Sync toast — the case/alert sync above is otherwise silent, so an edit made
+          on the persistent case bar while already subscribed gives no sign it actually
+          reached the subscription record. Auto-dismisses; doesn't block anything. */}
+      {syncToast && (
+        <div style={{
+          position: 'fixed', left: '50%', bottom: '24px', transform: 'translateX(-50%)',
+          zIndex: 1100, display: 'flex', alignItems: 'center', gap: '7px',
+          background: 'var(--gc-green)', color: 'var(--gc-paper)',
+          padding: '9px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.25)', whiteSpace: 'nowrap',
+        }}>
+          <CheckCircle2 size={14} />
+          {lang === 'en' ? 'Synced — your email updates now use this case'
+            : lang === 'tw' ? '已同步 — 郵件更新已改用這個案子'
+            : '已同步 — 邮件更新已改用这个案子'}
+        </div>
+      )}
+
       {/* Alert Preferences — ABOVE the subscribe form. When it sat below, an
           unsubscribed visitor had the whole form between them and the toggles,
           which read as "these appear only after you subscribe". */}
@@ -7939,12 +7991,35 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
 
             {/* 邮箱 + 订阅按钮 */}
             <div>
-              <label className="gc-eyebrow" style={{
-                fontSize: '8px', color: 'var(--gc-muted)',
-                letterSpacing: '0.14em', marginBottom: '4px', display: 'block',
-              }}>
-                {lang === 'en' ? 'Email' : lang === 'tw' ? '郵箱' : '邮箱'}
-              </label>
+              <div className="flex items-center justify-between" style={{ marginBottom: '4px' }}>
+                <label className="gc-eyebrow" style={{
+                  fontSize: '8px', color: 'var(--gc-muted)', letterSpacing: '0.14em',
+                }}>
+                  {lang === 'en' ? 'Email' : lang === 'tw' ? '郵箱' : '邮箱'}
+                </label>
+                <button type="button" onClick={() => setUpdateMode((v) => !v)}
+                  style={{
+                    fontSize: '10.5px', color: 'var(--gc-green-ink)', fontWeight: 600,
+                    background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+                  }}>
+                  {updateMode
+                    ? (lang === 'en' ? '← New signup instead' : lang === 'tw' ? '← 改成新訂閱' : '← 改成新订阅')
+                    : (lang === 'en' ? 'Already subscribed? Update here' : lang === 'tw' ? '已經訂閱過？點此更改訂閱' : '已经订阅过？点此更改订阅')}
+                </button>
+              </div>
+              {updateMode && (
+                <div style={{
+                  fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.5,
+                  marginBottom: '6px', padding: '6px 8px',
+                  background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px',
+                }}>
+                  {lang === 'en'
+                    ? 'Enter the email you subscribed with. Submitting updates your existing subscription with the case above — it won\'t create a duplicate.'
+                    : lang === 'tw'
+                      ? '填你訂閱時用的郵箱。提交後會用上面這個案子更新你現有的訂閱，不會重複訂閱。'
+                      : '填你订阅时用的邮箱。提交后会用上面这个案子更新你现有的订阅，不会重复订阅。'}
+                </div>
+              )}
               <div className="flex gap-2">
                 <input
                   type="email"
@@ -7983,10 +8058,26 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
                     letterSpacing: '0.02em',
                     transition: 'all 120ms',
                   }}>
-                  {emailStatus === 'loading' ? '...' : t.emailSubscribe}
+                  {emailStatus === 'loading' ? '...' : updateMode
+                    ? (lang === 'en' ? 'Update' : lang === 'tw' ? '更新訂閱' : '更新订阅')
+                    : t.emailSubscribe}
                 </button>
               </div>
             </div>
+
+            {emailStatus === 'updated' && (
+              <div className="flex items-center gap-2" style={{
+                fontSize: '12px', color: 'var(--gc-green-ink)',
+                background: 'var(--gc-green-soft)',
+                padding: '8px 12px', borderRadius: '3px',
+                border: '1px solid var(--gc-green-border)',
+              }}>
+                <CheckCircle2 size={14} />
+                {lang === 'en' ? 'Subscription updated — future emails use this case.'
+                  : lang === 'tw' ? '訂閱已更新 — 之後的郵件會用這個案子。'
+                  : '订阅已更新 — 之后的邮件会用这个案子。'}
+              </div>
+            )}
 
             {emailStatus === 'success' && (
               <div className="flex items-center gap-2" style={{
@@ -14190,11 +14281,16 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
   const [email, setEmail] = useState('');
   const [subLang, setSubLang] = useState(lang);
   const [alerts, setAlerts] = useState({ whenCurrent: true, whenEligible: true, monthlyUpdates: true, retrogression: true });
-  const [status, setStatus] = useState(''); // '' | 'loading' | 'sent' | 'error' | 'invalid'
+  const [status, setStatus] = useState(''); // '' | 'loading' | 'sent' | 'updated' | 'error' | 'invalid'
+  // Same purpose as in SmartAlerts: a browser/device with no gc_subscribedEmail flag
+  // (private window, different device) lands here as if it were a first-time visitor.
+  // /api/subscribe already upserts by email, so re-submitting an existing address just
+  // works — this only changes the copy so it doesn't look like a fresh, unconfirmed signup.
+  const [updateMode, setUpdateMode] = useState(false);
   if (!show) return null;
 
   // Already a subscriber (and not mid-flow): no form — just say so and offer settings.
-  if (isSubscribed && status !== 'sent') {
+  if (isSubscribed && status !== 'sent' && status !== 'updated') {
     let savedEmail = '';
     try { savedEmail = window.localStorage.getItem('gc_subscribedEmail') || ''; } catch { /* noop */ }
     return (
@@ -14253,12 +14349,14 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
       });
       const result = await resp.json().catch(() => ({ success: false }));
       if (resp.ok && result.success) {
-        setStatus('sent');
         try {
           window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase());
           window.sessionStorage.setItem('gc_subNudgeShown', '1');
         } catch { /* noop */ }
         announceSubscribed();
+        // Updating an already-confirmed subscriber sends no confirmation mail — saying
+        // "check your inbox" here would be wrong, so it gets its own status/copy.
+        setStatus(result.confirmed ? 'updated' : 'sent');
       } else {
         setStatus('error');
         setTimeout(() => setStatus(''), 3000);
@@ -14290,7 +14388,24 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
       }}>
         <button type="button" aria-label="close" onClick={onClose}
           style={{ position: 'absolute', top: '4px', right: '4px', width: '36px', height: '36px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '18px', lineHeight: 1, color: 'var(--gc-muted)' }}>×</button>
-        {status === 'sent' ? (
+        {status === 'updated' ? (
+          <>
+            <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '8px', paddingRight: '28px' }}>
+              {lang === 'en' ? 'Subscription updated' : lang === 'tw' ? '訂閱已更新' : '订阅已更新'}
+            </div>
+            <div style={{ fontSize: '12.5px', lineHeight: 1.7, color: 'var(--gc-ink-soft)' }}>
+              {lang === 'en'
+                ? <>Future emails to <b>{email.trim()}</b> will use this case. No confirmation needed — it was already active.</>
+                : lang === 'tw'
+                  ? <>之後發到 <b>{email.trim()}</b> 的郵件會用這個案子。不用重新確認，訂閱本來就是有效的。</>
+                  : <>之后发到 <b>{email.trim()}</b> 的邮件会用这个案子。不用重新确认，订阅本来就是有效的。</>}
+            </div>
+            <button type="button" onClick={onClose}
+              style={{ width: '100%', marginTop: '12px', padding: '9px', fontSize: '12.5px', fontWeight: 700, background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              {lang === 'en' ? 'Got it' : lang === 'tw' ? '知道了' : '知道了'}
+            </button>
+          </>
+        ) : status === 'sent' ? (
           <>
             <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '8px', paddingRight: '28px' }}>
               {lang === 'en' ? 'One more step' : lang === 'tw' ? '還差一步' : '还差一步'}
@@ -14316,9 +14431,35 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
           </>
         ) : (
           <>
-            <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '2px', paddingRight: '28px' }}>
-              {lang === 'en' ? 'Track this case by email' : lang === 'tw' ? '訂閱這個案子的排期' : '订阅这个案子的排期'}
+            <div className="flex items-start justify-between" style={{ gap: '8px' }}>
+              <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '2px', paddingRight: '20px' }}>
+                {updateMode
+                  ? (lang === 'en' ? 'Update your subscription' : lang === 'tw' ? '更改訂閱' : '更改订阅')
+                  : (lang === 'en' ? 'Track this case by email' : lang === 'tw' ? '訂閱這個案子的排期' : '订阅这个案子的排期')}
+              </div>
             </div>
+            <button type="button" onClick={() => setUpdateMode((v) => !v)}
+              style={{
+                fontSize: '10.5px', color: 'var(--gc-green-ink)', fontWeight: 600,
+                background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', marginBottom: '6px',
+              }}>
+              {updateMode
+                ? (lang === 'en' ? '← New signup instead' : lang === 'tw' ? '← 改成新訂閱' : '← 改成新订阅')
+                : (lang === 'en' ? 'Already subscribed (e.g. private window)? Update here' : lang === 'tw' ? '已經訂閱過（例如無痕視窗）？點此更改' : '已经订阅过（比如无痕浏览）？点此更改')}
+            </button>
+            {updateMode && (
+              <div style={{
+                fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.5,
+                marginBottom: '8px', padding: '6px 8px',
+                background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px',
+              }}>
+                {lang === 'en'
+                  ? <>If the case below isn't right yet, close this, use "Edit case" on the page to fix it, then reopen and submit with the email you subscribed with — it updates your existing subscription, no duplicate.</>
+                  : lang === 'tw'
+                    ? <>如果下面這個案子不是你要的，先關掉這個彈窗，用頁面上的「編輯案子」改好，再點訂閱進來、填你訂閱時用的郵箱提交——會更新你現有的訂閱，不會重複訂閱。</>
+                    : <>如果下面这个案子不是你要的，先关掉这个弹窗，用页面上的"编辑案子"改好，再点订阅进来、填你订阅时用的邮箱提交——会更新你现有的订阅，不会重复订阅。</>}
+              </div>
+            )}
             <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '10px' }}>
               {userCase.category}{subtypeLabel(userCase.category, userCase.subtype, lang) ? ` (${subtypeLabel(userCase.category, userCase.subtype, lang)})` : ''} · {userCase.country} · {lang === 'en' ? 'PD ' : '优先日 '}{pdLabel}
             </div>
@@ -14369,7 +14510,9 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
                 background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none', borderRadius: '4px',
                 cursor: 'pointer', opacity: status === 'loading' ? 0.6 : 1,
               }}>
-              {status === 'loading' ? '…' : (lang === 'en' ? 'Subscribe' : lang === 'tw' ? '一鍵訂閱' : '一键订阅')}
+              {status === 'loading' ? '…' : updateMode
+                ? (lang === 'en' ? 'Update subscription' : lang === 'tw' ? '更新訂閱' : '更新订阅')
+                : (lang === 'en' ? 'Subscribe' : lang === 'tw' ? '一鍵訂閱' : '一键订阅')}
             </button>
             <div className="flex items-center justify-between" style={{ marginTop: '8px' }}>
               <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>
