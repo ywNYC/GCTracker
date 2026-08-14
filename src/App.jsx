@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, memo, createContext, useContext, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, Calendar, MapPin, Briefcase, Home, TrendingUp, TrendingDown, Minus, AlertCircle, AlertTriangle, CheckCircle2, Clock, Info, FileText, Zap, Shield, Users, Target, Database, RefreshCw, ExternalLink, Sparkles, Eye, Bell, BarChart3, Mail, Download, History, HelpCircle, DollarSign, Scale, Plane, Activity, Ruler, Dot, ClipboardList, Share2 } from 'lucide-react';
+import { Globe, Calendar, MapPin, Briefcase, Home, TrendingUp, TrendingDown, Minus, AlertCircle, AlertTriangle, CheckCircle2, Clock, Info, FileText, Zap, Shield, Users, Target, Database, RefreshCw, ExternalLink, Sparkles, Eye, Bell, BarChart3, Mail, Download, History, HelpCircle, DollarSign, Scale, Plane, Activity, Ruler, Dot, ClipboardList, Share2, Lock } from 'lucide-react';
 // Shared with the Cloudflare Pages Functions email pipeline (functions/api/admin/send-monthly.js)
 // so the site and the monthly emails can't silently diverge — see _gcMath.js's own header
 // comment for what still can't be shared (parseDate's 'U' handling differs on purpose;
@@ -924,6 +924,17 @@ const COUNTRY_CODE = {
   India: 'IND',
   Mexico: 'MEX',
   Philippines: 'PHL',
+};
+
+// Same country pills, but reading in the active UI language — English keeps the
+// passport-style code (CHN/IND/...), zh/tw show the actual country name so the
+// label under the flag isn't stuck in English when the rest of the page isn't.
+const COUNTRY_LABEL_ZH = { China: '中国', Taiwan: '全球', Other: '全球', India: '印度', Mexico: '墨西哥', Philippines: '菲律宾' };
+const COUNTRY_LABEL_TW = { China: '中國', Taiwan: '全球', Other: '全球', India: '印度', Mexico: '墨西哥', Philippines: '菲律賓' };
+const countryShortLabel = (v, lang) => {
+  if (lang === 'tw') return COUNTRY_LABEL_TW[v] || v;
+  if (lang === 'zh') return COUNTRY_LABEL_ZH[v] || v;
+  return COUNTRY_CODE[v] || v.slice(0, 3).toUpperCase();
 };
 
 const bulletinMay2026 = {
@@ -2054,20 +2065,6 @@ const InputPanel = ({ userCase, setUserCase }) => {
     { v: 'Mexico', label: t.countryMexico },
     { v: 'Philippines', label: t.countryPhilippines },
   ];
-  // short label for compact country button
-  const shortCountry = (v) => {
-    if (lang === 'en') {
-      return v === 'Taiwan' ? 'ROW' : v;
-    }
-    const map = {
-      Taiwan: lang === 'tw' ? '全球' : '全球',
-      China: lang === 'tw' ? '中國' : '中国',
-      India: '印度',
-      Mexico: lang === 'tw' ? '墨西哥' : '墨西哥',
-      Philippines: lang === 'tw' ? '菲律賓' : '菲律宾',
-    };
-    return map[v] || v;
-  };
 
   return (
     <div style={{
@@ -2111,7 +2108,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
                   className="flex flex-col items-center gap-1 justify-center">
                   <CountryFlag country={c.v} size={16} />
                   <span className="gc-mono truncate" style={{ fontSize: '10px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
-                    {COUNTRY_CODE[c.v] || c.v.slice(0, 3).toUpperCase()}
+                    {countryShortLabel(c.v, lang)}
                   </span>
                 </button>
               );
@@ -2172,6 +2169,22 @@ const InputPanel = ({ userCase, setUserCase }) => {
               {userCase.inUS ? (lang === 'en' ? 'YES' : '是') : (lang === 'en' ? 'NO' : '否')}
             </button>
           </div>
+        </div>
+
+        {/* Date of birth — optional, only powers the "how old will you be" line
+            on the Overview countdown card. Year+month only; day defaults to the
+            1st wherever an age gets computed from it. */}
+        <div style={{ width: '100%', marginTop: '10px' }}>
+          <div className="flex items-center gap-1 mb-1">
+            <Calendar size={10} style={{ color: 'var(--gc-muted-soft)' }} className="flex-shrink-0" />
+            <span className="gc-label" style={{ fontSize: '9px' }}>
+              {lang === 'en' ? 'Date of birth (optional)' : lang === 'tw' ? '出生年月（選填）' : '出生年月（选填）'}
+            </span>
+          </div>
+          <YearMonthDropdown value={userCase.birthYearMonth || ''} allowEmpty
+            placeholder={lang === 'en' ? 'Not set' : '未填写'}
+            triggerStyle={{ padding: '9px 9px' }}
+            onChange={(ym) => setUserCase({ ...userCase, birthYearMonth: ym })} />
         </div>
 
         <SubtypeChips userCase={userCase} setUserCase={setUserCase} />
@@ -2332,7 +2345,7 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0, overflow: 'hidden' }}>
           <CountryFlag country={userCase.country} size={12} />
           <span className="gc-mono" style={{ fontSize: '10px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '0.06em', flexShrink: 0 }}>
-            {COUNTRY_CODE[userCase.country] || userCase.country.slice(0, 3).toUpperCase()}
+            {countryShortLabel(userCase.country, lang)}
           </span>
           <span style={{ color: 'var(--gc-rule)', flexShrink: 0 }}>·</span>
           <span className="gc-serif" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gc-ink)', letterSpacing: '-0.005em', flexShrink: 0 }}>
@@ -2417,7 +2430,7 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
                   className="flex flex-col items-center justify-center gap-0.5">
                   <CountryFlag country={c.v} size={13} />
                   <span className="gc-mono" style={{ fontSize: '8px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
-                    {COUNTRY_CODE[c.v] || c.v.slice(0, 3).toUpperCase()}
+                    {countryShortLabel(c.v, lang)}
                   </span>
                 </button>
               );
@@ -2483,6 +2496,18 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
           </div>
 
           <SubtypeChips userCase={userCase} setUserCase={setUserCase} />
+
+          {/* Date of birth — optional; only powers the "how old will you be"
+              line on the Overview countdown card. Year+month only, so any age
+              computed from it defaults the day to the 1st. */}
+          <div style={{ marginTop: '6px' }}>
+            <div className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-muted)', marginBottom: '3px', letterSpacing: '0.1em' }}>
+              {lang === 'en' ? 'DATE OF BIRTH (OPTIONAL)' : lang === 'tw' ? '出生年月（選填）' : '出生年月（选填）'}
+            </div>
+            <YearMonthDropdown value={userCase.birthYearMonth || ''} allowEmpty
+              placeholder={lang === 'en' ? 'Not set' : '未填写'}
+              onChange={(ym) => setUserCase({ ...userCase, birthYearMonth: ym })} />
+          </div>
 
           {/* F-category mismatch hint — compact */}
           {mismatch && (
@@ -4945,6 +4970,21 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                                 ? (lang === 'en' ? `At this pace you could file around ${fmtYM(etaDate)}` : lang === 'tw' ? `照這個速度，約 ${fmtYM(etaDate)} 前後就能遞件` : `照这个速度，约 ${fmtYM(etaDate)} 前后就能递件`)
                                 : (lang === 'en' ? `At this pace, approval opens around ${fmtYM(etaDate)}` : lang === 'tw' ? `照這個速度，約 ${fmtYM(etaDate)} 前後可獲批` : `照这个速度，约 ${fmtYM(etaDate)} 前后可获批`)}
                             </div>
+                            {/* Optional — only when a birth year/month is on file. Day defaults
+                                to the 1st since we only collect year+month. */}
+                            {userCase.birthYearMonth && (() => {
+                              const [by, bm] = userCase.birthYearMonth.split('-').map(Number);
+                              const birth = new Date(by, bm - 1, 1);
+                              let age = etaDate.getFullYear() - birth.getFullYear();
+                              const hadBirthday = etaDate.getMonth() > birth.getMonth()
+                                || (etaDate.getMonth() === birth.getMonth() && etaDate.getDate() >= birth.getDate());
+                              if (!hadBirthday) age -= 1;
+                              return (
+                                <div style={{ marginTop: '2px' }}>
+                                  {lang === 'en' ? `You'll be about ${age} then` : lang === 'tw' ? `屆時你大約 ${age} 歲` : `届时你大约 ${age} 岁`}
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                         {/* Where the number comes from — declared up front, expandable proof */}
@@ -7089,7 +7129,7 @@ const MonthlyUpdate = ({ userCase }) => {
       {hasPreviousData && (() => {
         const flat = [];
         changes.forEach((ch) => {
-          if (ch.primary?.days) flat.push({ label: `${ch.cat}·${COUNTRY_CODE[userCase.country] || 'CHN'}`, d: ch.primary.type === 'advanced' ? ch.primary.days : -ch.primary.days });
+          if (ch.primary?.days) flat.push({ label: `${ch.cat}·${countryShortLabel(userCase.country, lang)}`, d: ch.primary.type === 'advanced' ? ch.primary.days : -ch.primary.days });
           if (ch.secondary?.days) flat.push({ label: `${ch.cat}·ROW`, d: ch.secondary.type === 'advanced' ? ch.secondary.days : -ch.secondary.days });
         });
         if (!flat.length) return null;
@@ -7134,7 +7174,7 @@ const MonthlyUpdate = ({ userCase }) => {
                   <div className="text-[9px] text-slate-500 flex items-center gap-1 justify-end mb-0">
                     <CountryFlag country={userCase.country} size={12} />
                     <span style={{ fontWeight: 600, letterSpacing: '0.03em' }}>
-                      {COUNTRY_CODE[userCase.country] || ''}
+                      {countryShortLabel(userCase.country, lang)}
                     </span>
                   </div>
                   <div className="text-[10px] font-semibold text-slate-700">
@@ -7571,7 +7611,7 @@ const CompareByCountry = ({ userCase }) => {
                 className="flex flex-col items-center gap-0.5 justify-center">
                 <CountryFlag country={c.v} size={14} />
                 <span className="gc-mono" style={{ fontSize: '9px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
-                  {COUNTRY_CODE[c.v] || c.v.slice(0, 3).toUpperCase()}
+                  {countryShortLabel(c.v, lang)}
                 </span>
               </button>
             );
@@ -7613,7 +7653,7 @@ const CompareByCountry = ({ userCase }) => {
                 className="flex flex-col items-center gap-0.5 justify-center">
                 <CountryFlag country={c.v} size={14} />
                 <span className="gc-mono" style={{ fontSize: '9px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
-                  {COUNTRY_CODE[c.v] || c.v.slice(0, 3).toUpperCase()}
+                  {countryShortLabel(c.v, lang)}
                 </span>
               </button>
             );
@@ -7682,7 +7722,7 @@ const CompareByCountry = ({ userCase }) => {
                   }}>
                     <CountryFlag country={countryA} size={11} />
                     <span className="gc-mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-paper)', letterSpacing: '0.06em' }}>
-                      {COUNTRY_CODE[countryA] || countryA.slice(0, 3).toUpperCase()}
+                      {countryShortLabel(countryA, lang)}
                     </span>
                   </div>
                   <div className="text-sm font-bold" style={{ color: 'var(--gc-ink)' }}>{countryALabel}</div>
@@ -7741,7 +7781,7 @@ const CompareByCountry = ({ userCase }) => {
                   }}>
                     <CountryFlag country={countryB} size={11} />
                     <span className="gc-mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '0.06em' }}>
-                      {COUNTRY_CODE[countryB] || countryB.slice(0, 3).toUpperCase()}
+                      {countryShortLabel(countryB, lang)}
                     </span>
                   </div>
                   <div className="text-sm font-bold" style={{ color: 'var(--gc-ink)' }}>{countryBLabel}</div>
@@ -8401,8 +8441,117 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
 // EB downgrade), and free comparison (the original tool). Verdict sentence first,
 // timelines as evidence — same language as the Overview card.
 // ============================================================
+// Tone → chip/fill colors. Kept to 3 tones (matches the rest of the app's
+// status vocabulary): green = better, red = worse, ink = wash (neutral/minor).
+const CH_TONE = {
+  'var(--gc-green)': { soft: 'var(--gc-green-soft)', border: 'var(--gc-green-border)' },
+  'var(--gc-red)': { soft: 'var(--gc-red-soft)', border: 'var(--gc-red-border)' },
+  'var(--gc-ink)': { soft: 'var(--gc-paper-soft)', border: 'var(--gc-rule)' },
+};
+
+// One row of the two-row compare: a real duration is a proportional bar; an
+// already-current state isn't a point on that duration scale at all (it's a
+// categorical "done"), so it gets a solid filled bar with a checkmark instead
+// of being squashed into a barely-visible sliver at the "now" end.
+const CompareBarRow = ({ label, r, color, zMin, zMax, lang }) => {
+  if (r.now) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '68px', flexShrink: 0, textAlign: 'right', lineHeight: 1.3 }}>{label}</div>
+        <div style={{ flex: 1, height: '16px', borderRadius: '0 4px 4px 0', background: color, display: 'flex', alignItems: 'center', gap: '5px', paddingLeft: '8px' }}>
+          <CheckCircle2 size={11} style={{ color: '#fff' }} strokeWidth={2.2} />
+          <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#fff', letterSpacing: '0.01em' }}>
+            {lang === 'en' ? 'Available now' : '现在就可推进'}
+          </span>
+        </div>
+      </div>
+    );
+  }
+  if (r.unavailable || r.months == null) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '68px', flexShrink: 0, textAlign: 'right' }}>{label}</div>
+        <div style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>{lang === 'en' ? 'No visas this month (U)' : '本月无名额（U）'}</div>
+      </div>
+    );
+  }
+  const pct = Math.max(((r.months - zMin) / (zMax - zMin || 1)) * 100, 3);
+  const fmtEta = r.months / 12 >= 1.5 ? (lang === 'en' ? `~${(r.months / 12).toFixed(1)} yrs` : `约 ${(r.months / 12).toFixed(1)} 年`)
+    : (lang === 'en' ? `~${Math.max(Math.round(r.months), 1)} mo` : `约 ${Math.max(Math.round(r.months), 1)} 个月`);
+  const fmtYM2 = r.eta ? (lang === 'en' ? r.eta.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : `${r.eta.getFullYear()}年${r.eta.getMonth() + 1}月`) : '';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '68px', flexShrink: 0, textAlign: 'right', lineHeight: 1.3 }}>{label}</div>
+      <div style={{ flex: 1, height: '16px', background: 'var(--gc-paper-soft)', borderRadius: '0 4px 4px 0', position: 'relative', overflow: 'hidden' }}>
+        {zMin > 0 && (
+          <span style={{ position: 'absolute', left: '2px', top: 0, bottom: 0, width: '4px', zIndex: 2,
+            background: 'repeating-linear-gradient(-55deg, var(--gc-paper-soft), var(--gc-paper-soft) 1.5px, var(--gc-muted-soft) 1.5px, var(--gc-muted-soft) 3px)' }} />
+        )}
+        <div style={{ position: 'relative', height: '100%', width: `${pct}%`, background: color, borderRadius: '0 4px 4px 0' }} />
+      </div>
+      <div className="gc-mono" style={{ fontSize: '10.5px', fontWeight: 700, color, whiteSpace: 'nowrap', flexShrink: 0 }}>
+        {fmtEta}{fmtYM2 ? ` · ${fmtYM2}` : ''}
+      </div>
+    </div>
+  );
+};
+
+// Two aligned bars sharing one baseline/scale — the length gap IS the point for
+// a big difference. For a genuinely close pair (< 20% apart), 0..max makes the
+// real gap disappear visually, so the track zooms to just the gap between them
+// instead; the diagonal break mark is the standard "axis doesn't start at zero"
+// tell, and the delta line below still states the honest number either way.
+const CompareRows = ({ rowA, rowB, lang }) => {
+  const aM = rowA.r.now ? 0 : (rowA.r.months ?? null);
+  const bM = rowB.r.now ? 0 : (rowB.r.months ?? null);
+  if (aM == null || bM == null) {
+    return (
+      <div style={{ marginTop: '9px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        <CompareBarRow label={rowA.label} r={rowA.r} color={rowA.color} zMin={0} zMax={1} lang={lang} />
+        <CompareBarRow label={rowB.label} r={rowB.r} color={rowB.color} zMin={0} zMax={1} lang={lang} />
+      </div>
+    );
+  }
+  const maxM = Math.max(aM, bM, 1);
+  const bothReal = !rowA.r.now && !rowB.r.now;
+  const relDelta = Math.abs(aM - bM) / maxM;
+  const zoom = bothReal && relDelta > 0 && relDelta < 0.2;
+  const zMin = zoom ? Math.min(aM, bM) * 0.85 : 0;
+  const zMax = zoom ? Math.max(aM, bM) * 1.15 : maxM;
+
+  const dm = aM - bM; // positive = row B is faster
+  const dAbs = Math.abs(dm);
+  const deltaTxt = dAbs < 1
+    ? (lang === 'en' ? 'Almost no difference (< 1 mo)' : '几乎没有差异（< 1 个月）')
+    : (() => {
+        const pct = Math.round(dAbs / maxM * 100);
+        const mTxt = dAbs >= 18 ? (lang === 'en' ? `~${(dAbs / 12).toFixed(1)} yrs` : `约 ${(dAbs / 12).toFixed(1)} 年`) : (lang === 'en' ? `~${Math.round(dAbs)} mo` : `约 ${Math.round(dAbs)} 个月`);
+        return dm > 0
+          ? (lang === 'en' ? `${pct}% apart · faster by ${mTxt}` : `相差 ${pct}% · 快 ${mTxt}`)
+          : (lang === 'en' ? `${pct}% apart · slower by ${mTxt}` : `相差 ${pct}% · 慢 ${mTxt}`);
+      })();
+  const deltaColor = dAbs < 1 ? 'var(--gc-muted)' : dm > 0 ? 'var(--gc-green)' : 'var(--gc-red)';
+
+  return (
+    <div style={{ marginTop: '9px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        <CompareBarRow label={rowA.label} r={rowA.r} color={rowA.color} zMin={zMin} zMax={zMax} lang={lang} />
+        <CompareBarRow label={rowB.label} r={rowB.r} color={rowB.color} zMin={zMin} zMax={zMax} lang={lang} />
+      </div>
+      <div style={{ fontSize: '10.5px', fontWeight: 700, color: deltaColor, margin: '5px 0 0 76px' }}>
+        {deltaTxt}
+        {zoom && <span style={{ fontWeight: 600, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · bars zoomed to show the gap' : ' · 条形已局部放大，便于看清差距'}</span>}
+      </div>
+      <div className="flex items-center justify-between" style={{ fontSize: '9px', color: 'var(--gc-muted-soft)', marginTop: '2px', marginLeft: '76px' }}>
+        <span>{zoom ? (lang === 'en' ? 'zoomed' : '局部放大') : (lang === 'en' ? 'today' : '今天')}</span>
+        <span>{lang === 'en' ? `~${(maxM / 12).toFixed(1)} yrs out` : `约 ${(maxM / 12).toFixed(1)} 年后`}</span>
+      </div>
+    </div>
+  );
+};
+
 const CompareHub = ({ userCase }) => {
-  const { lang } = useLang();
+  const { lang, t } = useLang();
   const [openRule, setOpenRule] = useState(null); // index of the card whose rule is open
 
   // Zero choices: everything below is auto-computed from the user's own case, on the
@@ -8420,65 +8569,71 @@ const CompareHub = ({ userCase }) => {
     const cal = paceDaysToCalendar(cat, rc, st.days, chartKey);
     return { months: cal / 30.44, eta: new Date(Date.now() + cal * 86400000) };
   };
-  const fmtEta = (r) => r.now ? (lang === 'en' ? 'now' : '现在就可')
-    : r.unavailable ? 'U'
-    : r.months / 12 >= 1.5 ? (lang === 'en' ? `~${(r.months / 12).toFixed(1)} yrs` : `约 ${(r.months / 12).toFixed(1)} 年`)
-    : (lang === 'en' ? `~${Math.max(Math.round(r.months), 1)} mo` : `约 ${Math.max(Math.round(r.months), 1)} 个月`);
-  const fmtYM2 = (d) => !d ? '' : lang === 'en'
-    ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
-    : `${d.getFullYear()}年${d.getMonth() + 1}月`;
   const diffText = (m) => Math.abs(m) / 12 >= 1
     ? `${(Math.abs(m) / 12).toFixed(1)} ${lang === 'en' ? 'yrs' : '年'}`
     : `${Math.round(Math.abs(m))} ${lang === 'en' ? 'mo' : '个月'}`;
+  const catLabel = t?.[userCase.category.toLowerCase()] || userCase.category;
 
+  // Ordered slots: [cross-chargeability OR pool] then [category move OR "not applicable"].
+  // A slot that doesn't apply renders as a slim ghost row instead of vanishing —
+  // the page should look like it checked everything, not like it ran out of content.
   const cards = [];
+  let catMoveGhost = null; // set below if there's no adjacent-category move for this case
 
-  // Card 1 — spouse's birth country, always vs the ROW pool (the only pool that helps).
   if (userCase.country !== 'Taiwan') {
     const mine = etaFor(userCase.category, userCase.country);
     const row = etaFor(userCase.category, 'Taiwan');
     const d = (mine.months ?? 0) - (row.months ?? 0);
+    const big = (row.now && !mine.now) || d > 1;
     cards.push({
-      title: lang === 'en' ? 'If your spouse was born elsewhere' : '如果配偶出生在非积压国',
+      icon: Users,
+      title: lang === 'en' ? "Spouse's birth country" : '配偶出生地',
+      badge: row.now && !mine.now ? (lang === 'en' ? 'now' : '现在就可') : d > 1 ? (lang === 'en' ? 'faster' : '可提前') : (lang === 'en' ? 'minor' : '影响不大'),
       verdict: row.now && !mine.now
         ? (lang === 'en' ? 'Charged to a ROW-born spouse, you could proceed NOW.' : '按配偶的出生国（非积压国）计，你现在就可推进。')
         : d > 1
           ? (lang === 'en' ? `Marrying/married to someone born outside China·India etc. saves about ${diffText(d)}.` : `按配偶的出生国计，约可提前 ${diffText(d)}。`)
           : (lang === 'en' ? 'Right now this would not change your wait much.' : '目前这样做对你的等待影响不大。'),
-      tone: (row.now && !mine.now) || d > 1 ? 'var(--gc-green)' : 'var(--gc-ink)',
+      tone: big ? 'var(--gc-green)' : 'var(--gc-ink)',
       rows: [
-        { label: lang === 'en' ? 'As is' : '按你的出生国', r: mine, color: 'var(--gc-blue)' },
-        { label: lang === 'en' ? 'Via spouse (ROW)' : '按配偶出生国（ROW）', r: row, color: 'var(--gc-green)' },
+        { label: lang === 'en' ? 'As is' : '现状', r: mine, color: 'var(--gc-blue)' },
+        { label: lang === 'en' ? 'Via spouse' : '按配偶出生国', r: row, color: big ? 'var(--gc-green)' : 'var(--gc-muted)' },
       ],
       rule: lang === 'en'
-        ? 'Cross-chargeability, INA §202(b)(2): when spouses immigrate together, the case may be charged to either spouse\'s country of birth. Consult a lawyer for specifics.'
+        ? "Cross-chargeability, INA §202(b)(2): when spouses immigrate together, the case may be charged to either spouse's country of birth. Consult a lawyer for specifics."
         : '交叉归属（INA §202(b)(2)）：夫妻一同移民时，案件可计入任一方的出生国配额，两人都按更快的那国排期。细节请咨询律师。',
     });
   } else {
     cards.push({
+      icon: CheckCircle2,
       title: lang === 'en' ? 'Your quota pool' : '你的配额池',
+      badge: lang === 'en' ? 'optimal' : '无需操作',
       verdict: lang === 'en' ? 'You are already in the fastest (ROW) pool — a spouse\'s birth country cannot speed this up.' : '你已在最快的全球配额池——配偶出生地无法再加速。',
-      tone: 'var(--gc-green)', rows: [], rule: null,
+      tone: 'var(--gc-green)', rows: null, rule: null,
     });
   }
 
-  // Card 2 — the one category move that applies to THIS case, if any.
   const catMove = {
-    F2A: { to: 'IR', title: lang === 'en' ? 'If your spouse naturalizes' : '如果配偶入籍',
+    F2A: { to: 'IR', title: lang === 'en' ? 'Spouse naturalizes' : '配偶入籍',
       rule: lang === 'en' ? 'Spouses of U.S. citizens are Immediate Relatives: no quota, no bulletin. The upgrade is automatic on naturalization.' : '公民配偶属直系亲属（IR）：不占配额、不用等公告。担保人入籍后自动升级，通知 USCIS 即可。' },
-    F2B: { to: 'F1', title: lang === 'en' ? 'If your parent naturalizes' : '如果父母入籍',
+    F2B: { to: 'F1', title: lang === 'en' ? 'Parent naturalizes' : '父母入籍',
       rule: lang === 'en' ? 'F2B auto-converts to F1 on naturalization. If F1 is SLOWER for your country, CSPA §6 lets you opt out in writing and stay in F2B.' : 'F2B 在父母入籍后自动转 F1。若你的国家 F1 反而更慢，CSPA 第 6 条允许书面 opt-out 留在 F2B。' },
-    EB2: { to: 'EB3', title: lang === 'en' ? 'If you downgrade to EB-3' : '如果降级到 EB-3',
+    EB2: { to: 'EB3', title: lang === 'en' ? 'Downgrade to EB-3' : '降级到 EB-3',
       rule: lang === 'en' ? 'File a new I-140 under EB-3 with the same PERM and keep your original priority date (8 CFR 204.5(e)).' : '用同一份 PERM 重递 EB-3 的 I-140，原优先日保留（8 CFR 204.5(e)）。' },
-    EB3: { to: 'EB2', title: lang === 'en' ? 'If you upgrade to EB-2' : '如果升回 EB-2',
+    EB3: { to: 'EB2', title: lang === 'en' ? 'Upgrade to EB-2' : '升级到 EB-2',
       rule: lang === 'en' ? 'Same mechanism in reverse; priority date retention applies if the original I-140 was approved.' : '同一机制反向操作；只要原 I-140 获批过，优先日同样保留。' },
   }[userCase.category];
+
   if (catMove) {
     const from = etaFor(userCase.category, userCase.country);
     const to = catMove.to === 'IR' ? { now: true, months: 0 } : etaFor(catMove.to, userCase.country);
     const d = (from.months ?? 0) - (to.months ?? 0);
+    const good = catMove.to === 'IR' || d > 1;
+    const bad = d < -1;
     cards.push({
+      icon: RefreshCw,
       title: catMove.title,
+      badge: catMove.to === 'IR' ? (lang === 'en' ? 'now' : '现在就可') : good ? (lang === 'en' ? 'faster' : '可提前') : bad ? (lang === 'en' ? 'slower' : '会变慢') : (lang === 'en' ? 'minor' : '影响不大'),
       verdict: catMove.to === 'IR'
         ? (lang === 'en' ? 'You would become an Immediate Relative — no bulletin wait at all.' : '你将升级为直系亲属——完全不用再等公告。')
         : d > 1
@@ -8486,13 +8641,17 @@ const CompareHub = ({ userCase }) => {
           : d < -1
             ? (lang === 'en' ? `Careful — the new category is slower by ~${diffText(d)}. Consider opting out.` : `注意：新类别反而慢约 ${diffText(d)}——可考虑 opt-out 留在原类别。`)
             : (lang === 'en' ? 'Both categories are about the same right now.' : '两个类别目前差别不大。'),
-      tone: catMove.to === 'IR' || d > 1 ? 'var(--gc-green)' : d < -1 ? 'var(--gc-red)' : 'var(--gc-ink)',
+      tone: good ? 'var(--gc-green)' : bad ? 'var(--gc-red)' : 'var(--gc-ink)',
       rows: [
         { label: userCase.category, r: from, color: 'var(--gc-blue)' },
-        { label: catMove.to === 'IR' ? (lang === 'en' ? 'IR' : '直系亲属') : catMove.to, r: to, color: 'var(--gc-green)' },
+        { label: catMove.to === 'IR' ? (lang === 'en' ? 'IR' : '直系亲属') : catMove.to, r: to, color: good ? 'var(--gc-green)' : bad ? 'var(--gc-red)' : 'var(--gc-muted)' },
       ],
       rule: catMove.rule,
     });
+  } else {
+    catMoveGhost = lang === 'en'
+      ? `${catLabel} has no adjacent category with an automatic conversion or speed-up.`
+      : `${catLabel} 没有可自动转换或提速的邻近类别。`;
   }
 
   return (
@@ -8500,7 +8659,7 @@ const CompareHub = ({ userCase }) => {
       <div style={{ padding: '4px 0 0' }}>
         <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>{lang === 'en' ? 'WHAT IF' : '如果'}</div>
         <h2 className="gc-serif" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 2px' }}>
-          {lang === 'en' ? 'What could change your wait' : '什么能改变你的等待'}
+          {lang === 'en' ? 'Would this make you faster' : '这样做会不会更快'}
         </h2>
         <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: 0 }}>
           {lang === 'en'
@@ -8509,44 +8668,47 @@ const CompareHub = ({ userCase }) => {
         </p>
       </div>
       {cards.map((c, i) => {
-        const maxM = Math.max(...c.rows.map((r) => r.r.months || 0), 1);
+        const t = CH_TONE[c.tone];
+        const Icon = c.icon;
         return (
-          <div key={i} style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderLeft: `2px solid ${c.tone}`, borderRadius: '4px', padding: '12px 14px' }}>
-            <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginBottom: '4px' }}>{c.title}</div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', lineHeight: 1.5 }}>{c.verdict}</div>
-            {c.rows.length > 0 && (
-              <div style={{ marginTop: '10px' }}>
-                {c.rows.map((r, ri) => (
-                  <div key={ri} style={{ marginBottom: '7px' }}>
-                    <div className="flex items-center justify-between" style={{ fontSize: '11px', marginBottom: '3px' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--gc-ink)' }}>{r.label}</span>
-                      <span className="gc-mono" style={{ fontWeight: 700, color: r.color }}>
-                        {fmtEta(r.r)}{r.r.eta ? ` · ${fmtYM2(r.r.eta)}` : ''}
-                      </span>
-                    </div>
-                    <div style={{ height: '8px', background: 'var(--gc-rule-soft)', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.max(((r.r.months || 0) / maxM) * 100, r.r.now ? 3 : 4)}%`, background: r.color, borderRadius: '4px' }} />
-                    </div>
-                  </div>
-                ))}
+          <React.Fragment key={i}>
+            <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderLeft: `2px solid ${c.tone}`, borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ padding: '11px 14px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                  <Icon size={15} style={{ color: c.tone, flexShrink: 0 }} strokeWidth={1.8} />
+                  <span className="gc-serif" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{c.title}</span>
+                </div>
+                <span className="gc-eyebrow" style={{ fontSize: '9px', fontWeight: 700, color: c.tone, border: `1px solid ${t.border}`, background: t.soft, borderRadius: '2px', padding: '2px 6px', letterSpacing: '0.08em', flexShrink: 0 }}>
+                  {c.badge}
+                </span>
               </div>
-            )}
-            {c.rule && (
-              <>
-                <button type="button" onClick={() => setOpenRule(openRule === i ? null : i)}
-                  style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600, marginTop: '7px' }}>
-                  {openRule === i ? (lang === 'en' ? 'hide the rule' : '收起规则') : (lang === 'en' ? 'which rule allows this?' : '依据什么规则？')}
-                </button>
-                {openRule === i && (
-                  <div style={{ fontSize: '11px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px', padding: '8px 10px', marginTop: '6px' }}>
-                    {c.rule}
-                  </div>
+              <div style={{ padding: '8px 14px 12px' }}>
+                <div className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, lineHeight: 1.35, color: c.tone }}>{c.verdict}</div>
+                {c.rows && <CompareRows rowA={c.rows[0]} rowB={c.rows[1]} lang={lang} />}
+                {c.rule && (
+                  <>
+                    <button type="button" onClick={() => setOpenRule(openRule === i ? null : i)}
+                      style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600, marginTop: '8px' }}>
+                      {openRule === i ? (lang === 'en' ? 'hide the rule' : '收起规则') : (lang === 'en' ? 'which rule allows this?' : '依据什么规则？')}
+                    </button>
+                    {openRule === i && (
+                      <div style={{ fontSize: '11px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px', padding: '8px 10px', marginTop: '6px' }}>
+                        {c.rule}
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </div>
+              </div>
+            </div>
+          </React.Fragment>
         );
       })}
+      {catMoveGhost && (
+        <div style={{ padding: '10px 12px', background: 'transparent', border: '1px dashed var(--gc-rule-soft)', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: '10px', opacity: 0.8 }}>
+          <Lock size={15} style={{ color: 'var(--gc-muted-soft)', flexShrink: 0 }} strokeWidth={1.8} />
+          <div style={{ fontSize: '12px', color: 'var(--gc-muted)', lineHeight: 1.4 }}>{catMoveGhost}</div>
+        </div>
+      )}
       <p style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.6, margin: '4px 2px 0' }}>
         {lang === 'en'
           ? 'Estimates use the same 12-month real pace as the Overview. Individual cases vary — talk to a lawyer before acting.'
@@ -9453,7 +9615,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                 style={{ color: terminalMode ? C.textMuted : 'var(--gc-muted)',
                          fontFamily: terminalMode ? 'ui-monospace, monospace' : 'inherit' }}>
             <span className="gc-mono" style={{ fontWeight: 700 }}>
-              {COUNTRY_CODE[userCase.country] || userCase.country.slice(0,3).toUpperCase()}
+              {countryShortLabel(userCase.country, lang)}
             </span>
             {' · '}
             {lang === 'en' ? '12mo + forecast' : '12个月 + 预测'}
@@ -9609,7 +9771,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
               style={{ color: terminalMode ? C.textMuted : 'var(--gc-muted)',
                        fontFamily: terminalMode ? 'ui-monospace, monospace' : 'inherit' }}>
           {terminalMode
-            ? (COUNTRY_CODE[userCase.country] || userCase.country.slice(0,3).toUpperCase())
+            ? (countryShortLabel(userCase.country, lang))
             : (country === 'China' ? '中国大陆' :
                country === 'India' ? '印度' :
                country === 'Other' ? (lang === 'en' ? 'Others' : '全球/其他') :
@@ -14709,6 +14871,11 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                   : (lang === 'en' ? 'Track this case by email' : lang === 'tw' ? '訂閱這個案子的排期' : '订阅这个案子的排期')}
               </div>
             </div>
+            {!updateMode && (
+              <div className="gc-eyebrow" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginBottom: '6px' }}>
+                {lang === 'en' ? 'NEW SIGNUP' : lang === 'tw' ? '新訂閱' : '新订阅'}
+              </div>
+            )}
             <button type="button" onClick={() => setUpdateMode((v) => !v)}
               style={{
                 display: 'block', width: '100%', textAlign: 'left', boxSizing: 'border-box',
@@ -14720,7 +14887,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
               }}>
               {updateMode
                 ? (lang === 'en' ? '← New signup instead' : lang === 'tw' ? '← 改成新訂閱' : '← 改成新订阅')
-                : (lang === 'en' ? 'Already subscribed (e.g. private window)? Update here →' : lang === 'tw' ? '已經訂閱過（例如無痕視窗）？點此更改 →' : '已经订阅过（比如无痕浏览）？点此更改 →')}
+                : (lang === 'en' ? 'Already subscribed? Update here →' : lang === 'tw' ? '已經訂閱過？點此更改 →' : '已经订阅过？点此更改 →')}
             </button>
             {updateMode ? (
               <>
@@ -15463,6 +15630,7 @@ export default function App() {
       country: 'Taiwan', category: 'EB3',
       priorityDate: '2024-07-15', inUS: true,
       petitionerStatus: 'USC', // 'USC' (美国公民) or 'LPR' (绿卡持有人). Only used for F categories.
+      birthYearMonth: '', // 'YYYY-MM', optional — powers the age line on the countdown card
     };
   });
   // Persist userCase changes to localStorage
