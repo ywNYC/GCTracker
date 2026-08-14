@@ -13364,7 +13364,7 @@ const PATHWAY_GROUPS = {
 // ============================================================
 // The Index — interactive pathway finder component
 // ============================================================
-const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase }) => {
+const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onCategoryPicked }) => {
   const { t, lang } = useLang();
   const [mode, setMode] = useState('quiz');
   const [filterGroup, setFilterGroup] = useState('all');
@@ -13809,9 +13809,10 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase }) =
                   <div style={{ padding: '8px 10px', background: 'var(--gc-amber-soft)', border: '1px solid var(--gc-amber-border)', borderRadius: 'var(--gc-radius-sm)', fontSize: '11px', color: 'var(--gc-amber-ink)', lineHeight: 1.5 }}>
                     <b>{lang === 'en' ? 'Note: ' : '注意:'}</b>{info.caveat}
                   </div>
-                  {resultPath.goesTo && setUserCase && setTab && (
+                  {resultPath.goesTo && (onCategoryPicked || (setUserCase && setTab)) && (
                     <button
                       onClick={() => {
+                        if (onCategoryPicked) { onCategoryPicked(resultPath.goesTo); return; }
                         setUserCase({ ...userCase, category: resultPath.goesTo });
                         setTab('trends');
                       }}
@@ -13822,7 +13823,9 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase }) =
                         border: 'none', borderRadius: 'var(--gc-radius-sm)',
                         cursor: 'pointer', letterSpacing: '0.02em',
                       }}>
-                      {lang === 'en' ? `See ${resultPath.goesTo} wait times →` : `查看 ${resultPath.goesTo} 排期 →`}
+                      {onCategoryPicked
+                        ? (lang === 'en' ? `Use ${resultPath.goesTo} — set up my case →` : `用 ${resultPath.goesTo} 填写我的案件 →`)
+                        : (lang === 'en' ? `See ${resultPath.goesTo} wait times →` : `查看 ${resultPath.goesTo} 排期 →`)}
                     </button>
                   )}
                 </div>
@@ -13952,9 +13955,10 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase }) =
                       <div style={{ padding: '7px 9px', background: 'var(--gc-amber-soft)', border: '1px solid var(--gc-amber-border)', borderRadius: 'var(--gc-radius-sm)', fontSize: '10.5px', color: 'var(--gc-amber-ink)', lineHeight: 1.5 }}>
                         <b>{lang === 'en' ? 'Note: ' : '注意:'}</b>{info.caveat}
                       </div>
-                      {p.goesTo && setUserCase && setTab && (
+                      {p.goesTo && (onCategoryPicked || (setUserCase && setTab)) && (
                         <button
                           onClick={() => {
+                            if (onCategoryPicked) { onCategoryPicked(p.goesTo); return; }
                             setUserCase({ ...userCase, category: p.goesTo });
                             setTab('trends');
                           }}
@@ -13965,7 +13969,9 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase }) =
                             border: 'none', borderRadius: 'var(--gc-radius-sm)',
                             cursor: 'pointer', letterSpacing: '0.02em',
                           }}>
-                          {lang === 'en' ? `See ${p.goesTo} wait times →` : `查看 ${p.goesTo} 排期 →`}
+                          {onCategoryPicked
+                            ? (lang === 'en' ? `Use ${p.goesTo} — set up my case →` : `用 ${p.goesTo} 填写我的案件 →`)
+                            : (lang === 'en' ? `See ${p.goesTo} wait times →` : `查看 ${p.goesTo} 排期 →`)}
                         </button>
                       )}
                     </div>
@@ -14136,7 +14142,7 @@ const LanguageGateModal = ({ theme = 'passport', onPick }) => {
 // ============================================================
 // OnboardingModal — first-time setup (choose: I have a case, or I'm exploring)
 // ============================================================
-const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', initialForm = null, onComplete, onExplore, onDemo, onThemeChange, onClose }) => {
+const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', initialForm = null, onComplete, onThemeChange, onClose }) => {
   // Local state for the form (only used when user clicks "I have a case")
   const [mode, setMode] = useState(initialMode); // 'choose' | 'form'
   const [subtypeAttempted, setSubtypeAttempted] = useState(false);
@@ -14172,8 +14178,6 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       haveCaseDesc: 'Enter my category, country, and priority date',
       exploring: 'I\'m exploring',
       exploringDesc: 'Not sure which category I\'m in — help me find out',
-      demo: 'See a demo',
-      demoDesc: 'Browse the app with a random sample case',
       country: 'Country of chargeability',
       category: 'Category',
       categoryPlaceholder: 'Select category',
@@ -14198,8 +14202,6 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       haveCaseDesc: '填写我的类别、国家、优先日',
       exploring: '我在探索',
       exploringDesc: '还不确定自己属于哪个类别 — 帮我找找',
-      demo: '看演示',
-      demoDesc: '用一个随机示例案件浏览 app',
       country: '国籍类别',
       category: '绿卡类别',
       categoryPlaceholder: '选择类别',
@@ -14224,8 +14226,6 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       haveCaseDesc: '填寫我的類別、國家、優先日',
       exploring: '我在探索',
       exploringDesc: '還不確定自己屬於哪個類別 — 幫我找找',
-      demo: '看演示',
-      demoDesc: '用一個隨機示例案件瀏覽 app',
       country: '國籍類別',
       category: '綠卡類別',
       categoryPlaceholder: '選擇類別',
@@ -14285,7 +14285,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
         borderTop: '3px solid var(--gc-green)',
         borderRadius: 'var(--gc-radius)',
         width: '100%',
-        maxWidth: '380px',
+        maxWidth: mode === 'explore' ? '460px' : '380px',
         maxHeight: '92vh',
         overflowY: 'auto',
         padding: '20px 18px 16px',
@@ -14345,7 +14345,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
 
             {/* I'm exploring */}
             <button
-              onClick={onExplore}
+              onClick={() => setMode('explore')}
               style={{
                 width: '100%',
                 textAlign: 'left',
@@ -14373,37 +14373,6 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                 </div>
               </div>
               <span style={{ color: 'var(--gc-muted)', fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>›</span>
-            </button>
-
-            {/* See demo — skip setup, use a sample case */}
-            <button
-              onClick={onDemo}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                padding: '10px 14px',
-                background: 'transparent',
-                border: '1px dashed var(--gc-rule)',
-                borderRadius: 'var(--gc-radius-sm)',
-                cursor: 'pointer',
-                transition: 'all 140ms',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--gc-paper-soft)'; e.currentTarget.style.borderStyle = 'solid'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderStyle = 'dashed'; }}
-            >
-              <Eye size={16} style={{ color: 'var(--gc-muted)', flexShrink: 0 }} strokeWidth={1.6} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gc-ink-soft)', lineHeight: 1.25, marginBottom: '1px' }}>
-                  {t.demo}
-                </div>
-                <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.35 }}>
-                  {t.demoDesc}
-                </div>
-              </div>
-              <span style={{ color: 'var(--gc-muted-soft)', fontSize: '14px', lineHeight: 1, flexShrink: 0 }}>›</span>
             </button>
 
             {/* Theme picker — tiny inline swatches, low-key so it doesn't compete with main CTAs.
@@ -14466,6 +14435,26 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {mode === 'explore' && (
+          <div>
+            <button
+              onClick={() => setMode('choose')}
+              style={{
+                marginBottom: '12px',
+                padding: '6px 0',
+                fontSize: '12px', fontWeight: 600,
+                background: 'transparent', color: 'var(--gc-muted)',
+                border: 'none', cursor: 'pointer',
+              }}>
+              {t.back}
+            </button>
+            <TheIndex
+              userCase={form}
+              onCategoryPicked={(category) => { setForm({ ...form, category }); setMode('form'); }}
+            />
           </div>
         )}
 
@@ -15749,38 +15738,7 @@ export default function App() {
           initialMode={onboardingInitialMode}
           initialForm={onboardingInitialMode === 'form' ? userCase : null}
           onComplete={(form) => { setUserCase(form); setTab('overview'); setHasOnboarded(true); setOnboardingInitialMode('choose'); }}
-          onExplore={() => { setTab('index'); setHasOnboarded(true); setOnboardingInitialMode('choose'); }}
           onClose={() => { setHasOnboarded(true); setOnboardingInitialMode('choose'); }}
-          onDemo={() => {
-            // Curated list of compelling demo cases — each shows off the app
-            // with real tension/story. Random pick each time, so returning
-            // demo-browsers see something new.
-            const demoCases = [
-              // EB-2 India — the iconic decade-long wait
-              { country: 'India', category: 'EB2', priorityDate: '2013-03-15', inUS: true, petitionerStatus: 'USC' },
-              // EB-3 India — similarly long, different curve
-              { country: 'India', category: 'EB3', priorityDate: '2014-08-20', inUS: true, petitionerStatus: 'USC' },
-              // EB-2 China — long wait, different trend from India
-              { country: 'China', category: 'EB2', priorityDate: '2020-05-10', inUS: true, petitionerStatus: 'USC' },
-              // EB-3 China — shows retrogression history
-              { country: 'China', category: 'EB3', priorityDate: '2021-11-05', inUS: true, petitionerStatus: 'USC' },
-              // F2A ROW — close to current, shows "almost there" vibe
-              { country: 'Taiwan', category: 'F2A', priorityDate: '2023-06-01', inUS: true, petitionerStatus: 'LPR' },
-              // F4 Philippines — decades-long, famous example
-              { country: 'Philippines', category: 'F4', priorityDate: '2003-07-22', inUS: false, petitionerStatus: 'USC' },
-              // F4 Mexico — also very long, different country profile
-              { country: 'Mexico', category: 'F4', priorityDate: '2001-02-14', inUS: false, petitionerStatus: 'USC' },
-              // EB-3 Philippines — moderate wait, shows eligibility close
-              { country: 'Philippines', category: 'EB3', priorityDate: '2022-09-18', inUS: true, petitionerStatus: 'USC' },
-              // F1 China — moderate-to-long, shows unmarried adult child scenario
-              { country: 'China', category: 'F1', priorityDate: '2016-04-03', inUS: false, petitionerStatus: 'USC' },
-            ];
-            const pick = demoCases[Math.floor(Math.random() * demoCases.length)];
-            setUserCase(pick);
-            setTab('overview');
-            setHasOnboarded(true);
-            setOnboardingInitialMode('choose');
-          }}
           onThemeChange={setTheme}
         />
       )}
