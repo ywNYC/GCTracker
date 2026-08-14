@@ -1633,11 +1633,15 @@ const subtypeLabel = (cat, id, lang) => {
   return lang === 'en' ? row[3] : lang === 'tw' ? row[2] : row[1];
 };
 
-// SubtypeChips — single-select pills under the category picker. Required at
-// onboarding (blocks Start) so every case carries a subtype for reporting;
-// still doesn't affect cutoff-date math. `error` highlights the label red
-// after a blocked Start attempt. Tapping the active chip clears it; changing
-// category resets it upstream.
+// defaultSubtype — the subtype field should never sit empty: whenever a category
+// has subtypes, pre-pick the first one instead of nulling it out. Users can still
+// change it, they just can't be left with no selection after a category swap.
+const defaultSubtype = (cat) => (CATEGORY_SUBTYPES[cat] ? CATEGORY_SUBTYPES[cat][0][0] : null);
+
+// SubtypeChips — single-select pills under the category picker. `subtype` is never
+// left empty (see defaultSubtype): picking a different chip changes it, tapping the
+// already-active chip is a no-op. `required`/`error` are kept as a belt-and-suspenders
+// check for any legacy record that still has a null subtype on file.
 const SubtypeChips = ({ userCase, setUserCase, required = false, error = false }) => {
   const { lang } = useLang();
   const opts = CATEGORY_SUBTYPES[userCase.category];
@@ -1649,7 +1653,7 @@ const SubtypeChips = ({ userCase, setUserCase, required = false, error = false }
           const on = userCase.subtype === id;
           return (
             <button key={id} type="button"
-              onClick={() => setUserCase({ ...userCase, subtype: on ? null : id })}
+              onClick={() => { if (!on) setUserCase({ ...userCase, subtype: id }); }}
               style={{
                 padding: '4px 9px', fontSize: '10.5px', fontWeight: on ? 700 : 500,
                 border: `1px solid ${on ? 'var(--gc-green)' : error ? 'var(--gc-red)' : 'var(--gc-rule)'}`,
@@ -1954,10 +1958,11 @@ const InputPanel = ({ userCase, setUserCase }) => {
             <CategoryDropdown value={userCase.category}
               triggerStyle={{ padding: '9px 9px' }}
               onChange={(newCat) => {
+                if (newCat === userCase.category) return;
                 let newPetitioner = userCase.petitionerStatus;
                 if (newCat === 'F2A' || newCat === 'F2B') newPetitioner = 'LPR';
                 else if (newCat === 'F1' || newCat === 'F3' || newCat === 'F4') newPetitioner = 'USC';
-                setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner, subtype: null });
+                setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner, subtype: defaultSubtype(newCat) });
               }} />
           </div>
 
@@ -2257,10 +2262,11 @@ const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false }) => {
             {/* Category */}
             <CategoryDropdown value={userCase.category}
               onChange={(newCat) => {
+                if (newCat === userCase.category) return;
                 let newPetitioner = userCase.petitionerStatus;
                 if (newCat === 'F2A' || newCat === 'F2B') newPetitioner = 'LPR';
                 else if (newCat === 'F1' || newCat === 'F3' || newCat === 'F4') newPetitioner = 'USC';
-                setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner, subtype: null });
+                setUserCase({ ...userCase, category: newCat, petitionerStatus: newPetitioner, subtype: defaultSubtype(newCat) });
               }} />
 
             {/* Priority Date */}
@@ -13715,7 +13721,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     priorityDate: '2024-07-15',
     inUS: true,
     petitionerStatus: 'USC',
-    subtype: null,
+    subtype: defaultSubtype('EB3'),
   });
 
   const countries = [
@@ -14047,9 +14053,10 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               <CategoryDropdown value={form.category}
                 triggerStyle={{ padding: '9px 9px', background: 'var(--gc-paper-soft)' }}
                 onChange={(newCat) => {
+                  if (newCat === form.category) return;
                   const isF2C = newCat === 'F2A' || newCat === 'F2B';
                   const newPetitioner = isF2C ? 'LPR' : 'USC';
-                  setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: null });
+                  setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: defaultSubtype(newCat) });
                   setSubtypeAttempted(false);
                 }} />
               <SubtypeChips userCase={form} setUserCase={setForm}
