@@ -14275,7 +14275,7 @@ const announceSubscribed = () => {
 // 订阅 button and the case-card mail icon (via the 'gc-open-subscribe' event), so
 // nobody has to navigate to a separate page just to subscribe.
 // ============================================================
-const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
+const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passport' }) => {
   const { lang } = useLang();
   const isSubscribed = useSubscribed();
   const [email, setEmail] = useState('');
@@ -14287,6 +14287,15 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
   // /api/subscribe already upserts by email, so re-submitting an existing address just
   // works — this only changes the copy so it doesn't look like a fresh, unconfirmed signup.
   const [updateMode, setUpdateMode] = useState(false);
+  // Updating an already-active subscription needs no "click to confirm" step (unlike a
+  // brand-new signup, which genuinely has one more step — check email). So this closes
+  // itself, same as if the visitor had opened the modal already subscribed.
+  useEffect(() => {
+    if (status === 'updated') {
+      const timer = setTimeout(() => onClose(), 1400);
+      return () => clearTimeout(timer);
+    }
+  }, [status, onClose]);
   if (!show) return null;
 
   // Already a subscriber (and not mid-flow): no form — just say so and offer settings.
@@ -14389,22 +14398,18 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
         <button type="button" aria-label="close" onClick={onClose}
           style={{ position: 'absolute', top: '4px', right: '4px', width: '36px', height: '36px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '18px', lineHeight: 1, color: 'var(--gc-muted)' }}>×</button>
         {status === 'updated' ? (
-          <>
-            <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '8px', paddingRight: '28px' }}>
-              {lang === 'en' ? 'Subscription updated' : lang === 'tw' ? '訂閱已更新' : '订阅已更新'}
-            </div>
-            <div style={{ fontSize: '12.5px', lineHeight: 1.7, color: 'var(--gc-ink-soft)' }}>
+          <div className="flex items-center gap-2" style={{
+            fontSize: '12.5px', color: 'var(--gc-green-ink)', lineHeight: 1.5,
+          }}>
+            <CheckCircle2 size={16} className="flex-shrink-0" />
+            <span>
               {lang === 'en'
-                ? <>Future emails to <b>{email.trim()}</b> will use this case. No confirmation needed — it was already active.</>
+                ? <>Done — future emails to <b>{email.trim()}</b> use this case.</>
                 : lang === 'tw'
-                  ? <>之後發到 <b>{email.trim()}</b> 的郵件會用這個案子。不用重新確認，訂閱本來就是有效的。</>
-                  : <>之后发到 <b>{email.trim()}</b> 的邮件会用这个案子。不用重新确认，订阅本来就是有效的。</>}
-            </div>
-            <button type="button" onClick={onClose}
-              style={{ width: '100%', marginTop: '12px', padding: '9px', fontSize: '12.5px', fontWeight: 700, background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-              {lang === 'en' ? 'Got it' : lang === 'tw' ? '知道了' : '知道了'}
-            </button>
-          </>
+                  ? <>已更新 — 之後發到 <b>{email.trim()}</b> 的郵件會用這個案子。</>
+                  : <>已更新 — 之后发到 <b>{email.trim()}</b> 的邮件会用这个案子。</>}
+            </span>
+          </div>
         ) : status === 'sent' ? (
           <>
             <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-green-ink)', marginBottom: '8px', paddingRight: '28px' }}>
@@ -14440,29 +14445,37 @@ const SubscribeModal = ({ show, onClose, userCase, theme = 'passport' }) => {
             </div>
             <button type="button" onClick={() => setUpdateMode((v) => !v)}
               style={{
-                fontSize: '10.5px', color: 'var(--gc-green-ink)', fontWeight: 600,
-                background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', marginBottom: '6px',
+                display: 'block', width: '100%', textAlign: 'left', boxSizing: 'border-box',
+                fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.01em',
+                color: updateMode ? 'var(--gc-ink-soft)' : 'var(--gc-green-ink)',
+                background: updateMode ? 'var(--gc-paper-soft)' : 'var(--gc-green-soft)',
+                border: `1px solid ${updateMode ? 'var(--gc-rule-soft)' : 'var(--gc-green-border)'}`,
+                borderRadius: '4px', padding: '7px 9px', cursor: 'pointer', marginBottom: '8px',
               }}>
               {updateMode
                 ? (lang === 'en' ? '← New signup instead' : lang === 'tw' ? '← 改成新訂閱' : '← 改成新订阅')
-                : (lang === 'en' ? 'Already subscribed (e.g. private window)? Update here' : lang === 'tw' ? '已經訂閱過（例如無痕視窗）？點此更改' : '已经订阅过（比如无痕浏览）？点此更改')}
+                : (lang === 'en' ? 'Already subscribed (e.g. private window)? Update here →' : lang === 'tw' ? '已經訂閱過（例如無痕視窗）？點此更改 →' : '已经订阅过（比如无痕浏览）？点此更改 →')}
             </button>
-            {updateMode && (
-              <div style={{
-                fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.5,
-                marginBottom: '8px', padding: '6px 8px',
-                background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px',
-              }}>
-                {lang === 'en'
-                  ? <>If the case below isn't right yet, close this, use "Edit case" on the page to fix it, then reopen and submit with the email you subscribed with — it updates your existing subscription, no duplicate.</>
-                  : lang === 'tw'
-                    ? <>如果下面這個案子不是你要的，先關掉這個彈窗，用頁面上的「編輯案子」改好，再點訂閱進來、填你訂閱時用的郵箱提交——會更新你現有的訂閱，不會重複訂閱。</>
-                    : <>如果下面这个案子不是你要的，先关掉这个弹窗，用页面上的"编辑案子"改好，再点订阅进来、填你订阅时用的邮箱提交——会更新你现有的订阅，不会重复订阅。</>}
+            {updateMode ? (
+              <>
+                <CompactCaseBar userCase={userCase} setUserCase={setUserCase} defaultExpanded />
+                <div style={{
+                  fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.5,
+                  marginBottom: '8px', padding: '6px 8px', marginTop: '-2px',
+                  background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px',
+                }}>
+                  {lang === 'en'
+                    ? 'Adjust the case above if needed, then submit with the email you subscribed with — it updates your existing subscription, no duplicate.'
+                    : lang === 'tw'
+                      ? '上面案子不對就先改好，再填你訂閱時用的郵箱提交——會更新你現有的訂閱，不會重複訂閱。'
+                      : '上面案子不对就先改好，再填你订阅时用的邮箱提交——会更新你现有的订阅，不会重复订阅。'}
+                </div>
+              </>
+            ) : (
+              <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '10px' }}>
+                {userCase.category}{subtypeLabel(userCase.category, userCase.subtype, lang) ? ` (${subtypeLabel(userCase.category, userCase.subtype, lang)})` : ''} · {userCase.country} · {lang === 'en' ? 'PD ' : '优先日 '}{pdLabel}
               </div>
             )}
-            <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '10px' }}>
-              {userCase.category}{subtypeLabel(userCase.category, userCase.subtype, lang) ? ` (${subtypeLabel(userCase.category, userCase.subtype, lang)})` : ''} · {userCase.country} · {lang === 'en' ? 'PD ' : '优先日 '}{pdLabel}
-            </div>
             <input
               type="email" value={email} onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') subscribe(); }}
@@ -15337,7 +15350,7 @@ export default function App() {
           onThemeChange={setTheme}
         />
       )}
-      <SubscribeModal show={showSubModal} onClose={() => setShowSubModal(false)} userCase={userCase} theme={theme} />
+      <SubscribeModal show={showSubModal} onClose={() => setShowSubModal(false)} userCase={userCase} setUserCase={setUserCase} theme={theme} />
       {subtypePrompt && hasOnboarded && CATEGORY_SUBTYPES[userCase.category] && !userCase.subtype && (
         <SubtypeUpdateModal
           userCase={userCase}
