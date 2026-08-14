@@ -15718,8 +15718,8 @@ export default function App() {
     // 预测 tab 下架：总结页的估算+推导链已覆盖其价值（下月概率的增量不足以撑一个 tab）。
     // ForecastHub 代码保留，恢复时解开此行。
     // { id: 'trends', label: t.navTrends, icon: BarChart3 },
-    { id: 'update', label: t.navUpdate, icon: TrendingUp },
     { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
+    { id: 'update', label: t.navUpdate, icon: TrendingUp },
     { id: 'compare', label: t.navCompare, icon: Target },
     { id: 'index', label: t.navIndex, icon: ClipboardList },
     { id: 'about', label: lang === 'en' ? 'About' : lang === 'tw' ? '關於' : '关于', icon: Info },
