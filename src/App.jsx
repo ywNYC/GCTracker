@@ -1484,7 +1484,7 @@ const currentThemeAttr = () => {
 // native select's option sheet (white system UI on iOS) and CSS can't reach it,
 // so the picker is drawn in-page instead: grouped, scrollable, theme-tokened.
 // ============================================================
-const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
+const CategoryDropdown = ({ value, onChange, triggerStyle = {}, placeholder = '' }) => {
   const { t, lang } = useLang();
   const [open, setOpen] = useState(false);
   // Panel position is FIXED (viewport coords from the trigger's rect): ancestors use
@@ -1528,7 +1528,7 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
     { key: 'f', label: lang === 'en' ? 'FAMILY · F' : lang === 'tw' ? '親屬移民 · F' : '亲属移民 · F', items: ['F1', 'F2A', 'F2B', 'F3', 'F4'] },
   ];
   const descOf = (v) => (t[v.toLowerCase()] || v).replace(/^(EB[-]?\d[A-Z]?|F\d[A-Z]?|SR)\s*/i, '');
-  const curDesc = descOf(value);
+  const curDesc = value ? descOf(value) : '';
 
   return (
     <div ref={wrapRef} style={{ position: 'relative', minWidth: 0 }}>
@@ -1543,8 +1543,14 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {} }) => {
           ...triggerStyle,
         }}>
         <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          <span className="gc-mono" style={{ fontWeight: 700 }}>{value}</span>
-          <span style={{ color: 'var(--gc-ink-soft)', fontWeight: 500 }}> {curDesc}</span>
+          {value ? (
+            <>
+              <span className="gc-mono" style={{ fontWeight: 700 }}>{value}</span>
+              <span style={{ color: 'var(--gc-ink-soft)', fontWeight: 500 }}> {curDesc}</span>
+            </>
+          ) : (
+            <span style={{ color: 'var(--gc-muted)', fontWeight: 400 }}>{placeholder}</span>
+          )}
         </span>
         <span style={{ flexShrink: 0, color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
       </button>
@@ -1677,7 +1683,7 @@ const SubtypeChips = ({ userCase, setUserCase, required = false, error = false }
 // a day grid. Same fixed-position pattern as CategoryDropdown (ancestors clip absolute
 // panels with their overflow:hidden animations).
 // ============================================================
-const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, placeholder = '' }) => {
+const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, placeholder = '', minYear = 1995, newestYearFirst = false }) => {
   const { lang } = useLang();
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
@@ -1733,7 +1739,8 @@ const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, 
 
   const thisYear = new Date().getFullYear();
   const years = [];
-  for (let yy = 1995; yy <= thisYear; yy++) years.push(yy);
+  for (let yy = minYear; yy <= thisYear; yy++) years.push(yy);
+  if (newestYearFirst) years.reverse();
   const dim = daysInMonth(y, m);
   const days = [];
   for (let dd = 1; dd <= dim; dd++) days.push(dd);
@@ -1815,8 +1822,8 @@ const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, 
             {lang === 'en' ? 'YEAR' : '年'}
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
-            <button type="button" onClick={() => y > 1995 && setDate(y - 1, m, d)}
-              className="gc-mono" style={{ ...gridBtn(false), width: '44px', opacity: y <= 1995 ? 0.35 : 1 }}>
+            <button type="button" onClick={() => y > minYear && setDate(y - 1, m, d)}
+              className="gc-mono" style={{ ...gridBtn(false), width: '44px', opacity: y <= minYear ? 0.35 : 1 }}>
               ‹
             </button>
             <button type="button" onClick={() => setView('years')}
@@ -1852,6 +1859,171 @@ const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, 
               <button key={dd} type="button" onClick={() => setDate(y, m, dd, true)}
                 className="gc-mono" style={gridBtn(dd === d)}>
                 {dd}
+              </button>
+            ))}
+          </div>
+          </>
+          )}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
+
+// YearMonthDropdown — same trigger/panel styling as DateDropdown, but year+month
+// only (no day grid). Used for fields like date of birth where a day isn't asked.
+// ============================================================
+const YearMonthDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, placeholder = '' }) => {
+  const { lang } = useLang();
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState(null);
+  const [view, setView] = useState('ym'); // 'ym' = stepper + month grid; 'years' = full tappable year grid
+  const wrapRef = useRef(null);
+  const panelRef = useRef(null);
+  const rawParts = /^(\d{4})-(\d{2})$/.exec(value || '');
+  const hasValue = !!rawParts;
+  const parts = rawParts || [null, String(new Date().getFullYear()), '01'];
+  const y = parseInt(parts[1], 10);
+  const m = parseInt(parts[2], 10);
+
+  const toggleOpen = () => {
+    if (!open && wrapRef.current) {
+      setRect(wrapRef.current.getBoundingClientRect());
+      setView('ym');
+    }
+    setOpen((v) => !v);
+  };
+  useEffect(() => {
+    if (!open) return undefined;
+    const inSelf = (t) => (wrapRef.current && wrapRef.current.contains(t))
+      || (panelRef.current && panelRef.current.contains(t));
+    const close = (e) => {
+      if (!inSelf(e.target)) setOpen(false);
+    };
+    const onScroll = (e) => {
+      if (inSelf(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [open]);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const setYm = (ny, nm, closeAfter = false) => {
+    onChange(`${ny}-${pad2(nm)}`);
+    if (closeAfter) setOpen(false);
+  };
+
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  for (let yy = thisYear; yy >= 1930; yy--) years.push(yy);
+
+  const fmt = hasValue
+    ? (lang === 'en'
+        ? new Date(y, m - 1, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+        : `${y}年${m}月`)
+    : (placeholder || (lang === 'en' ? 'Select month' : lang === 'tw' ? '選擇年月' : '选择年月'));
+
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
+  const spaceBelow = rect ? vh - rect.bottom - 16 : 340;
+  const spaceAbove = rect ? rect.top - 16 : 340;
+  const openUp = rect ? (spaceBelow < 300 && spaceAbove > spaceBelow) : false;
+  const panelMaxH = Math.max(200, Math.min(380, openUp ? spaceAbove : spaceBelow));
+
+  const gridBtn = (sel) => ({
+    border: 'none', borderRadius: '3px', cursor: 'pointer', padding: '6px 0',
+    fontSize: '11px', fontWeight: sel ? 700 : 500, textAlign: 'center',
+    background: sel ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
+    color: sel ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
+  });
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', minWidth: 0 }}>
+      <button type="button" onClick={toggleOpen}
+        className="flex items-center justify-between gc-mono"
+        style={{
+          boxSizing: 'border-box', width: '100%', minWidth: 0, gap: '6px',
+          padding: '6px 7px', fontSize: '11px', fontWeight: 600, textAlign: 'left',
+          color: 'var(--gc-ink)', background: 'var(--gc-surface)',
+          border: open ? '1px solid var(--gc-green)' : '1px solid var(--gc-rule)',
+          borderRadius: '3px', cursor: 'pointer',
+          ...triggerStyle,
+        }}>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: hasValue ? 'inherit' : 'var(--gc-muted)', fontWeight: hasValue ? 'inherit' : 400 }}>{fmt}</span>
+        <span className="flex items-center flex-shrink-0" style={{ gap: '6px' }}>
+          {allowEmpty && hasValue && (
+            <span role="button" onClick={(e) => { e.stopPropagation(); onChange(''); setOpen(false); }}
+              style={{ color: 'var(--gc-muted)', fontSize: '11px', lineHeight: 1, padding: '2px' }}>✕</span>
+          )}
+          <span style={{ color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+        </span>
+      </button>
+      {open && rect && createPortal(
+        <div ref={panelRef} className="visa-root" data-theme={currentThemeAttr()} style={{
+          position: 'fixed', zIndex: 1200,
+          top: openUp ? undefined : rect.bottom + 4,
+          bottom: openUp ? (vh - rect.top + 4) : undefined,
+          left: Math.max(8, Math.min(rect.left, vw - Math.min(vw * 0.86, 320) - 8)),
+          width: 'min(86vw, 320px)', maxHeight: `${panelMaxH}px`,
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
+          background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)',
+          borderTop: '2px solid var(--gc-green)', borderRadius: '4px',
+          boxShadow: '0 14px 40px rgba(0,0,0,0.18)', padding: '10px',
+        }}>
+          {view === 'years' ? (
+            <>
+              <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
+                {lang === 'en' ? 'PICK A YEAR' : lang === 'tw' ? '選擇年份' : '选择年份'}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
+                {years.map((yy) => (
+                  <button key={yy} type="button"
+                    onClick={() => { setYm(yy, m); setView('ym'); }}
+                    className="gc-mono" style={gridBtn(yy === y)}>
+                    {yy}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+          <>
+          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
+            {lang === 'en' ? 'YEAR' : '年'}
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button type="button" onClick={() => y > 1930 && setYm(y - 1, m)}
+              className="gc-mono" style={{ ...gridBtn(false), width: '44px', opacity: y <= 1930 ? 0.35 : 1 }}>
+              ‹
+            </button>
+            <button type="button" onClick={() => setView('years')}
+              className="gc-mono"
+              style={{
+                flex: 1, border: '1px solid var(--gc-green)', borderRadius: '3px', cursor: 'pointer',
+                padding: '6px 0', fontSize: '12px', fontWeight: 700, textAlign: 'center',
+                background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)',
+              }}>
+              {y} ▾
+            </button>
+            <button type="button" onClick={() => y < thisYear && setYm(y + 1, m)}
+              className="gc-mono" style={{ ...gridBtn(false), width: '44px', opacity: y >= thisYear ? 0.35 : 1 }}>
+              ›
+            </button>
+          </div>
+          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', margin: '7px 0 5px' }}>
+            {lang === 'en' ? 'MONTH' : '月'}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px' }}>
+            {[1,2,3,4,5,6,7,8,9,10,11,12].map((mm) => (
+              <button key={mm} type="button" onClick={() => setYm(y, mm, true)}
+                className="gc-mono" style={gridBtn(mm === m)}>
+                {mm}
               </button>
             ))}
           </div>
@@ -13806,21 +13978,28 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
   // Local state for the form (only used when user clicks "I have a case")
   const [mode, setMode] = useState(initialMode); // 'choose' | 'form'
   const [subtypeAttempted, setSubtypeAttempted] = useState(false);
+  const [categoryAttempted, setCategoryAttempted] = useState(false);
+  const [pdAttempted, setPdAttempted] = useState(false);
+  const [inUSAttempted, setInUSAttempted] = useState(false);
+  const [roleAttempted, setRoleAttempted] = useState(false);
+  const [dobAttempted, setDobAttempted] = useState(false);
   const [form, setForm] = useState(initialForm || {
     country: 'Taiwan',
-    category: 'EB3',
-    priorityDate: '2024-07-15',
-    inUS: true,
+    category: null, // must be explicitly chosen — no default, see onboarding required-field check on Start
+    priorityDate: '', // must be explicitly chosen — no default, see onboarding required-field check on Start
+    birthYearMonth: '', // 'YYYY-MM' — must be explicitly chosen, no default, see Start button check
+    inUS: null, // must be explicitly chosen — no default, see onboarding required-field check on Start
+    role: null, // 'petitioner' | 'beneficiary' — must be explicitly chosen, same as inUS
     petitionerStatus: 'USC',
-    subtype: defaultSubtype('EB3'),
+    subtype: null,
   });
 
   const countries = [
-    { v: 'Taiwan',      en: 'TWN / HK / ROW', zh: '台湾/港澳/全球', tw: '台灣/港澳/全球' },
-    { v: 'China',       en: 'China',          zh: '中国大陆',       tw: '中國大陸' },
-    { v: 'India',       en: 'India',          zh: '印度',          tw: '印度' },
-    { v: 'Mexico',      en: 'Mexico',         zh: '墨西哥',         tw: '墨西哥' },
-    { v: 'Philippines', en: 'Philippines',    zh: '菲律宾',         tw: '菲律賓' },
+    { v: 'Taiwan',      en: 'TWN / HK / ROW', zh: '台湾/港澳/全球', tw: '台灣/港澳/全球', code: { en: 'ROW', zh: '全球',  tw: '全球'  } },
+    { v: 'China',       en: 'China',          zh: '中国大陆',       tw: '中國大陸', code: { en: 'CHN', zh: '中国',  tw: '中國'  } },
+    { v: 'India',       en: 'India',          zh: '印度',          tw: '印度',    code: { en: 'IND', zh: '印度',  tw: '印度'  } },
+    { v: 'Mexico',      en: 'Mexico',         zh: '墨西哥',         tw: '墨西哥',  code: { en: 'MEX', zh: '墨西哥', tw: '墨西哥' } },
+    { v: 'Philippines', en: 'Philippines',    zh: '菲律宾',         tw: '菲律賓',  code: { en: 'PHL', zh: '菲律宾', tw: '菲律賓' } },
   ];
 
   const t = {
@@ -13835,8 +14014,15 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       demoDesc: 'Browse the app with a random sample case',
       country: 'Country of chargeability',
       category: 'Category',
+      categoryPlaceholder: 'Select category',
       pd: 'Priority Date',
-      inUS: 'I am currently in the US',
+      dob: 'Date of Birth',
+      inUS: 'Are you currently in the US?',
+      inUSYes: 'In the US',
+      inUSNo: 'Outside the US',
+      role: 'Are you the petitioner or the beneficiary?',
+      rolePetitioner: 'Petitioner',
+      roleBeneficiary: 'Beneficiary',
       petitioner: 'Petitioner',
       start: 'Start →',
       back: '← Back',
@@ -13845,7 +14031,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     },
     zh: {
       title: '绿卡晴雨表',
-      subtitle: '先告诉我你的情况',
+      subtitle: '简单告诉我你的情况',
       haveCase: '我已在排期中',
       haveCaseDesc: '填写我的类别、国家、优先日',
       exploring: '我在探索',
@@ -13854,8 +14040,15 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       demoDesc: '用一个随机示例案件浏览 app',
       country: '国籍类别',
       category: '绿卡类别',
+      categoryPlaceholder: '选择类别',
       pd: '优先日',
-      inUS: '我目前在美国境内',
+      dob: '出生年月',
+      inUS: '你目前在美国境内吗？',
+      inUSYes: '在美国境内',
+      inUSNo: '不在美国境内',
+      role: '你是申请人还是被申请人？',
+      rolePetitioner: '申请人',
+      roleBeneficiary: '被申请人',
       petitioner: '担保人身份',
       start: '开始使用 →',
       back: '← 返回',
@@ -13864,7 +14057,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     },
     tw: {
       title: '綠卡晴雨表',
-      subtitle: '先告訴我你的情況',
+      subtitle: '簡單告訴我你的情況',
       haveCase: '我已在排期中',
       haveCaseDesc: '填寫我的類別、國家、優先日',
       exploring: '我在探索',
@@ -13873,8 +14066,15 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       demoDesc: '用一個隨機示例案件瀏覽 app',
       country: '國籍類別',
       category: '綠卡類別',
+      categoryPlaceholder: '選擇類別',
       pd: '優先日',
-      inUS: '我目前在美國境內',
+      dob: '出生年月',
+      inUS: '你目前在美國境內嗎？',
+      inUSYes: '在美國境內',
+      inUSNo: '不在美國境內',
+      role: '你是申請人還是被申請人？',
+      rolePetitioner: '申請人',
+      roleBeneficiary: '被申請人',
       petitioner: '擔保人身份',
       start: '開始使用 →',
       back: '← 返回',
@@ -13883,7 +14083,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     },
   }[lang] || t?.en || { title: 'Green Card Tracker' };
 
-  const isF = form.category.startsWith('F');
+  const isF = !!form.category && form.category.startsWith('F');
   const isF2 = form.category === 'F2A' || form.category === 'F2B';
 
   return (
@@ -14119,18 +14319,18 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                     <button key={c.v}
                       onClick={() => setForm({ ...form, country: c.v })}
                       style={{
-                        padding: '8px 4px',
+                        padding: '5px 4px',
                         fontSize: '10px', fontWeight: 600,
                         background: active ? 'var(--gc-ink)' : 'transparent',
                         color: active ? 'var(--gc-paper)' : 'var(--gc-muted)',
                         borderLeft: i > 0 ? '1px solid var(--gc-rule)' : 'none',
                         cursor: 'pointer', transition: 'all 120ms',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
                         minWidth: 0,
                       }}>
                       <CountryFlag country={c.v} size={12} />
                       <span style={{ fontSize: '9px', letterSpacing: '0.04em' }}>
-                        {COUNTRY_CODE[c.v] || c.v.slice(0, 3).toUpperCase()}
+                        {c.code[lang] || c.code.en}
                       </span>
                     </button>
                   );
@@ -14142,49 +14342,95 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
             <div>
               <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.category}</div>
               <CategoryDropdown value={form.category}
-                triggerStyle={{ padding: '9px 9px', background: 'var(--gc-paper-soft)' }}
+                placeholder={t.categoryPlaceholder}
+                triggerStyle={{
+                  padding: '9px 9px', background: 'var(--gc-paper-soft)',
+                  ...(categoryAttempted && !form.category ? { border: '1px solid var(--gc-red)' } : {}),
+                }}
                 onChange={(newCat) => {
                   if (newCat === form.category) return;
                   const isF2C = newCat === 'F2A' || newCat === 'F2B';
                   const newPetitioner = isF2C ? 'LPR' : 'USC';
                   setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: defaultSubtype(newCat) });
                   setSubtypeAttempted(false);
+                  setCategoryAttempted(false);
                 }} />
               <SubtypeChips userCase={form} setUserCase={setForm}
                 required={!!CATEGORY_SUBTYPES[form.category]}
                 error={subtypeAttempted && !!CATEGORY_SUBTYPES[form.category] && !form.subtype} />
             </div>
 
-            {/* Priority Date — same themed picker as the case bar, not the OS sheet */}
-            <div>
-              <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.pd}</div>
-              <DateDropdown value={form.priorityDate}
-                triggerStyle={{ padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)' }}
-                onChange={(pd) => setForm({ ...form, priorityDate: pd })} />
+            {/* Priority Date + Date of Birth — side by side; DOB required, no default */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.pd}</div>
+                <DateDropdown value={form.priorityDate} allowEmpty minYear={2010} newestYearFirst
+                  triggerStyle={{
+                    padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)',
+                    ...(pdAttempted && !form.priorityDate ? { border: '1px solid var(--gc-red)' } : {}),
+                  }}
+                  onChange={(pd) => { setForm({ ...form, priorityDate: pd }); setPdAttempted(false); }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.dob}</div>
+                <YearMonthDropdown value={form.birthYearMonth}
+                  triggerStyle={{
+                    padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)',
+                    ...(dobAttempted && !form.birthYearMonth ? { border: '1px solid var(--gc-red)' } : {}),
+                  }}
+                  onChange={(ym) => { setForm({ ...form, birthYearMonth: ym }); setDobAttempted(false); }} />
+              </div>
             </div>
 
-            {/* In US toggle */}
-            <button
-              onClick={() => setForm({ ...form, inUS: !form.inUS })}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '9px',
-                padding: '9px 11px', width: '100%',
-                background: form.inUS ? 'var(--gc-green-soft)' : 'var(--gc-paper-soft)',
-                border: `1px solid ${form.inUS ? 'var(--gc-green-border)' : 'var(--gc-rule)'}`,
-                borderRadius: 'var(--gc-radius-sm)',
-                cursor: 'pointer', transition: 'all 120ms',
-              }}>
-              <div style={{
-                width: '14px', height: '14px', flexShrink: 0,
-                border: `1.5px solid ${form.inUS ? 'var(--gc-green)' : 'var(--gc-muted)'}`,
-                background: form.inUS ? 'var(--gc-green)' : 'transparent',
-                borderRadius: '2px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                {form.inUS && <span style={{ color: 'var(--gc-paper)', fontSize: '10px', lineHeight: 1 }}>✓</span>}
+            {/* Role — required, no default; both options start unselected */}
+            <div>
+              <div style={{ marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{t.role}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                {[{ v: 'petitioner', label: t.rolePetitioner }, { v: 'beneficiary', label: t.roleBeneficiary }].map((o) => {
+                  const active = form.role === o.v;
+                  const showError = roleAttempted && form.role === null;
+                  return (
+                    <button key={o.v} type="button"
+                      onClick={() => { setForm({ ...form, role: o.v }); setRoleAttempted(false); }}
+                      style={{
+                        padding: '9px 8px', fontSize: '12px', fontWeight: active ? 700 : 500,
+                        background: active ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
+                        color: active ? 'var(--gc-paper)' : 'var(--gc-ink)',
+                        border: `1px solid ${active ? 'var(--gc-green)' : showError ? 'var(--gc-red)' : 'var(--gc-rule)'}`,
+                        borderRadius: 'var(--gc-radius-sm)',
+                        cursor: 'pointer', transition: 'all 120ms',
+                      }}>
+                      {o.label}
+                    </button>
+                  );
+                })}
               </div>
-              <span style={{ fontSize: '12px', color: 'var(--gc-ink)', textAlign: 'left' }}>{t.inUS}</span>
-            </button>
+            </div>
+
+            {/* In US — required, no default; both options start unselected */}
+            <div>
+              <div style={{ marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{t.inUS}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                {[{ v: true, label: t.inUSYes }, { v: false, label: t.inUSNo }].map((o) => {
+                  const active = form.inUS === o.v;
+                  const showError = inUSAttempted && form.inUS === null;
+                  return (
+                    <button key={String(o.v)} type="button"
+                      onClick={() => { setForm({ ...form, inUS: o.v }); setInUSAttempted(false); }}
+                      style={{
+                        padding: '9px 8px', fontSize: '12px', fontWeight: active ? 700 : 500,
+                        background: active ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
+                        color: active ? 'var(--gc-paper)' : 'var(--gc-ink)',
+                        border: `1px solid ${active ? 'var(--gc-green)' : showError ? 'var(--gc-red)' : 'var(--gc-rule)'}`,
+                        borderRadius: 'var(--gc-radius-sm)',
+                        cursor: 'pointer', transition: 'all 120ms',
+                      }}>
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Petitioner — only for F categories */}
             {isF && (
@@ -14226,8 +14472,28 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               </button>
               <button
                 onClick={() => {
+                  if (!form.category) {
+                    setCategoryAttempted(true);
+                    return;
+                  }
                   if (CATEGORY_SUBTYPES[form.category] && !form.subtype) {
                     setSubtypeAttempted(true);
+                    return;
+                  }
+                  if (!form.priorityDate) {
+                    setPdAttempted(true);
+                    return;
+                  }
+                  if (form.role === null) {
+                    setRoleAttempted(true);
+                    return;
+                  }
+                  if (form.inUS === null) {
+                    setInUSAttempted(true);
+                    return;
+                  }
+                  if (!form.birthYearMonth) {
+                    setDobAttempted(true);
                     return;
                   }
                   onComplete(form);
