@@ -62,8 +62,16 @@ export async function onRequestPost(context) {
 
   const email = String(body.email || '').trim().toLowerCase();
   const token = String(body.token || '');
-  const subtype = String(body.subtype || '').trim();
-  if (!email || !token || !subtype) return json({ error: 'Missing email, token, or subtype' }, 400);
+  // Both fields optional in the request — the frontend only sends whichever ones
+  // it actually asked for (already-known fields aren't re-submitted), so at least
+  // one of the two must be present.
+  const subtype = body.subtype != null ? String(body.subtype).trim() : '';
+  const birthYearMonth = body.birthYearMonth != null ? String(body.birthYearMonth).trim() : '';
+  if (!email || !token) return json({ error: 'Missing email or token' }, 400);
+  if (!subtype && !birthYearMonth) return json({ error: 'Nothing to update' }, 400);
+  if (birthYearMonth && !/^\d{4}-\d{2}$/.test(birthYearMonth)) {
+    return json({ error: 'Invalid birthYearMonth format' }, 400);
+  }
 
   const expected = await buildSubtypeToken(email, env);
   if (!safeEqual(token, expected)) return json({ error: 'Invalid or expired link' }, 403);
@@ -78,12 +86,16 @@ export async function onRequestPost(context) {
     return json({ error: 'Corrupt subscriber record' }, 500);
   }
 
-  const category = record.userCase?.category;
-  const validIds = VALID_SUBTYPES[category];
-  if (!validIds) return json({ error: 'This case category does not take a subtype' }, 400);
-  if (!validIds.includes(subtype)) return json({ error: 'Unknown subtype for this category' }, 400);
-
-  record.userCase.subtype = subtype;
+  if (subtype) {
+    const category = record.userCase?.category;
+    const validIds = VALID_SUBTYPES[category];
+    if (!validIds) return json({ error: 'This case category does not take a subtype' }, 400);
+    if (!validIds.includes(subtype)) return json({ error: 'Unknown subtype for this category' }, 400);
+    record.userCase.subtype = subtype;
+  }
+  if (birthYearMonth) {
+    record.userCase.birthYearMonth = birthYearMonth;
+  }
   record.lastUpdated = new Date().toISOString();
 
   try {
@@ -93,5 +105,5 @@ export async function onRequestPost(context) {
     return json({ error: 'Save failed, try again' }, 500);
   }
 
-  return json({ success: true, subtype });
+  return json({ success: true, subtype: subtype || record.userCase.subtype, birthYearMonth: birthYearMonth || record.userCase.birthYearMonth });
 }

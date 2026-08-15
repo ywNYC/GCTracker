@@ -685,9 +685,10 @@ const renderBulletinFigure = (cutPoints, series, lang, chartCode = 'A') => {
 const SUBTYPE_CATEGORIES = new Set(['EB1', 'EB2', 'EB3', 'EB4', 'EB5']);
 
 // `email`/`subtypeToken` are only set when the caller wants this link to double as
-// a "fill in your missing subtype" prompt (see admin/send-monthly.js) — they're
-// omitted whenever the subscriber already has one, so old records that predate the
-// subtype field are the only ones that ever see the extra params.
+// a "fill in what's missing" prompt (see admin/send-monthly.js) — they're omitted
+// whenever the subscriber's record already has both subtype (where applicable) and
+// birth year/month on file, so only records predating one of those fields ever see
+// the extra params.
 const buildCaseUrl = (siteUrl, userCase, { email, subtypeToken } = {}) => {
   const base = String(siteUrl || '').replace(/\/+$/, '');
   if (!userCase?.category || !userCase?.country || !userCase?.priorityDate) return base;
@@ -698,7 +699,9 @@ const buildCaseUrl = (siteUrl, userCase, { email, subtypeToken } = {}) => {
   if (userCase.inUS === false) p.set('in', '0');
   if (userCase.petitionerStatus) p.set('ps', userCase.petitionerStatus);
   if (userCase.subtype) p.set('st', userCase.subtype);
-  if (!userCase.subtype && email && subtypeToken && SUBTYPE_CATEGORIES.has(userCase.category)) {
+  const missingSubtype = !userCase.subtype && SUBTYPE_CATEGORIES.has(userCase.category);
+  const missingBirth = !userCase.birthYearMonth;
+  if ((missingSubtype || missingBirth) && email && subtypeToken) {
     p.set('se', email);
     p.set('stk', subtypeToken);
   }

@@ -1885,163 +1885,113 @@ const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, 
 // YearMonthDropdown — same trigger/panel styling as DateDropdown, but year+month
 // only (no day grid). Used for fields like date of birth where a day isn't asked.
 // ============================================================
-const YearMonthDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, placeholder = '' }) => {
-  const { lang } = useLang();
+// A single flat-list dropdown (no stepper/grid navigation), reused twice below for
+// year and month. Native <select> was tried first but its option list is OS-chrome
+// and can't be styled consistently across platforms, so this stays a custom
+// in-page popup matching the rest of the app's dropdown look.
+const SimpleListDropdown = ({ options, value, onChange, placeholder, style = {} }) => {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState(null);
-  const [view, setView] = useState('ym'); // 'ym' = stepper + month grid; 'years' = full tappable year grid
   const wrapRef = useRef(null);
   const panelRef = useRef(null);
-  const rawParts = /^(\d{4})-(\d{2})$/.exec(value || '');
-  const hasValue = !!rawParts;
-  const parts = rawParts || [null, String(new Date().getFullYear()), '01'];
-  const y = parseInt(parts[1], 10);
-  const m = parseInt(parts[2], 10);
-
-  const toggleOpen = () => {
-    if (!open && wrapRef.current) {
-      setRect(wrapRef.current.getBoundingClientRect());
-      setView('ym');
-    }
-    setOpen((v) => !v);
-  };
   useEffect(() => {
     if (!open) return undefined;
-    const inSelf = (t) => (wrapRef.current && wrapRef.current.contains(t))
-      || (panelRef.current && panelRef.current.contains(t));
-    const close = (e) => {
-      if (!inSelf(e.target)) setOpen(false);
-    };
-    const onScroll = (e) => {
-      if (inSelf(e.target)) return;
-      setOpen(false);
-    };
+    const inSelf = (t) => (wrapRef.current && wrapRef.current.contains(t)) || (panelRef.current && panelRef.current.contains(t));
+    const close = (e) => { if (!inSelf(e.target)) setOpen(false); };
     document.addEventListener('mousedown', close);
     document.addEventListener('touchstart', close);
-    window.addEventListener('scroll', onScroll, true);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('touchstart', close);
-      window.removeEventListener('scroll', onScroll, true);
-    };
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('touchstart', close); };
   }, [open]);
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const setYm = (ny, nm, closeAfter = false) => {
-    onChange(`${ny}-${pad2(nm)}`);
-    if (closeAfter) setOpen(false);
-  };
-
-  const thisYear = new Date().getFullYear();
-  const years = [];
-  for (let yy = thisYear; yy >= 1930; yy--) years.push(yy);
-
-  const fmt = hasValue
-    ? (lang === 'en'
-        ? new Date(y, m - 1, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
-        : `${y}年${m}月`)
-    : (placeholder || (lang === 'en' ? 'Select month' : lang === 'tw' ? '選擇年月' : '选择年月'));
-
+  const selected = options.find((o) => String(o.value) === String(value));
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 400;
-  const spaceBelow = rect ? vh - rect.bottom - 16 : 340;
-  const spaceAbove = rect ? rect.top - 16 : 340;
-  const openUp = rect ? (spaceBelow < 300 && spaceAbove > spaceBelow) : false;
-  const panelMaxH = Math.max(200, Math.min(380, openUp ? spaceAbove : spaceBelow));
-
-  const gridBtn = (sel) => ({
-    border: 'none', borderRadius: '3px', cursor: 'pointer', padding: '6px 0',
-    fontSize: '11px', fontWeight: sel ? 700 : 500, textAlign: 'center',
-    background: sel ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
-    color: sel ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
-  });
-
+  const panelMaxH = rect ? Math.max(160, Math.min(260, vh - rect.bottom - 20)) : 220;
   return (
-    <div ref={wrapRef} style={{ position: 'relative', minWidth: 0 }}>
-      <button type="button" onClick={toggleOpen}
+    <div ref={wrapRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+      <button type="button"
+        onClick={() => { if (!open && wrapRef.current) setRect(wrapRef.current.getBoundingClientRect()); setOpen((v) => !v); }}
         className="flex items-center justify-between gc-mono"
         style={{
-          boxSizing: 'border-box', width: '100%', minWidth: 0, gap: '6px',
+          boxSizing: 'border-box', width: '100%', gap: '6px',
           padding: '6px 7px', fontSize: '11px', fontWeight: 600, textAlign: 'left',
-          color: 'var(--gc-ink)', background: 'var(--gc-surface)',
+          color: selected ? 'var(--gc-ink)' : 'var(--gc-muted)', background: 'var(--gc-surface)',
           border: open ? '1px solid var(--gc-green)' : '1px solid var(--gc-rule)',
           borderRadius: '3px', cursor: 'pointer',
-          ...triggerStyle,
+          ...style,
         }}>
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: hasValue ? 'inherit' : 'var(--gc-muted)', fontWeight: hasValue ? 'inherit' : 400 }}>{fmt}</span>
-        <span className="flex items-center flex-shrink-0" style={{ gap: '6px' }}>
-          {allowEmpty && hasValue && (
-            <span role="button" onClick={(e) => { e.stopPropagation(); onChange(''); setOpen(false); }}
-              style={{ color: 'var(--gc-muted)', fontSize: '11px', lineHeight: 1, padding: '2px' }}>✕</span>
-          )}
-          <span style={{ color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
-        </span>
+        <span>{selected ? selected.label : placeholder}</span>
+        <span style={{ color: 'var(--gc-muted)', fontSize: '8px', transform: open ? 'rotate(180deg)' : 'none' }}>▼</span>
       </button>
       {open && rect && createPortal(
         <div ref={panelRef} className="visa-root" data-theme={currentThemeAttr()} style={{
-          position: 'fixed', zIndex: 1200,
-          top: openUp ? undefined : rect.bottom + 4,
-          bottom: openUp ? (vh - rect.top + 4) : undefined,
-          left: Math.max(8, Math.min(rect.left, vw - Math.min(vw * 0.86, 320) - 8)),
-          width: 'min(86vw, 320px)', maxHeight: `${panelMaxH}px`,
-          overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
-          background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)',
-          borderTop: '2px solid var(--gc-green)', borderRadius: '4px',
-          boxShadow: '0 14px 40px rgba(0,0,0,0.18)', padding: '10px',
+          position: 'fixed', zIndex: 1200, top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 88),
+          maxHeight: `${panelMaxH}px`, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+          background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderTop: '2px solid var(--gc-green)',
+          borderRadius: '4px', boxShadow: '0 14px 40px rgba(0,0,0,0.18)', padding: '4px',
         }}>
-          {view === 'years' ? (
-            <>
-              <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
-                {lang === 'en' ? 'PICK A YEAR' : lang === 'tw' ? '選擇年份' : '选择年份'}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
-                {years.map((yy) => (
-                  <button key={yy} type="button"
-                    onClick={() => { setYm(yy, m); setView('ym'); }}
-                    className="gc-mono" style={gridBtn(yy === y)}>
-                    {yy}
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-          <>
-          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
-            {lang === 'en' ? 'YEAR' : '年'}
-          </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button type="button" onClick={() => y > 1930 && setYm(y - 1, m)}
-              className="gc-mono" style={{ ...gridBtn(false), width: '44px', opacity: y <= 1930 ? 0.35 : 1 }}>
-              ‹
-            </button>
-            <button type="button" onClick={() => setView('years')}
-              className="gc-mono"
-              style={{
-                flex: 1, border: '1px solid var(--gc-green)', borderRadius: '3px', cursor: 'pointer',
-                padding: '6px 0', fontSize: '12px', fontWeight: 700, textAlign: 'center',
-                background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)',
+          {options.map((o) => (
+            <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); }}
+              className="gc-mono" style={{
+                display: 'block', width: '100%', textAlign: 'left', border: 'none', borderRadius: '3px',
+                padding: '6px 8px', fontSize: '11px', cursor: 'pointer',
+                fontWeight: String(o.value) === String(value) ? 700 : 500,
+                background: String(o.value) === String(value) ? 'var(--gc-green)' : 'transparent',
+                color: String(o.value) === String(value) ? 'var(--gc-paper)' : 'var(--gc-ink)',
               }}>
-              {y} ▾
+              {o.label}
             </button>
-            <button type="button" onClick={() => y < thisYear && setYm(y + 1, m)}
-              className="gc-mono" style={{ ...gridBtn(false), width: '44px', opacity: y >= thisYear ? 0.35 : 1 }}>
-              ›
-            </button>
-          </div>
-          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', margin: '7px 0 5px' }}>
-            {lang === 'en' ? 'MONTH' : '月'}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px' }}>
-            {[1,2,3,4,5,6,7,8,9,10,11,12].map((mm) => (
-              <button key={mm} type="button" onClick={() => setYm(y, mm, true)}
-                className="gc-mono" style={gridBtn(mm === m)}>
-                {mm}
-              </button>
-            ))}
-          </div>
-          </>
-          )}
+          ))}
         </div>,
-        document.body
+        document.body,
+      )}
+    </div>
+  );
+};
+
+// Order follows locale convention: zh/tw = 年→月, en = Month→Year (US date convention).
+const YearMonthDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, placeholder = '' }) => {
+  const { lang } = useLang();
+  const rawParts = /^(\d{4})-(\d{2})$/.exec(value || '');
+  // Local pending state so picking just the year doesn't silently commit a
+  // month (e.g. defaulting to January) before both halves are actually chosen —
+  // onChange only fires once year AND month are both known.
+  const [pendingY, setPendingY] = useState(rawParts ? rawParts[1] : '');
+  const [pendingM, setPendingM] = useState(rawParts ? rawParts[2] : '');
+  useEffect(() => {
+    const rp = /^(\d{4})-(\d{2})$/.exec(value || '');
+    setPendingY(rp ? rp[1] : '');
+    setPendingM(rp ? rp[2] : '');
+  }, [value]);
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  const thisYear = new Date().getFullYear();
+  const yearOpts = [];
+  for (let yy = thisYear; yy >= 1930; yy--) yearOpts.push({ value: String(yy), label: lang === 'en' ? String(yy) : `${yy}年` });
+  const monthNamesEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthOpts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((mm) => ({
+    value: pad2(mm), label: lang === 'en' ? monthNamesEn[mm - 1] : `${mm}月`,
+  }));
+
+  const setY = (ny) => { setPendingY(ny); if (pendingM) onChange(`${ny}-${pendingM}`); };
+  const setM = (nm) => { setPendingM(nm); if (pendingY) onChange(`${pendingY}-${nm}`); };
+
+  const yearPicker = (
+    <SimpleListDropdown key="y" options={yearOpts} value={pendingY} onChange={setY}
+      placeholder={lang === 'en' ? 'Year' : '年'} style={triggerStyle} />
+  );
+  const monthPicker = (
+    <SimpleListDropdown key="m" options={monthOpts} value={pendingM} onChange={setM}
+      placeholder={lang === 'en' ? 'Month' : '月'} style={triggerStyle} />
+  );
+
+  return (
+    <div className="flex items-center" style={{ gap: '6px', minWidth: 0 }}>
+      {lang === 'en' ? [monthPicker, yearPicker] : [yearPicker, monthPicker]}
+      {allowEmpty && (pendingY || pendingM) && (
+        <button type="button" onClick={() => { setPendingY(''); setPendingM(''); onChange(''); }}
+          aria-label="clear"
+          style={{ flexShrink: 0, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--gc-muted)', fontSize: '13px', padding: '4px' }}>
+          ✕
+        </button>
       )}
     </div>
   );
@@ -14182,7 +14132,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       category: 'Category',
       categoryPlaceholder: 'Select category',
       pd: 'Priority Date',
-      dob: 'Date of Birth',
+      dob: 'Your Date of Birth',
       inUS: 'Are you currently in the US?',
       inUSYes: 'In the US',
       inUSNo: 'Outside the US',
@@ -14206,7 +14156,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       category: '绿卡类别',
       categoryPlaceholder: '选择类别',
       pd: '优先日',
-      dob: '出生年月',
+      dob: '你的出生年月',
       inUS: '你目前在美国境内吗？',
       inUSYes: '在美国境内',
       inUSNo: '不在美国境内',
@@ -14230,7 +14180,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       category: '綠卡類別',
       categoryPlaceholder: '選擇類別',
       pd: '優先日',
-      dob: '出生年月',
+      dob: '你的出生年月',
       inUS: '你目前在美國境內嗎？',
       inUSYes: '在美國境內',
       inUSNo: '不在美國境內',
@@ -14699,6 +14649,20 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
   const [subLang, setSubLang] = useState(lang);
   const [alerts, setAlerts] = useState({ whenCurrent: true, whenEligible: true, monthlyUpdates: true, retrogression: true });
   const [status, setStatus] = useState(''); // '' | 'loading' | 'sent' | 'updated' | 'error' | 'invalid'
+  // Ask for subtype/birth year-month once, at signup, so the monthly-update email
+  // never has to chase a subscriber down for them later (see SubtypeUpdateModal).
+  // Already-known fields (wizard fill or a prior visit) are shown as text with a
+  // one-tap edit instead of re-asking — asking again after the visitor already has
+  // their result on screen reads as pointless friction and risks the signup itself.
+  const catHasSubtype = !!CATEGORY_SUBTYPES[userCase.category];
+  const subtypeKnown = !catHasSubtype || !!userCase.subtype;
+  const birthKnown = !!userCase.birthYearMonth;
+  const [editSubtype, setEditSubtype] = useState(false);
+  const [editBirth, setEditBirth] = useState(false);
+  const [subtypePick, setSubtypePick] = useState(userCase.subtype || null);
+  const [birthYM, setBirthYM] = useState(userCase.birthYearMonth || '');
+  const [subtypeAttempted, setSubtypeAttempted] = useState(false);
+  const [dobAttempted, setDobAttempted] = useState(false);
   // Same purpose as in SmartAlerts: a browser/device with no gc_subscribedEmail flag
   // (private window, different device) lands here as if it were a first-time visitor.
   // /api/subscribe already upserts by email, so re-submitting an existing address just
@@ -14761,6 +14725,18 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
       setTimeout(() => setStatus(''), 2500);
       return;
     }
+    // Only blocks on fields that were never known; already-known fields
+    // (wizard/URL) never re-prompt here (see catHasSubtype/birthKnown above).
+    if (!updateMode) {
+      if (!subtypeKnown && !subtypePick) { setSubtypeAttempted(true); return; }
+      if (!birthKnown && !birthYM) { setDobAttempted(true); return; }
+    }
+    const finalUserCase = updateMode ? userCase : {
+      ...userCase,
+      subtype: userCase.subtype || subtypePick,
+      birthYearMonth: userCase.birthYearMonth || birthYM,
+    };
+    setUserCase(finalUserCase);
     setStatus('loading');
     try {
       const resp = await fetch('/api/subscribe', {
@@ -14768,7 +14744,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
-          userCase,
+          userCase: finalUserCase,
           alerts,
           language: subLang,
         }),
@@ -14914,6 +14890,69 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                   : (lang === 'en' ? 'Something went wrong — try again' : lang === 'tw' ? '出錯了，再試一次' : '出错了，再试一次')}
               </div>
             )}
+            {catHasSubtype && !updateMode && (
+              <div style={{ marginTop: '8px' }}>
+                {subtypeKnown && !editSubtype ? (
+                  <div className="flex items-center justify-between" style={{ fontSize: '11.5px', color: 'var(--gc-ink-soft)' }}>
+                    <span>
+                      {lang === 'en' ? 'Subtype: ' : lang === 'tw' ? '細分：' : '细分：'}
+                      <b>{subtypeLabel(userCase.category, userCase.subtype || subtypePick, lang)}</b>
+                    </span>
+                    <button type="button" onClick={() => setEditSubtype(true)}
+                      style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-green-ink)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                      {lang === 'en' ? 'Edit' : lang === 'tw' ? '修改' : '修改'}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
+                      {lang === 'en' ? <>Which <b>{userCase.category}</b> subtype is your case?</>
+                        : <>你的 <b>{userCase.category}</b> 属于哪个细分？</>}
+                    </div>
+                    <SubtypeChips userCase={{ ...userCase, subtype: subtypePick }} setUserCase={(uc) => { setSubtypePick(uc.subtype); setSubtypeAttempted(false); }} required />
+                    {subtypeAttempted && !subtypePick && (
+                      <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+                        {lang === 'en' ? 'Please pick a subtype' : lang === 'tw' ? '請選擇細分' : '请选择细分'}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+            {!updateMode && (
+              <div style={{ marginTop: '8px' }}>
+                {birthKnown && !editBirth ? (
+                  <div className="flex items-center justify-between" style={{ fontSize: '11.5px', color: 'var(--gc-ink-soft)' }}>
+                    <span>
+                      {lang === 'en'
+                        ? <>Born: <b>{new Date(parseInt(userCase.birthYearMonth.slice(0, 4), 10), parseInt(userCase.birthYearMonth.slice(5, 7), 10) - 1, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}</b></>
+                        : <>出生年月：<b>{userCase.birthYearMonth.slice(0, 4)}年{parseInt(userCase.birthYearMonth.slice(5, 7), 10)}月</b></>}
+                    </span>
+                    <button type="button" onClick={() => setEditBirth(true)}
+                      style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-green-ink)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                      {lang === 'en' ? 'Edit' : lang === 'tw' ? '修改' : '修改'}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
+                      {lang === 'en' ? 'Your date of birth' : '你的出生年月'}{' '}
+                      <span style={{ color: 'var(--gc-ink-soft)' }}>
+                        {lang === 'en' ? '(helps us predict your timeline more precisely)' : '(填了才能算准你的排期预测)'}
+                      </span>
+                    </div>
+                    <YearMonthDropdown value={birthYM}
+                      triggerStyle={dobAttempted && !birthYM ? { border: '1px solid var(--gc-red)' } : {}}
+                      onChange={(ym) => { setBirthYM(ym); setDobAttempted(false); }} />
+                    {dobAttempted && !birthYM && (
+                      <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+                        {lang === 'en' ? 'Please pick your date of birth' : lang === 'tw' ? '請選擇出生年月' : '请选择出生年月'}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
             <div className="flex items-center" style={{ gap: '6px', margin: '10px 0 2px' }}>
               <span style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>{lang === 'en' ? 'Email language' : lang === 'tw' ? '郵件語言' : '邮件语言'}</span>
               <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -14965,32 +15004,42 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
   );
 };
 
-// SubtypeUpdateModal — one-time prompt for subscribers whose EB1-EB5 record predates
-// the subtype field. Only ever shown when the page was opened via the monthly-update
-// email's special link (see buildCaseUrl/buildSubtypeToken) — App() gates on that,
-// this component just renders the ask and posts the answer. Dismissible: skipping
-// costs nothing, the app works fine without a subtype on file.
+// SubtypeUpdateModal — one-time prompt for subscribers whose record is missing the
+// subtype and/or birth year-month fields (added after they first subscribed). Only
+// ever shown when the page was opened via the monthly-update email's special link
+// (see buildCaseUrl/buildSubtypeToken) — App() gates on that, this component just
+// renders whichever field(s) are actually missing and posts the answer. Dismissible:
+// skipping costs nothing, the app works fine without these on file.
 // ============================================================
 const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone, onClose }) => {
   const { lang } = useLang();
   const [pick, setPick] = useState(userCase.subtype || null);
+  const [birthYM, setBirthYM] = useState(userCase.birthYearMonth || '');
   const [status, setStatus] = useState(''); // '' | 'loading' | 'error'
+  const [subtypeAttempted, setSubtypeAttempted] = useState(false);
+  const [dobAttempted, setDobAttempted] = useState(false);
 
   const opts = CATEGORY_SUBTYPES[userCase.category];
-  if (!opts) return null;
+  const needsSubtype = !!opts && !userCase.subtype;
+  const needsBirth = !userCase.birthYearMonth;
+  if (!needsSubtype && !needsBirth) return null;
 
   const save = async () => {
-    if (!pick) return;
+    if (needsSubtype && !pick) { setSubtypeAttempted(true); return; }
+    if (needsBirth && !birthYM) { setDobAttempted(true); return; }
     setStatus('loading');
     try {
+      const body = { email, token };
+      if (needsSubtype) body.subtype = pick;
+      if (needsBirth) body.birthYearMonth = birthYM;
       const resp = await fetch('/api/update-subtype', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, token, subtype: pick }),
+        body: JSON.stringify(body),
       });
       const result = await resp.json().catch(() => ({ success: false }));
       if (resp.ok && result.success) {
-        onDone(pick);
+        onDone({ subtype: needsSubtype ? pick : userCase.subtype, birthYearMonth: needsBirth ? birthYM : userCase.birthYearMonth });
       } else {
         setStatus('error');
       }
@@ -14998,6 +15047,8 @@ const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone
       setStatus('error');
     }
   };
+
+  const canSave = (!needsSubtype || !!pick) && (!needsBirth || !!birthYM);
 
   return (
     <div className="visa-root" data-theme={theme}
@@ -15009,27 +15060,56 @@ const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone
         borderRadius: '6px', padding: '16px 18px 14px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
       }}>
         <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '6px' }}>
-          {lang === 'en' ? 'One quick thing' : lang === 'tw' ? '補充一個小資訊' : '补充一个小信息'}
+          {needsSubtype && needsBirth
+            ? (lang === 'en' ? 'Two quick things' : lang === 'tw' ? '補充兩個小資訊' : '补充两个小信息')
+            : (lang === 'en' ? 'One quick thing' : lang === 'tw' ? '補充一個小資訊' : '补充一个小信息')}
         </div>
         <div style={{ fontSize: '12.5px', lineHeight: 1.7, color: 'var(--gc-ink-soft)', marginBottom: '4px' }}>
           {lang === 'en'
-            ? <>This question didn't exist when you subscribed. Which <b>{userCase.category}</b> subtype is your case?</>
+            ? 'This helps us calculate your prediction more precisely.'
             : lang === 'tw'
-              ? <>你訂閱的時候還沒有這道題。你的 <b>{userCase.category}</b> 屬於哪個細分？</>
-              : <>你订阅的时候还没有这道题。你的 <b>{userCase.category}</b> 属于哪个细分？</>}
+              ? '這樣才能給你算準排期預測。'
+              : '这样才能给你算准排期预测。'}
         </div>
-        <SubtypeChips userCase={{ ...userCase, subtype: pick }} setUserCase={(uc) => setPick(uc.subtype)} required />
+        {needsSubtype && (
+          <>
+            <div style={{ fontSize: '11px', color: 'var(--gc-muted)', margin: '8px 0 3px' }}>
+              {lang === 'en' ? <>Which <b>{userCase.category}</b> subtype is your case?</> : <>你的 <b>{userCase.category}</b> 属于哪个细分？</>}
+            </div>
+            <SubtypeChips userCase={{ ...userCase, subtype: pick }} setUserCase={(uc) => { setPick(uc.subtype); setSubtypeAttempted(false); }} required />
+            {subtypeAttempted && !pick && (
+              <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+                {lang === 'en' ? 'Please pick a subtype' : lang === 'tw' ? '請選擇細分' : '请选择细分'}
+              </div>
+            )}
+          </>
+        )}
+        {needsBirth && (
+          <div style={{ marginTop: needsSubtype ? '10px' : '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
+              {lang === 'en' ? 'Your date of birth?' : lang === 'tw' ? '你的出生年月？' : '你的出生年月？'}
+            </div>
+            <YearMonthDropdown value={birthYM}
+              triggerStyle={dobAttempted && !birthYM ? { border: '1px solid var(--gc-red)' } : {}}
+              onChange={(ym) => { setBirthYM(ym); setDobAttempted(false); }} />
+            {dobAttempted && !birthYM && (
+              <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+                {lang === 'en' ? 'Please pick your date of birth' : lang === 'tw' ? '請選擇出生年月' : '请选择出生年月'}
+              </div>
+            )}
+          </div>
+        )}
         {status === 'error' && (
           <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '6px' }}>
             {lang === 'en' ? 'Something went wrong — try again.' : lang === 'tw' ? '出錯了，再試一次。' : '出错了，再试一次。'}
           </div>
         )}
         <div className="flex items-center justify-end" style={{ marginTop: '12px' }}>
-          <button type="button" onClick={save} disabled={!pick || status === 'loading'}
+          <button type="button" onClick={save} disabled={status === 'loading'}
             style={{
               border: 'none', borderRadius: '4px', background: 'var(--gc-green)', color: 'var(--gc-paper)',
-              padding: '8px 16px', cursor: pick ? 'pointer' : 'default', fontSize: '12px', fontWeight: 700,
-              opacity: !pick || status === 'loading' ? 0.5 : 1,
+              padding: '8px 16px', cursor: 'pointer', fontSize: '12px', fontWeight: 700,
+              opacity: (!canSave && (subtypeAttempted || dobAttempted)) || status === 'loading' ? 0.5 : 1,
             }}>
             {status === 'loading' ? '…' : (lang === 'en' ? 'Save' : lang === 'tw' ? '儲存' : '保存')}
           </button>
@@ -15743,13 +15823,14 @@ export default function App() {
         />
       )}
       <SubscribeModal show={showSubModal} onClose={() => setShowSubModal(false)} userCase={userCase} setUserCase={setUserCase} theme={theme} />
-      {subtypePrompt && hasOnboarded && CATEGORY_SUBTYPES[userCase.category] && !userCase.subtype && (
+      {subtypePrompt && hasOnboarded
+        && ((CATEGORY_SUBTYPES[userCase.category] && !userCase.subtype) || !userCase.birthYearMonth) && (
         <SubtypeUpdateModal
           userCase={userCase}
           email={subtypePrompt.email}
           token={subtypePrompt.token}
           theme={theme}
-          onDone={(subtype) => { setUserCase({ ...userCase, subtype }); setSubtypePrompt(null); }}
+          onDone={({ subtype, birthYearMonth }) => { setUserCase({ ...userCase, subtype, birthYearMonth }); setSubtypePrompt(null); }}
           onClose={() => setSubtypePrompt(null)}
         />
       )}
