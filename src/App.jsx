@@ -15071,10 +15071,22 @@ const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone
     if (needsBirth && !birthYM) { setDobAttempted(true); return; }
     setStatus('loading');
     try {
-      const body = { email, token };
-      if (needsSubtype) body.subtype = pick;
-      if (needsBirth) body.birthYearMonth = birthYM;
-      const resp = await fetch('/api/update-subtype', {
+      // Two ways in. WITH a token: the deep link from the monthly-update email, which
+      // only reaches subscribers whose category moved that month — so it can never
+      // cover everyone signed up before these fields existed. WITHOUT one: this
+      // browser already knows it's subscribed (gc_subscribedEmail), which is proof
+      // enough to upsert that same address through the normal subscribe path — no
+      // token to mint, and /api/subscribe preserves the alerts/language already on
+      // file when the request omits them.
+      const merged = {
+        ...userCase,
+        ...(needsSubtype ? { subtype: pick } : {}),
+        ...(needsBirth ? { birthYearMonth: birthYM } : {}),
+      };
+      const body = token
+        ? { email, token, ...(needsSubtype ? { subtype: pick } : {}), ...(needsBirth ? { birthYearMonth: birthYM } : {}) }
+        : { email, userCase: merged };
+      const resp = await fetch(token ? '/api/update-subtype' : '/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -15725,7 +15737,38 @@ export default function App() {
   // localStorage means "your last session's case" survives refresh.
   const urlCase = parseUserCaseFromURL();
   const subtypePromptFromURL = parseSubtypePromptFromURL();
-  const [subtypePrompt, setSubtypePrompt] = useState(subtypePromptFromURL);
+  // Backfill for everyone who subscribed before subtype/birth existed. The email deep
+  // link (se/stk) only rides the monthly update, which only goes to subscribers whose
+  // category actually moved — so on its own it would never reach a stagnant category.
+  // This browser already knows which address it subscribed with, so a returning visitor
+  // can be asked directly, no token and no email needed. Token stays null: the save path
+  // in SubtypeUpdateModal branches on it. Dismissal is per-session, so declining costs
+  // one tap and it doesn't turn into a permanent nag.
+  const localIntakePrompt = (() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      if (window.sessionStorage.getItem('gc_intakeAsked') === '1') return null;
+      const saved = window.localStorage.getItem('gc_subscribedEmail');
+      if (!saved) return null;
+      // Critical: the token-less save posts the whole userCase, so it must be certain
+      // the case on screen is this visitor's own. Someone reading a case link shared by
+      // a friend is subscribed here too, and asking them would overwrite their own
+      // subscription with the friend's category/country/priority date. The token path
+      // (from their own monthly email) is immune — it posts only the two fields — so
+      // this guard applies to the local prompt alone.
+      if (urlCase) {
+        let ownCase = null;
+        try { ownCase = JSON.parse(window.localStorage.getItem('gc_userCase') || 'null'); } catch { /* noop */ }
+        const sameCase = ownCase
+          && ownCase.category === urlCase.category
+          && ownCase.country === urlCase.country
+          && ownCase.priorityDate === urlCase.priorityDate;
+        if (!sameCase) return null;
+      }
+      return { email: saved, token: null };
+    } catch { return null; }
+  })();
+  const [subtypePrompt, setSubtypePrompt] = useState(subtypePromptFromURL || localIntakePrompt);
   useEffect(() => {
     if (!subtypePromptFromURL || typeof window === 'undefined') return;
     // Strip se/stk right after reading them — they're one-time link credentials,
@@ -15912,8 +15955,15 @@ export default function App() {
           email={subtypePrompt.email}
           token={subtypePrompt.token}
           theme={theme}
-          onDone={({ subtype, birthYearMonth }) => { setUserCase({ ...userCase, subtype, birthYearMonth }); setSubtypePrompt(null); }}
-          onClose={() => setSubtypePrompt(null)}
+          onDone={({ subtype, birthYearMonth }) => {
+            setUserCase({ ...userCase, subtype, birthYearMonth });
+            try { window.sessionStorage.setItem('gc_intakeAsked', '1'); } catch { /* noop */ }
+            setSubtypePrompt(null);
+          }}
+          onClose={() => {
+            try { window.sessionStorage.setItem('gc_intakeAsked', '1'); } catch { /* noop */ }
+            setSubtypePrompt(null);
+          }}
         />
       )}
       <style>{`

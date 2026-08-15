@@ -235,6 +235,8 @@ export async function onRequestPost(context) {
   let wasConfirmed = false;
   let confirmedAt = null;
   let existingCase = null;
+  let existingAlerts = null;
+  let existingLanguage = null;
   if (isUpdate) {
     try {
       const existing = JSON.parse(existingRaw);
@@ -242,6 +244,8 @@ export async function onRequestPost(context) {
       wasConfirmed = existing.confirmed === true;
       confirmedAt = existing.confirmedAt || null;
       existingCase = existing.userCase || null;
+      existingAlerts = existing.alerts || null;
+      existingLanguage = existing.language || null;
     } catch {}
   }
 
@@ -271,8 +275,11 @@ export async function onRequestPost(context) {
     email: emailKey,
     name: (typeof name === 'string' ? name.trim().slice(0, 50) : ''),
     userCase: mergedCase || null,
-    alerts: alerts || {},
-    language: language || 'zh',
+    // A request that omits alerts entirely is not the same as one turning them all
+    // off: `alerts || {}` used to silently unsubscribe an existing subscriber from
+    // every notification. Only an explicitly sent object replaces what's on file.
+    alerts: (alerts && typeof alerts === 'object') ? alerts : (existingAlerts || {}),
+    language: language || existingLanguage || 'zh',
     subscribedAt,
     lastUpdated: new Date().toISOString(),
     userAgent: (request.headers.get('user-agent') || '').slice(0, 200),
