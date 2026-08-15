@@ -234,14 +234,31 @@ export async function onRequestPost(context) {
   const isUpdate = existingRaw !== null;
   let wasConfirmed = false;
   let confirmedAt = null;
+  let existingCase = null;
   if (isUpdate) {
     try {
       const existing = JSON.parse(existingRaw);
       if (existing.subscribedAt) subscribedAt = existing.subscribedAt;
       wasConfirmed = existing.confirmed === true;
       confirmedAt = existing.confirmedAt || null;
+      existingCase = existing.userCase || null;
     } catch {}
   }
+
+  // userCase is stored as a whole object, so a client that posts one missing
+  // birthYearMonth/role/subtype would erase answers we already have — and a browser
+  // running a cached older bundle does exactly that on every preference sync. These
+  // three are answered once and never "unset", so absence means "didn't ask", not
+  // "cleared". Anything the client does send still wins.
+  const mergedCase = (() => {
+    if (!userCase || typeof userCase !== 'object') return userCase || existingCase || null;
+    if (!existingCase) return userCase;
+    const out = { ...userCase };
+    for (const f of ['birthYearMonth', 'role', 'subtype']) {
+      if (!out[f] && existingCase[f]) out[f] = existingCase[f];
+    }
+    return out;
+  })();
 
   const record = {
     // Double opt-in: a record only counts as a subscriber once the recipient clicks
@@ -253,7 +270,7 @@ export async function onRequestPost(context) {
     confirmedAt,
     email: emailKey,
     name: (typeof name === 'string' ? name.trim().slice(0, 50) : ''),
-    userCase: userCase || null,
+    userCase: mergedCase || null,
     alerts: alerts || {},
     language: language || 'zh',
     subscribedAt,

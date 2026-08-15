@@ -7791,6 +7791,30 @@ const CompareByCountry = ({ userCase }) => {
 };
 
 // ============================================================
+// Which signup-time fields this case is still missing. There are three subscribe
+// entry points (SmartAlerts, InlineSubscribeCTA, SubscribeModal) and only the modal
+// ever asked for these — the other two POSTed userCase raw, so anyone arriving on a
+// ?c=&ct=&pd= link (which skips onboarding entirely, see parseUserCaseFromURL) could
+// subscribe with no birth month at all. 2026-08-15: 1 of 82 records had one.
+// Single source of truth so the three paths can't drift apart again.
+// ============================================================
+const caseIntakeGaps = (uc) => ({
+  needsSubtype: !!CATEGORY_SUBTYPES[uc?.category] && !uc?.subtype,
+  needsBirth: !uc?.birthYearMonth,
+});
+const caseNeedsIntake = (uc) => {
+  const g = caseIntakeGaps(uc);
+  return g.needsSubtype || g.needsBirth;
+};
+// Hand off to SubscribeModal (which owns the subtype/birth pickers) instead of
+// POSTing an incomplete case. Carries the address already typed so the visitor
+// doesn't retype it — the modal is one more tap, not a restart.
+const openSubscribeModal = (prefillEmail = '') => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('gc-open-subscribe', { detail: { email: prefillEmail } }));
+};
+
+// ============================================================
 // Smart Alerts Component
 // ============================================================
 const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, greenCardInfo = { approvalDate: null, isConditional: false } }) => {
@@ -7841,6 +7865,15 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
     if (!validateEmail(email)) {
       setEmailStatus('invalid');
       setTimeout(() => setEmailStatus(''), 3000);
+      return;
+    }
+
+    // This form has no subtype/birth pickers of its own. Rather than silently
+    // writing a record missing them, hand the visitor to SubscribeModal, which does.
+    // updateMode is no exception: an existing subscriber whose stored case predates
+    // these fields is exactly who we need them from.
+    if (caseNeedsIntake(userCase)) {
+      openSubscribeModal(email.trim().toLowerCase());
       return;
     }
 
@@ -14642,10 +14675,17 @@ const announceSubscribed = () => {
 // 订阅 button and the case-card mail icon (via the 'gc-open-subscribe' event), so
 // nobody has to navigate to a separate page just to subscribe.
 // ============================================================
-const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passport' }) => {
+const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passport', prefillEmail = '' }) => {
   const { lang } = useLang();
   const isSubscribed = useSubscribed();
   const [email, setEmail] = useState('');
+  // The two inline entry points hand off to this modal when the case is missing
+  // subtype/birth (see openSubscribeModal). Carry over whatever they already typed
+  // so the handoff costs one tap, not a retype — only on open, never overwriting
+  // an address the visitor is mid-edit in this modal.
+  useEffect(() => {
+    if (show && prefillEmail) setEmail(prefillEmail);
+  }, [show, prefillEmail]);
   const [subLang, setSubLang] = useState(lang);
   const [alerts, setAlerts] = useState({ whenCurrent: true, whenEligible: true, monthlyUpdates: true, retrogression: true });
   const [status, setStatus] = useState(''); // '' | 'loading' | 'sent' | 'updated' | 'error' | 'invalid'
@@ -14727,11 +14767,11 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
     }
     // Only blocks on fields that were never known; already-known fields
     // (wizard/URL) never re-prompt here (see catHasSubtype/birthKnown above).
-    if (!updateMode) {
-      if (!subtypeKnown && !subtypePick) { setSubtypeAttempted(true); return; }
-      if (!birthKnown && !birthYM) { setDobAttempted(true); return; }
-    }
-    const finalUserCase = updateMode ? userCase : {
+    // Deliberately NOT skipped in updateMode: that toggle is plain UI state any
+    // first-time visitor can flip, so gating on it left the whole check bypassable.
+    if (!subtypeKnown && !subtypePick) { setSubtypeAttempted(true); return; }
+    if (!birthKnown && !birthYM) { setDobAttempted(true); return; }
+    const finalUserCase = {
       ...userCase,
       subtype: userCase.subtype || subtypePick,
       birthYearMonth: userCase.birthYearMonth || birthYM,
@@ -14890,7 +14930,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                   : (lang === 'en' ? 'Something went wrong — try again' : lang === 'tw' ? '出錯了，再試一次' : '出错了，再试一次')}
               </div>
             )}
-            {catHasSubtype && !updateMode && (
+            {catHasSubtype && (
               <div style={{ marginTop: '8px' }}>
                 {subtypeKnown && !editSubtype ? (
                   <div className="flex items-center justify-between" style={{ fontSize: '11.5px', color: 'var(--gc-ink-soft)' }}>
@@ -14919,7 +14959,9 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                 )}
               </div>
             )}
-            {!updateMode && (
+            {/* Rendered in updateMode too — the subscribe() gate now applies there,
+                and known values show as one read-only line, not a re-prompt. */}
+            {(
               <div style={{ marginTop: '8px' }}>
                 {birthKnown && !editBirth ? (
                   <div className="flex items-center justify-between" style={{ fontSize: '11.5px', color: 'var(--gc-ink-soft)' }}>
@@ -15141,6 +15183,13 @@ const InlineSubscribeCTA = ({ userCase, label }) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setStatus('invalid');
       setTimeout(() => setStatus(''), 2500);
+      return;
+    }
+    // One-row widget with no room for the subtype/birth pickers — hand off to
+    // SubscribeModal rather than POST an incomplete case (see caseIntakeGaps).
+    if (caseNeedsIntake(userCase)) {
+      markTouched();
+      openSubscribeModal(email.trim().toLowerCase());
       return;
     }
     setStatus('loading');
@@ -15659,12 +15708,20 @@ export default function App() {
     params.set('pd', uc.priorityDate);
     if (!uc.inUS) params.set('in', '0');
     if (uc.petitionerStatus) params.set('ps', uc.petitionerStatus);
+    // Was omitted, which is how this URL (rewritten on every case change, then winning
+    // over localStorage on the next load) silently dropped subtype from your own case.
+    if (uc.subtype) params.set('st', uc.subtype);
+    // birthYearMonth and role stay OUT of the URL on purpose: this string is shareable
+    // and crawlable, and a date of birth in it is a worse problem than the one being
+    // fixed. They survive reloads via the same-case merge in the userCase initializer.
     const newURL = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
     window.history.replaceState({}, '', newURL);
   };
 
   // Init userCase: priority is URL params > localStorage > default.
-  // URL params win so shared links always load that case (not your own).
+  // URL params win so shared links always load that case (not your own) — except for
+  // the fields the URL cannot carry, which are merged back from localStorage when the
+  // link turns out to describe this device's own case. See the initializer below.
   // localStorage means "your last session's case" survives refresh.
   const urlCase = parseUserCaseFromURL();
   const subtypePromptFromURL = parseSubtypePromptFromURL();
@@ -15681,7 +15738,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [userCase, setUserCase] = useState(() => {
-    if (urlCase) return urlCase;
+    let saved = null;
     if (typeof window !== 'undefined') {
       try {
         const raw = window.localStorage.getItem('gc_userCase');
@@ -15690,11 +15747,31 @@ export default function App() {
           // Sanity check — must have all required fields
           if (parsed && parsed.country && parsed.category && parsed.priorityDate
               && typeof parsed.inUS === 'boolean' && parsed.petitionerStatus) {
-            return parsed;
+            saved = parsed;
           }
         }
       } catch (e) { /* noop */ }
     }
+    if (urlCase) {
+      // The URL can't express birthYearMonth/role, so taking it wholesale used to wipe
+      // them off your own case every reload (writeUserCaseToURL rewrites this URL on
+      // every change, and it wins here) — which is how signups landed with no birth
+      // month even after the wizard made it required. Carry those two back over ONLY
+      // when the link describes the case already saved on this device; a link shared by
+      // someone else is a different person and must not inherit this device's DOB.
+      const sameCase = saved
+        && saved.category === urlCase.category
+        && saved.country === urlCase.country
+        && saved.priorityDate === urlCase.priorityDate;
+      if (!sameCase) return urlCase;
+      return {
+        ...urlCase,
+        subtype: urlCase.subtype || saved.subtype || null,
+        ...(saved.birthYearMonth ? { birthYearMonth: saved.birthYearMonth } : {}),
+        ...(saved.role ? { role: saved.role } : {}),
+      };
+    }
+    if (saved) return saved;
     return {
       country: 'Taiwan', category: 'EB3',
       priorityDate: '2024-07-15', inUS: true,
@@ -15763,8 +15840,13 @@ export default function App() {
   // Subscribe modal — opened by the nav's 订阅 button and the case card's mail
   // icon (custom event, so deep components don't need a prop drill).
   const [showSubModal, setShowSubModal] = useState(false);
+  // Set when an inline entry point hands off a half-finished signup (see openSubscribeModal).
+  const [subModalPrefill, setSubModalPrefill] = useState('');
   useEffect(() => {
-    const open = () => setShowSubModal(true);
+    const open = (e) => {
+      setSubModalPrefill((e && e.detail && e.detail.email) || '');
+      setShowSubModal(true);
+    };
     const gotoAlerts = () => setTab('alerts');
     window.addEventListener('gc-open-subscribe', open);
     window.addEventListener('gc-goto-alerts', gotoAlerts);
@@ -15822,7 +15904,7 @@ export default function App() {
           onThemeChange={setTheme}
         />
       )}
-      <SubscribeModal show={showSubModal} onClose={() => setShowSubModal(false)} userCase={userCase} setUserCase={setUserCase} theme={theme} />
+      <SubscribeModal show={showSubModal} onClose={() => { setShowSubModal(false); setSubModalPrefill(''); }} userCase={userCase} setUserCase={setUserCase} theme={theme} prefillEmail={subModalPrefill} />
       {subtypePrompt && hasOnboarded
         && ((CATEGORY_SUBTYPES[userCase.category] && !userCase.subtype) || !userCase.birthYearMonth) && (
         <SubtypeUpdateModal
