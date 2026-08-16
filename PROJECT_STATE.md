@@ -479,7 +479,7 @@ postgc 一键去向。均 localStorage 防重复。聚合门槛：时间线中�
 
 ---
 
-## 第 18 轮（2026-08-16）：beacon 匿名带上案子信息（未提交未推送）
+## 第 18 轮（2026-08-16）：beacon 匿名带上案子信息（已推 main）
 
 **起因**：分析当天 0 新增订阅时发现，`hasCase`/`subscribed` 这两个布尔位是 `/api/beacon`
 唯一记的东西——配了案但没订阅的访客，类别/国家/优先日从来没传到服务器，落地页流量里
@@ -505,7 +505,7 @@ postgc 一键去向。均 localStorage 防重复。聚合门槛：时间线中�
 `birthYearMonth` 也不会出现在 payload 里；另用 node 脚本单独跑了后端校验逻辑，
 确认 XSS 载荷/伪造 country/垃圾日期格式都会被清空成空字符串而不是原样入库。
 
-**状态**：只在本地工作区，未 commit、未推 main。用户已看过验证结果，还没决定要不要推。
+**状态**：已 commit 并推 main，Cloudflare Pages 会自动部署。
 
 **状态**：已 commit 并推 main，Cloudflare Pages 会自动部署。
 
