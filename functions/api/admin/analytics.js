@@ -41,6 +41,10 @@ export async function onRequestGet(context) {
   } while (cursor);
 
   const days = {};
+  // One entry per vid (not per session) — a visitor pinging three times in a day with
+  // the same case shouldn't triple-count in the breakdown. Last-write-wins per vid
+  // per day, same as how beacon.js overwrites dwell time.
+  const caseByVidDay = new Map();
   for (const r of bySid) {
     const d = (days[r.day] ||= { sessions: 0, vids: new Set(), dwells: [], langs: {}, withCase: 0, subscribed: 0 });
     d.sessions += 1;
@@ -49,6 +53,18 @@ export async function onRequestGet(context) {
     if (r.lang) d.langs[r.lang] = (d.langs[r.lang] || 0) + 1;
     if (r.hasCase) d.withCase += 1;
     if (r.subscribed) d.subscribed += 1;
+    if (r.category && r.country) {
+      caseByVidDay.set(`${r.day}:${r.vid}`, { day: r.day, category: r.category, country: r.country });
+    }
+  }
+
+  // Category+country distribution across ALL visitors who configured a case, whether
+  // or not they ever subscribed — the whole point of carrying these fields on the
+  // beacon instead of only ever seeing this breakdown for the subset who signed up.
+  const caseBreakdown = {};
+  for (const { category, country } of caseByVidDay.values()) {
+    const key = `${category}-${country}`;
+    caseBreakdown[key] = (caseBreakdown[key] || 0) + 1;
   }
 
   const median = (a) => {
@@ -81,7 +97,7 @@ export async function onRequestGet(context) {
     medianDwellSec: Math.round(median(allDwells) / 1000),
   };
 
-  return new Response(JSON.stringify({ totals, days: out }, null, 2), {
+  return new Response(JSON.stringify({ totals, caseBreakdown, days: out }, null, 2), {
     headers: { 'Content-Type': 'application/json' },
   });
 }

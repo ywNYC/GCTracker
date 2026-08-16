@@ -477,6 +477,36 @@ postgc 一键去向。均 localStorage 防重复。聚合门槛：时间线中�
 **验证方式**：Playwright 起本地 dev server 截图两处——表单长相、以及预置
 `localStorage.gc_nickname='Jack'` 后主页的问候条效果——用户看过截图后确认推送。
 
+---
+
+## 第 18 轮（2026-08-16）：beacon 匿名带上案子信息（未提交未推送）
+
+**起因**：分析当天 0 新增订阅时发现，`hasCase`/`subscribed` 这两个布尔位是 `/api/beacon`
+唯一记的东西——配了案但没订阅的访客，类别/国家/优先日从来没传到服务器，落地页流量里
+大多数其实是"配过案的老访客"，这部分人的案子分布完全是黑的。用户要求把这块信息也
+匿名收集起来，越详细越好，但明确要求不能影响埋点无感的体验。
+
+**改了什么**：
+- `index.html` 的 beacon `send()`——新增读取 `localStorage.gc_userCase`，把
+  `category`/`country`/`priorityDate`/`subtype` 一并放进 payload。**刻意不带
+  `birthYearMonth` 和姓名**——跟 `writeUserCaseToURL` 里不把生日放进可分享 URL 是
+  同一个理由（生日是准标识符，匿名埋点里也不该存原始值），这个先例直接沿用，没有
+  另外问用户要不要把生日也搭进去。
+- `functions/api/beacon.js`——新增白名单校验：`category`/`country` 必须命中
+  `src/App.jsx` 里的枚举值，`priorityDate` 必须是 `YYYY-MM-DD`，`subtype` 限
+  `[a-z0-9]{1,20}`。这是无鉴权公开写入端点，不校验的话谁都能把任意字符串塞进
+  统计表，四个字段全部按此收紧。
+- `functions/api/admin/analytics.js`——新增 `caseBreakdown`（`"F4-China": 12` 这种
+  按 category-country 计数，同一 vid 同一天只算一次，不会因为多次 ping 重复计数），
+  覆盖全部配过案的访客而不只是订阅者。
+
+**验证方式**：Playwright 起本地 dev server，拦截 `/api/beacon` 请求实测发出的 payload——
+确认 category/country/priorityDate 能正确带出，即使 `localStorage.gc_userCase` 里塞了
+`birthYearMonth` 也不会出现在 payload 里；另用 node 脚本单独跑了后端校验逻辑，
+确认 XSS 载荷/伪造 country/垃圾日期格式都会被清空成空字符串而不是原样入库。
+
+**状态**：只在本地工作区，未 commit、未推 main。用户已看过验证结果，还没决定要不要推。
+
 **状态**：已 commit 并推 main，Cloudflare Pages 会自动部署。
 
 ---

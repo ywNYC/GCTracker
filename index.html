@@ -35,12 +35,29 @@
           };
           var send = function () {
             var hasCase = false, subscribed = false, lang = '';
+            // Anonymous case shape only — category/country/subtype (already treated as
+            // shareable elsewhere, e.g. the deep-link URL) plus priorityDate. Deliberately
+            // NOT birthYearMonth or name: those are quasi-identifying even without an
+            // email attached, same reasoning as why birthYearMonth is kept out of the
+            // shareable case URL (see writeUserCaseToURL in App.jsx).
+            var category = '', country = '', priorityDate = '', subtype = '';
             try {
-              hasCase = !!localStorage.getItem('gc_userCase');
+              var rawCase = localStorage.getItem('gc_userCase');
+              hasCase = !!rawCase;
               subscribed = !!localStorage.getItem('gc_subscribedEmail');
               lang = (localStorage.getItem('gc_lang') || '').replace(/[^a-z]/g, '');
+              if (rawCase) {
+                var uc = JSON.parse(rawCase);
+                category = uc.category || '';
+                country = uc.country || '';
+                priorityDate = uc.priorityDate || '';
+                subtype = uc.subtype || '';
+              }
             } catch (e) {}
-            var payload = JSON.stringify({ vid: vid, sid: sid, dwellMs: total(), lang: lang, hasCase: hasCase, subscribed: subscribed });
+            var payload = JSON.stringify({
+              vid: vid, sid: sid, dwellMs: total(), lang: lang, hasCase: hasCase, subscribed: subscribed,
+              category: category, country: country, priorityDate: priorityDate, subtype: subtype,
+            });
             if (navigator.sendBeacon) navigator.sendBeacon('/api/beacon', payload);
           };
           document.addEventListener('visibilitychange', function () {
