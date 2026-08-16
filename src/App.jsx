@@ -14668,6 +14668,21 @@ const useSubscribed = () => {
 const announceSubscribed = () => {
   try { window.dispatchEvent(new Event('gc-subscribed')); } catch { /* noop */ }
 };
+// Shared nickname state, mirrors useSubscribed — set once at signup, read by the
+// homepage greeting bar.
+const useNickname = () => {
+  const [name, setName] = useState(() => {
+    try { return window.localStorage.getItem('gc_nickname') || ''; } catch { return ''; }
+  });
+  useEffect(() => {
+    const h = () => {
+      try { setName(window.localStorage.getItem('gc_nickname') || ''); } catch { /* noop */ }
+    };
+    window.addEventListener('gc-subscribed', h);
+    return () => window.removeEventListener('gc-subscribed', h);
+  }, []);
+  return name;
+};
 
 // ============================================================
 // SubscribeModal — the entire subscribe flow in one dialog: email + email language
@@ -14679,6 +14694,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
   const { lang } = useLang();
   const isSubscribed = useSubscribed();
   const [email, setEmail] = useState('');
+  const [nickname, setNickname] = useState('');
   // The two inline entry points hand off to this modal when the case is missing
   // subtype/birth (see openSubscribeModal). Carry over whatever they already typed
   // so the handoff costs one tap, not a retype — only on open, never overwriting
@@ -14784,6 +14800,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
+          name: nickname.trim(),
           userCase: finalUserCase,
           alerts,
           language: subLang,
@@ -14794,6 +14811,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
         try {
           window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase());
           window.sessionStorage.setItem('gc_subNudgeShown', '1');
+          if (nickname.trim()) window.localStorage.setItem('gc_nickname', nickname.trim());
         } catch { /* noop */ }
         announceSubscribed();
         // Updating an already-confirmed subscriber sends no confirmation mail — saying
@@ -14930,6 +14948,14 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                   : (lang === 'en' ? 'Something went wrong — try again' : lang === 'tw' ? '出錯了，再試一次' : '出错了，再试一次')}
               </div>
             )}
+            <input
+              type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
+              placeholder={lang === 'en' ? 'What should we call you? (optional)' : lang === 'tw' ? '怎麼稱呼您（可選）' : '怎么称呼您（可选）'}
+              style={{
+                width: '100%', fontSize: '13px', padding: '9px 10px', boxSizing: 'border-box',
+                border: '1px solid var(--gc-rule)', borderRadius: '4px',
+                background: 'var(--gc-paper)', color: 'var(--gc-ink)', marginTop: '6px',
+              }} />
             {catHasSubtype && (
               <div style={{ marginTop: '8px' }}>
                 {subtypeKnown && !editSubtype ? (
@@ -15904,6 +15930,7 @@ export default function App() {
   // Reset button: two-stage confirmation. null = idle, number = timestamp of first click.
   // After second click within 5s, wipe all gc_* localStorage keys + reload.
   const [confirmReset, setConfirmReset] = useState(null);
+  const nicknameGreeting = useNickname();
 
   const t = translations[lang];
 
@@ -16725,6 +16752,16 @@ export default function App() {
               </div>
             </div>
           </header>
+
+          {nicknameGreeting && (
+            <div style={{ width: '100%', background: 'var(--gc-paper-soft)', borderBottom: '1px solid var(--gc-rule-soft)' }}>
+              <div className="max-w-3xl mx-auto" style={{ padding: '6px 12px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--gc-ink-soft)' }}>
+                  {lang === 'en' ? <>Hi, <b>{nicknameGreeting}</b></> : <><b>{nicknameGreeting}</b>，你好</>}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Time Machine banner — only shown when viewing a non-default month */}
           {isTimeMachineActive && (

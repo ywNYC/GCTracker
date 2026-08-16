@@ -459,6 +459,28 @@ postgc 一键去向。均 localStorage 防重复。聚合门槛：时间线中�
 
 ---
 
+## 第 17 轮（2026-08-16）：订阅弹窗加可选昵称字段 + 主页问候（已推 main）
+
+**发现**：`/api/subscribe`（`functions/api/subscribe.js`）早就接收并落盘 `name` 字段
+（trim 后截 50 字），但 `SubscribeModal` 的 POST body 一直没带这个字段——后端功能建好后
+前端没接上，所以生产 KV 里现存记录的 `name` 全是空字符串。
+
+**改了什么**：
+- `SubscribeModal`——新增 `nickname` state，邮箱框下面加一行可选文本框（占位「怎么称呼您
+  （可选）」，不填不挡订阅），POST body 补 `name: nickname.trim()`。只碰了这一个入口；
+  SmartAlerts/InlineSubscribeCTA 两条直接 POST 的路径没有昵称框，仍不带 `name` 字段
+  （不在这轮范围内，需要的话是独立一轮）。
+- 订阅成功后把昵称写进 `localStorage.gc_nickname`（新增 `useNickname` hook，跟
+  `useSubscribed` 同一模式，靠 `gc-subscribed` 事件刷新）。
+- Header 下方新增一条问候条，`gc_nickname` 有值时显示「Jack，你好」/`Hi, Jack`，无值不渲染。
+
+**验证方式**：Playwright 起本地 dev server 截图两处——表单长相、以及预置
+`localStorage.gc_nickname='Jack'` 后主页的问候条效果——用户看过截图后确认推送。
+
+**状态**：已 commit 并推 main，Cloudflare Pages 会自动部署。
+
+---
+
 ## 别重踩的坑
 
 - **推 `main` 即上线**（Cloudflare Pages 自动部署），推送前先问用户。改动走功能分支 + PR。
