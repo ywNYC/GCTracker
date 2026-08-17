@@ -86,6 +86,7 @@ export async function onRequestGet(context) {
       userCase: record.userCase,
       alerts: record.alerts,
       language: record.language,
+      name: record.name,
     });
   } catch (err) {
     console.error('Welcome email error after confirm:', err);

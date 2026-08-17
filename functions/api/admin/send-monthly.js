@@ -182,6 +182,7 @@ export async function onRequestPost(context) {
           siteUrl,
           unsubscribeUrl,
           subtypeToken,
+          name: record.name,
         });
 
         const resp = await fetch('https://api.resend.com/emails', {

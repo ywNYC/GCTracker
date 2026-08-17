@@ -67,8 +67,11 @@ export async function onRequestPost(context) {
   // one of the two must be present.
   const subtype = body.subtype != null ? String(body.subtype).trim() : '';
   const birthYearMonth = body.birthYearMonth != null ? String(body.birthYearMonth).trim() : '';
+  // Optional, unlike subtype/birthYearMonth — a blank name is never "nothing to
+  // update" on its own, only alongside the other two being empty too.
+  const name = body.name != null ? String(body.name).trim().slice(0, 50) : '';
   if (!email || !token) return json({ error: 'Missing email or token' }, 400);
-  if (!subtype && !birthYearMonth) return json({ error: 'Nothing to update' }, 400);
+  if (!subtype && !birthYearMonth && !name) return json({ error: 'Nothing to update' }, 400);
   if (birthYearMonth && !/^\d{4}-\d{2}$/.test(birthYearMonth)) {
     return json({ error: 'Invalid birthYearMonth format' }, 400);
   }
@@ -96,6 +99,9 @@ export async function onRequestPost(context) {
   if (birthYearMonth) {
     record.userCase.birthYearMonth = birthYearMonth;
   }
+  if (name) {
+    record.name = name;
+  }
   record.lastUpdated = new Date().toISOString();
 
   try {
@@ -105,5 +111,5 @@ export async function onRequestPost(context) {
     return json({ error: 'Save failed, try again' }, 500);
   }
 
-  return json({ success: true, subtype: subtype || record.userCase.subtype, birthYearMonth: birthYearMonth || record.userCase.birthYearMonth });
+  return json({ success: true, subtype: subtype || record.userCase.subtype, birthYearMonth: birthYearMonth || record.userCase.birthYearMonth, name: record.name });
 }

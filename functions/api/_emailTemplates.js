@@ -157,7 +157,7 @@ const getCopy = (lang) => {
 
 // ---- Welcome Email Template ----
 
-export const renderWelcomeEmail = ({ email, userCase, alerts, language, siteUrl, unsubscribeUrl }) => {
+export const renderWelcomeEmail = ({ email, userCase, alerts, language, siteUrl, unsubscribeUrl, name }) => {
   const lang = language === 'en' ? 'en' : 'zh';
   const t = getCopy(lang);
 
@@ -165,6 +165,13 @@ export const renderWelcomeEmail = ({ email, userCase, alerts, language, siteUrl,
   const country = formatCountry(userCase?.country);
   const priorityDate = escapeHtml(userCase?.priorityDate) || '—';
   const alertsLine = formatAlerts(alerts, lang);
+  // Optional — most records predate this field. Falls back to the unpersonalized
+  // headline/lede when absent, same copy as before this field existed.
+  const plainName = (name || '').trim();
+  const greetingText = plainName ? (lang === 'en' ? `Hi ${plainName},\n\n` : `${plainName}，你好：\n\n`) : '';
+  const greetingHtml = plainName
+    ? `<div style="font-size:14px; color:#2a2a2a; margin-bottom:6px;">${lang === 'en' ? `Hi ${escapeHtml(plainName)},` : `${escapeHtml(plainName)}，你好：`}</div>`
+    : '';
   // Same deep link the monthly email uses — lands the subscriber on their own case,
   // not the first-run picker.
   const caseUrl = buildCaseUrl(siteUrl, userCase);
@@ -175,7 +182,7 @@ export const renderWelcomeEmail = ({ email, userCase, alerts, language, siteUrl,
 
   // Plain text version (for clients that don't render HTML, and better deliverability)
   const text = lang === 'en'
-    ? `${t.headline}
+    ? `${greetingText}${t.headline}
 
 ${t.lede.replace(/<[^>]+>/g, '')}
 
@@ -196,7 +203,7 @@ Unsubscribe: ${unsubscribeUrl}
 
 Green Card Tracker · JMJ · 2026
 Data source: travel.state.gov`
-    : `${t.headline}
+    : `${greetingText}${t.headline}
 
 感谢订阅。我们会在每月 Visa Bulletin 发布、且你的类别出现变化时，第一时间发邮件提醒你。
 
@@ -249,6 +256,7 @@ ${emailHead(subject)}
         <tr>
           <td class="px" style="padding:28px 40px 8px;">
             <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:#8b3a3a; text-transform:uppercase; margin-bottom:8px;">${t.eyebrow}</div>
+            ${greetingHtml}
             <div class="headline" style="font-family:Georgia,serif; font-size:26px; line-height:1.25; font-weight:400; letter-spacing:-0.01em; margin-bottom:16px; color:#1a1a1a;">${escapeHtml(t.headline)}</div>
             <div style="font-size:14px; line-height:1.7; color:#2a2a2a;">${t.lede}</div>
           </td>
@@ -708,9 +716,16 @@ const buildCaseUrl = (siteUrl, userCase, { email, subtypeToken } = {}) => {
   return `${base}/?${p.toString()}`;
 };
 
-export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, notices, noticeI18n, bulletinMonthLabel, language, siteUrl, unsubscribeUrl, subtypeToken }) => {
+export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, notices, noticeI18n, bulletinMonthLabel, language, siteUrl, unsubscribeUrl, subtypeToken, name }) => {
   const lang = language === 'en' ? 'en' : 'zh';
   const caseUrl = buildCaseUrl(siteUrl, userCase, { email, subtypeToken });
+  // Optional — most records predate this field. Absent name falls back to the
+  // unpersonalized headline, same as before this field existed.
+  const plainName = (name || '').trim();
+  const greetingText = plainName ? (lang === 'en' ? `Hi ${plainName},\n\n` : `${plainName}，你好：\n\n`) : '';
+  const greetingHtml = plainName
+    ? `<div style="font-size:13px; color:#2a2a2a; margin-bottom:4px;">${lang === 'en' ? `Hi ${escapeHtml(plainName)},` : `${escapeHtml(plainName)}，你好：`}</div>`
+    : '';
 
   const category = formatCategory(userCase?.category);
   const country = formatCountry(userCase?.country);
@@ -981,7 +996,7 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   }
 
   const text = [
-    headline,
+    `${greetingText}${headline}`,
     '',
     lang === 'en' ? 'YOUR CASE' : '你的案子',
     `${lang === 'en' ? 'Category' : '类别'}: ${category}`,
@@ -1062,6 +1077,7 @@ ${emailHead(subject)}
         <tr>
           <td class="px" style="padding:28px 40px 8px;">
             <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:${eyebrowColor}; text-transform:uppercase; margin-bottom:8px;">${lang === 'en' ? '— Bulletin Update —' : '— 排期更新 —'}</div>
+            ${greetingHtml}
             <div class="headline" style="font-family:Georgia,serif; font-size:26px; line-height:1.3; font-weight:400; letter-spacing:-0.01em; margin-bottom:6px; color:#1a1a1a;">${headlineHtml}</div>
           </td>
         </tr>

@@ -511,6 +511,121 @@ postgc 一键去向。均 localStorage 防重复。聚合门槛：时间线中�
 
 ---
 
+## 第 19 轮（2026-08-16 晚）：姓名字段补到第二弹窗 + 邮件问候（未推送，纯本地）
+
+**起因**：用户发现第 17 轮只把 `name` 接到了 `SubscribeModal`（订阅时一次性问），但
+`SubtypeUpdateModal`（老订阅者靠月度邮件深链/本机已订阅标记补填 subtype/生日的那个
+「补充信息」弹窗）和邮件模板都还没接上，问「是用户没填对吧」得到否定回答后，要求
+补全 + 全流程 dry run 出截图。
+
+**改了什么**：
+- `src/App.jsx` `SubtypeUpdateModal`——新增 `currentName` prop（从 App() 的
+  `nicknameGreeting` 传入）和 `needsName = (needsSubtype || needsBirth) && !currentName`。
+  **刻意没把 needsName 单独设成弹窗触发条件**——只在 subtype/birth 任一缺失、弹窗本来
+  就要弹的时候顺带问一次，不然会对着几乎所有第 17 轮之前注册的老订阅者（同一批
+  `needsBirth` 覆盖的人）单独弹一次新弹窗，太打扰。这是本轮唯一需要用户后续确认的
+  设计判断，其余都是照抄第 17 轮已验证过的模式。保存成功后写
+  `localStorage.gc_nickname` 并 `announceSubscribed()`，让主页问候条不用刷新就更新。
+- 后端三处透传 `name`：`functions/api/update-subtype.js`（token 深链路径，新增可选
+  `name` 字段，写入 `record.name`，允许"只改名字、不改 subtype/birth"这种请求）、
+  `functions/api/confirm.js`（欢迎邮件调用带上 `record.name`）、
+  `functions/api/admin/send-monthly.js`（月度邮件调用带上 `record.name`）。
+- `functions/api/_emailTemplates.js`——`renderWelcomeEmail`/`renderMonthlyUpdateEmail`
+  新增可选 `name` 参数，有值时在正文标题上方加一行「Jack，你好：」/「Hi Jack,」，
+  中英文版、HTML/纯文本版都覆盖；无值时完全回退成改动前的文案，不影响没填过名字的
+  存量订阅者收到的邮件。
+
+**验证方式**：本地 `npm run dev`（纯 vite，不含 Pages Functions，所以 `/api/*` 提交
+本身没有实测，只测到前端把请求 body 拼对为止）+ Playwright 用
+`localStorage`/`sessionStorage` 预置状态触发四个界面截图：第二弹窗（SIJS/1995年6月/
+Jack 三项都填）、主页问候条、订阅弹窗（email+Jack 已填）、`renderWelcomeEmail` 直接
+渲染成 HTML 截图（不经 Resend，没有真实发信）。四张图发给用户确认过。
+
+**状态**：**未 commit、未推送**——`git status` 只有源码 diff，没有构建产物变化
+（跑 dev server 顺带弄脏的 `node_modules/.vite/deps/_metadata.json` 已 `git checkout`
+撤销）。下一步等用户看完确认再 commit + push（推 main 即上线，按老规矩先问）。
+
+---
+
+## 第 20 轮（2026-08-16 晚，接第 19 轮）：看完截图后两处追加——可递件状态加重 + 补两个对比场景
+
+**起因**：用户看完第 19 轮四张图后指出两点：（1）只看到「补充小信息」这个第二弹窗，
+没看过用户第一次进来时的引导弹窗长什么样；（2）案子卡片里「现在可递件」这行看着
+不够重——变成可递件是个有仪式感的时刻，配色/字重该更突出；同时想看还没排到、
+仍要等的案子首页和邮件长什么样做对比。
+
+**改了什么**：
+- `src/App.jsx` 案子卡片「现在可递件」那行（`eligibleLayout` 分支里，约第 4805-4822
+  行）——字号 22px→25px，字重 700→800，颜色从 `var(--gc-green)`（#0e4d2e）换成
+  `var(--gc-green-ink)`（#0a3a23，主题里本来就有的更深一档），对勾图标 20px→23px。
+  只挪用已有设计 token，没有新造颜色。**没改的两处**：`bigSubLabel`（第 4690 行）和
+  第 10411 行的另一处「现在可递件」文案是分享卡/其他组件，用户这次指的是首页案子卡片
+  这一处，没让我扩大范围就没碰。
+
+**验证方式（纯截图对比，代码未跑单元测试，这类视觉调整本来也没有）**：
+- 首次进入引导弹窗：清空全部 localStorage/sessionStorage 只留语言选择，重新加载，
+  截到「简单告诉我你的情况」两选项卡片。
+- 可递件样式：用第 19 轮同一个 EB4-菲律宾-2021/3/15 案子（本来就是可递件状态）重截，
+  跟第 19 轮那张图对比能看出字更大更深。
+- 对比场景：换成 EB3-印度-优先日 2023-01-01（真实表A截止日 2014-01-01，差 9 年），
+  首页显示「还需要约 14.7 年」+ 进度条 + 图表；对应邮件用 `functions/api/_gcMath.js`
+  的 `computeCaseUpdate()` 喂真实 `public/history.json` 的最近两期公告数据算出
+  `update` 对象，再交给 `renderMonthlyUpdateEmail` 渲染——这条路径没有手搓假数据，
+  走的是生产同一套计算逻辑，只是喂了一个虚构优先日。
+
+**状态**：本轮所有改动仍是**未 commit、未推送**，跟第 19 轮一起等用户最终拍板。
+`node_modules/.vite/deps/_metadata.json` 再次因跑 dev server 变脏，已 `git checkout` 撤销。
+
+---
+
+## 第 21 轮（2026-08-17，接第 19/20 轮）：名字字段挪到 OnboardingModal 首屏，不用等订阅
+
+**起因**：用户看完第 19 轮「补充小信息」弹窗截图后说没看到"第一次点进去"那个更早的
+弹窗（`mode: 'choose'` 那屏本身没有字段，用户其实想看的是点「我已在排期中」之后那个
+字段很多的表单，`OnboardingModal` 的 `mode: 'form'`），并且明确要求在"绿卡类别"这一行
+左边加一个"你的名字"输入框试一下。
+
+**改了什么（全部在 `src/App.jsx` 的 `OnboardingModal` 里）**：
+- `form` state 新增 `name: ''`（第 14137 行附近），可选，不参与 Start 按钮的必填校验链。
+- 原来"绿卡类别"是独占一行的 `<div>`，现在改成 `gridTemplateColumns: '1fr 1fr'` 两栏
+  （跟下面"优先日 + 出生年月"那行同款布局）：左栏"你的名字"文本框（占位"可选"），
+  右栏挪过去的原有 `CategoryDropdown` + `SubtypeChips`（chips 保持嵌在右栏内、紧跟在
+  下拉之下，没有被拆到栏外——避免因为改成两栏布局而拉大 chips 与下拉之间的间距）。
+- Start 按钮点击时：`form.name` 有值就先写 `localStorage.gc_nickname` 并调用
+  `announceSubscribed()`（跟 `SubscribeModal`/`SubtypeUpdateModal` 存名字是同一个
+  store、同一个刷新信号），再用解构 `const { name: _formName, ...caseOnly } = form`
+  把 `name` 从对象里摘出去，`onComplete(caseOnly)` 传给上层——**刻意不让 name 混进
+  `userCase`**：`userCase` 会被 `writeUserCaseToURL`/`beacon` 按白名单字段读取，虽然
+  两处都不会因为多一个陌生字段就出错，但姓名概念上是身份信息不是案子数据，跟第 17
+  轮"nickname 独立于 userCase"的设计保持一致。
+- 三语翻译新增 `yourName`/`yourNamePlaceholder`（en/zh/tw 各一份，占位统一是"可选"/
+  "Optional"）。
+
+**已知粗糙点，没进一步打磨**：EB2 这类 subtype 选项文案较长（如"雇主担保 PERM"），
+挤在两栏布局的右半栏里换行会比原来单栏宽版更容易折行——用户这轮只要求"试一下"这个
+布局，没要求同步优化 chips 折行，先如实截图给用户看，没有自作主张改字号或改成单独一行。
+
+**验证方式**：本地 dev server + Playwright，清空 localStorage 只留语言选择，点「我已在
+排期中」进入 `mode: 'form'`，在新输入框填 "Jack" 后截图确认布局。未打开类别下拉验证
+selected 态（跟这次请求无关，没有必要多花一轮截图）。
+
+**状态**：**未 commit、未推送**，跟第 19/20 轮一起。
+
+---
+
+## 第 22 轮（2026-08-17）：主页问候条字号太小，加大加深
+
+**改了什么**：`src/App.jsx` 主页问候条（约第 16812-16820 行，`nicknameGreeting` 那个
+条）——字号 12px→16px，颜色 `var(--gc-ink-soft)`（灰）→`var(--gc-ink)`（正文黑），
+上下 padding 6px→9px 配合更大字号。同样只挪用已有 token，没造新颜色。
+
+**验证方式**：本地 dev server + Playwright，用第 19 轮同一个 EB4-菲律宾-Jack 案子重截，
+"Jack，你好"明显比之前大一号、更黑。
+
+**状态**：**未 commit、未推送**，跟第 19-21 轮一起。
+
+---
+
 ## 别重踩的坑
 
 - **推 `main` 即上线**（Cloudflare Pages 自动部署），推送前先问用户。改动走功能分支 + PR。

@@ -116,7 +116,7 @@ export async function buildUnsubscribeUrl(email, env) {
 // ---- Resend ----
 
 // Sent by /api/confirm once the recipient has proved they own the address.
-export async function sendWelcomeEmail({ env, email, userCase, alerts, language }) {
+export async function sendWelcomeEmail({ env, email, userCase, alerts, language, name }) {
   if (!env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY not set, skipping welcome email');
     return { skipped: true };
@@ -136,6 +136,7 @@ export async function sendWelcomeEmail({ env, email, userCase, alerts, language 
     language,
     siteUrl,
     unsubscribeUrl,
+    name,
   });
 
   const resp = await fetch('https://api.resend.com/emails', {

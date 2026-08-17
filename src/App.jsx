@@ -4807,17 +4807,17 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                     {lang === 'en' ? 'Status · ' : lang === 'tw' ? '狀態 · ' : '状态 · '}{activeTableLabel}
                   </div>
                   <div className="gc-serif" style={{
-                    fontSize: '22px',
-                    fontWeight: 700,
-                    color: 'var(--gc-green)',
+                    fontSize: '25px',
+                    fontWeight: 800,
+                    color: 'var(--gc-green-ink)',
                     letterSpacing: '-0.01em',
                     lineHeight: 1.1,
                     marginTop: '2px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '7px',
                   }}>
-                    <CheckCircle2 size={20} strokeWidth={2.2} />
+                    <CheckCircle2 size={23} strokeWidth={2.5} />
                     <span>{lang === 'en' ? 'Can file now' : lang === 'tw' ? '現在可遞件' : '现在可递件'}</span>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px', lineHeight: 1.4 }}>
@@ -14143,6 +14143,9 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     role: null, // 'petitioner' | 'beneficiary' — must be explicitly chosen, same as inUS
     petitionerStatus: 'USC',
     subtype: null,
+    name: '', // optional, never blocks Start — stripped out of the object handed to onComplete,
+              // saved straight to gc_nickname instead (same store SubscribeModal's nickname field
+              // and the SubtypeUpdateModal backfill use), so it's never part of userCase itself.
   });
 
   const countries = [
@@ -14164,6 +14167,8 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       country: 'Country of chargeability',
       category: 'Category',
       categoryPlaceholder: 'Select category',
+      yourName: 'Your name',
+      yourNamePlaceholder: 'Optional',
       pd: 'Priority Date',
       dob: 'Your Date of Birth',
       inUS: 'Are you currently in the US?',
@@ -14188,6 +14193,8 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       country: '国籍类别',
       category: '绿卡类别',
       categoryPlaceholder: '选择类别',
+      yourName: '你的名字',
+      yourNamePlaceholder: '可选',
       pd: '优先日',
       dob: '你的出生年月',
       inUS: '你目前在美国境内吗？',
@@ -14212,6 +14219,8 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       country: '國籍類別',
       category: '綠卡類別',
       categoryPlaceholder: '選擇類別',
+      yourName: '你的名字',
+      yourNamePlaceholder: '可選',
       pd: '優先日',
       dob: '你的出生年月',
       inUS: '你目前在美國境內嗎？',
@@ -14472,26 +14481,39 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               </div>
             </div>
 
-            {/* Category */}
-            <div>
-              <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.category}</div>
-              <CategoryDropdown value={form.category}
-                placeholder={t.categoryPlaceholder}
-                triggerStyle={{
-                  padding: '9px 9px', background: 'var(--gc-paper-soft)',
-                  ...(categoryAttempted && !form.category ? { border: '1px solid var(--gc-red)' } : {}),
-                }}
-                onChange={(newCat) => {
-                  if (newCat === form.category) return;
-                  const isF2C = newCat === 'F2A' || newCat === 'F2B';
-                  const newPetitioner = isF2C ? 'LPR' : 'USC';
-                  setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: defaultSubtype(newCat) });
-                  setSubtypeAttempted(false);
-                  setCategoryAttempted(false);
-                }} />
-              <SubtypeChips userCase={form} setUserCase={setForm}
-                required={!!CATEGORY_SUBTYPES[form.category]}
-                error={subtypeAttempted && !!CATEGORY_SUBTYPES[form.category] && !form.subtype} />
+            {/* Name (optional) + Category — side by side, same row pattern as PD/DOB below */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.yourName}</div>
+                <input type="text" value={form.name || ''}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder={t.yourNamePlaceholder}
+                  style={{
+                    width: '100%', boxSizing: 'border-box', padding: '9px 9px', fontSize: '13px',
+                    background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule)',
+                    borderRadius: 'var(--gc-radius-sm)', color: 'var(--gc-ink)',
+                  }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.category}</div>
+                <CategoryDropdown value={form.category}
+                  placeholder={t.categoryPlaceholder}
+                  triggerStyle={{
+                    padding: '9px 9px', background: 'var(--gc-paper-soft)',
+                    ...(categoryAttempted && !form.category ? { border: '1px solid var(--gc-red)' } : {}),
+                  }}
+                  onChange={(newCat) => {
+                    if (newCat === form.category) return;
+                    const isF2C = newCat === 'F2A' || newCat === 'F2B';
+                    const newPetitioner = isF2C ? 'LPR' : 'USC';
+                    setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: defaultSubtype(newCat) });
+                    setSubtypeAttempted(false);
+                    setCategoryAttempted(false);
+                  }} />
+                <SubtypeChips userCase={form} setUserCase={setForm}
+                  required={!!CATEGORY_SUBTYPES[form.category]}
+                  error={subtypeAttempted && !!CATEGORY_SUBTYPES[form.category] && !form.subtype} />
+              </div>
             </div>
 
             {/* Priority Date + Date of Birth — side by side; DOB required, no default */}
@@ -14630,7 +14652,15 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                     setDobAttempted(true);
                     return;
                   }
-                  onComplete(form);
+                  // Name lives in gc_nickname (same store SubscribeModal's nickname field and
+                  // the SubtypeUpdateModal backfill write to), not in userCase — it's identity,
+                  // not case data, and userCase is what gets serialized into shareable URLs.
+                  if (form.name && form.name.trim()) {
+                    try { window.localStorage.setItem('gc_nickname', form.name.trim()); } catch { /* noop */ }
+                    announceSubscribed(); // homepage greeting bar picks it up immediately
+                  }
+                  const { name: _formName, ...caseOnly } = form;
+                  onComplete(caseOnly);
                 }}
                 style={{
                   flex: 1, padding: '10px 14px', fontSize: '13px', fontWeight: 700,
@@ -15079,10 +15109,11 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
 // renders whichever field(s) are actually missing and posts the answer. Dismissible:
 // skipping costs nothing, the app works fine without these on file.
 // ============================================================
-const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone, onClose }) => {
+const SubtypeUpdateModal = ({ userCase, email, token, currentName = '', theme = 'passport', onDone, onClose }) => {
   const { lang } = useLang();
   const [pick, setPick] = useState(userCase.subtype || null);
   const [birthYM, setBirthYM] = useState(userCase.birthYearMonth || '');
+  const [name, setName] = useState('');
   const [status, setStatus] = useState(''); // '' | 'loading' | 'error'
   const [subtypeAttempted, setSubtypeAttempted] = useState(false);
   const [dobAttempted, setDobAttempted] = useState(false);
@@ -15090,6 +15121,11 @@ const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone
   const opts = CATEGORY_SUBTYPES[userCase.category];
   const needsSubtype = !!opts && !userCase.subtype;
   const needsBirth = !userCase.birthYearMonth;
+  // Only ever offered opportunistically, alongside subtype/birth — not a trigger
+  // on its own, since that would pop this modal for nearly every subscriber who
+  // predates the name field (same population as needsBirth). Optional: never
+  // blocks save the way needsSubtype/needsBirth do.
+  const needsName = (needsSubtype || needsBirth) && !currentName;
   if (!needsSubtype && !needsBirth) return null;
 
   const save = async () => {
@@ -15104,14 +15140,15 @@ const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone
       // enough to upsert that same address through the normal subscribe path — no
       // token to mint, and /api/subscribe preserves the alerts/language already on
       // file when the request omits them.
+      const trimmedName = name.trim();
       const merged = {
         ...userCase,
         ...(needsSubtype ? { subtype: pick } : {}),
         ...(needsBirth ? { birthYearMonth: birthYM } : {}),
       };
       const body = token
-        ? { email, token, ...(needsSubtype ? { subtype: pick } : {}), ...(needsBirth ? { birthYearMonth: birthYM } : {}) }
-        : { email, userCase: merged };
+        ? { email, token, ...(needsSubtype ? { subtype: pick } : {}), ...(needsBirth ? { birthYearMonth: birthYM } : {}), ...(needsName && trimmedName ? { name: trimmedName } : {}) }
+        : { email, userCase: merged, ...(needsName && trimmedName ? { name: trimmedName } : {}) };
       const resp = await fetch(token ? '/api/update-subtype' : '/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -15119,7 +15156,11 @@ const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone
       });
       const result = await resp.json().catch(() => ({ success: false }));
       if (resp.ok && result.success) {
-        onDone({ subtype: needsSubtype ? pick : userCase.subtype, birthYearMonth: needsBirth ? birthYM : userCase.birthYearMonth });
+        if (needsName && trimmedName) {
+          try { window.localStorage.setItem('gc_nickname', trimmedName); } catch { /* noop */ }
+          announceSubscribed(); // refreshes the homepage greeting bar without a reload
+        }
+        onDone({ subtype: needsSubtype ? pick : userCase.subtype, birthYearMonth: needsBirth ? birthYM : userCase.birthYearMonth, name: needsName && trimmedName ? trimmedName : currentName });
       } else {
         setStatus('error');
       }
@@ -15177,6 +15218,20 @@ const SubtypeUpdateModal = ({ userCase, email, token, theme = 'passport', onDone
                 {lang === 'en' ? 'Please pick your date of birth' : lang === 'tw' ? '請選擇出生年月' : '请选择出生年月'}
               </div>
             )}
+          </div>
+        )}
+        {needsName && (
+          <div style={{ marginTop: needsSubtype || needsBirth ? '10px' : '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
+              {lang === 'en' ? 'What should we call you? (optional)' : lang === 'tw' ? '怎麼稱呼您（可選）' : '怎么称呼您（可选）'}
+            </div>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+              placeholder={lang === 'en' ? 'e.g. Jack' : '比如 小明'}
+              style={{
+                width: '100%', fontSize: '13px', padding: '8px 10px', boxSizing: 'border-box',
+                border: '1px solid var(--gc-rule)', borderRadius: '4px',
+                background: 'var(--gc-paper)', color: 'var(--gc-ink)',
+              }} />
           </div>
         )}
         {status === 'error' && (
@@ -15981,6 +16036,7 @@ export default function App() {
           userCase={userCase}
           email={subtypePrompt.email}
           token={subtypePrompt.token}
+          currentName={nicknameGreeting}
           theme={theme}
           onDone={({ subtype, birthYearMonth }) => {
             setUserCase({ ...userCase, subtype, birthYearMonth });
@@ -16755,8 +16811,8 @@ export default function App() {
 
           {nicknameGreeting && (
             <div style={{ width: '100%', background: 'var(--gc-paper-soft)', borderBottom: '1px solid var(--gc-rule-soft)' }}>
-              <div className="max-w-3xl mx-auto" style={{ padding: '6px 12px' }}>
-                <p style={{ fontSize: '12px', color: 'var(--gc-ink-soft)' }}>
+              <div className="max-w-3xl mx-auto" style={{ padding: '9px 12px' }}>
+                <p style={{ fontSize: '16px', color: 'var(--gc-ink)' }}>
                   {lang === 'en' ? <>Hi, <b>{nicknameGreeting}</b></> : <><b>{nicknameGreeting}</b>，你好</>}
                 </p>
               </div>
