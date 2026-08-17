@@ -511,7 +511,7 @@ postgc 一键去向。均 localStorage 防重复。聚合门槛：时间线中�
 
 ---
 
-## 第 19 轮（2026-08-16 晚）：姓名字段补到第二弹窗 + 邮件问候（未推送，纯本地）
+## 第 19 轮（2026-08-16 晚）：姓名字段补到第二弹窗 + 邮件问候（已推 main）
 
 **起因**：用户发现第 17 轮只把 `name` 接到了 `SubscribeModal`（订阅时一次性问），但
 `SubtypeUpdateModal`（老订阅者靠月度邮件深链/本机已订阅标记补填 subtype/生日的那个
@@ -541,9 +541,8 @@ postgc 一键去向。均 localStorage 防重复。聚合门槛：时间线中�
 Jack 三项都填）、主页问候条、订阅弹窗（email+Jack 已填）、`renderWelcomeEmail` 直接
 渲染成 HTML 截图（不经 Resend，没有真实发信）。四张图发给用户确认过。
 
-**状态**：**未 commit、未推送**——`git status` 只有源码 diff，没有构建产物变化
-（跑 dev server 顺带弄脏的 `node_modules/.vite/deps/_metadata.json` 已 `git checkout`
-撤销）。下一步等用户看完确认再 commit + push（推 main 即上线，按老规矩先问）。
+**状态**：已 commit 并推 main（跟第 20/21/22 轮合并成一个 commit `51b50ac` 一起推的，
+用户看完全部四轮截图后才一次性拍板），Cloudflare Pages 会自动部署。
 
 ---
 
@@ -573,7 +572,7 @@ Jack 三项都填）、主页问候条、订阅弹窗（email+Jack 已填）、`
   `update` 对象，再交给 `renderMonthlyUpdateEmail` 渲染——这条路径没有手搓假数据，
   走的是生产同一套计算逻辑，只是喂了一个虚构优先日。
 
-**状态**：本轮所有改动仍是**未 commit、未推送**，跟第 19 轮一起等用户最终拍板。
+**状态**：已 commit 并推 main（`51b50ac`，跟第 19/21/22 轮合并一次推送）。
 `node_modules/.vite/deps/_metadata.json` 再次因跑 dev server 变脏，已 `git checkout` 撤销。
 
 ---
@@ -609,7 +608,7 @@ Jack 三项都填）、主页问候条、订阅弹窗（email+Jack 已填）、`
 排期中」进入 `mode: 'form'`，在新输入框填 "Jack" 后截图确认布局。未打开类别下拉验证
 selected 态（跟这次请求无关，没有必要多花一轮截图）。
 
-**状态**：**未 commit、未推送**，跟第 19/20 轮一起。
+**状态**：已 commit 并推 main（`51b50ac`，跟第 19/20/22 轮合并一次推送）。
 
 ---
 
@@ -622,7 +621,7 @@ selected 态（跟这次请求无关，没有必要多花一轮截图）。
 **验证方式**：本地 dev server + Playwright，用第 19 轮同一个 EB4-菲律宾-Jack 案子重截，
 "Jack，你好"明显比之前大一号、更黑。
 
-**状态**：**未 commit、未推送**，跟第 19-21 轮一起。
+**状态**：已 commit 并推 main（`51b50ac`，跟第 19-21 轮合并一次推送）。
 
 ---
 
