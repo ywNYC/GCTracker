@@ -15032,7 +15032,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                 {subtypeKnown && !editSubtype ? (
                   <div className="flex items-center justify-between" style={{ fontSize: '11.5px', color: 'var(--gc-ink-soft)' }}>
                     <span>
-                      {lang === 'en' ? 'Subtype: ' : lang === 'tw' ? '細分：' : '细分：'}
+                      {lang === 'en' ? 'Subtype: ' : lang === 'tw' ? '簽證類型細分：' : '签证类型细分：'}
                       <b>{subtypeLabel(userCase.category, userCase.subtype || subtypePick, lang)}</b>
                     </span>
                     <button type="button" onClick={() => setEditSubtype(true)}
