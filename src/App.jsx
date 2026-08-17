@@ -14481,7 +14481,10 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               </div>
             </div>
 
-            {/* Name (optional) + Category — side by side, same row pattern as PD/DOB below */}
+            {/* Name (optional) + Date of Birth — side by side. Category moves to its own
+                full-width row below so its subtype chips (up to 3, some with long CJK
+                labels like "雇主担保 PERM") get the full row width instead of wrapping
+                to 3 lines in a half-width column. */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div style={{ minWidth: 0 }}>
                 <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.yourName}</div>
@@ -14495,39 +14498,6 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                   }} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.category}</div>
-                <CategoryDropdown value={form.category}
-                  placeholder={t.categoryPlaceholder}
-                  triggerStyle={{
-                    padding: '9px 9px', background: 'var(--gc-paper-soft)',
-                    ...(categoryAttempted && !form.category ? { border: '1px solid var(--gc-red)' } : {}),
-                  }}
-                  onChange={(newCat) => {
-                    if (newCat === form.category) return;
-                    const isF2C = newCat === 'F2A' || newCat === 'F2B';
-                    const newPetitioner = isF2C ? 'LPR' : 'USC';
-                    setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: defaultSubtype(newCat) });
-                    setSubtypeAttempted(false);
-                    setCategoryAttempted(false);
-                  }} />
-                <SubtypeChips userCase={form} setUserCase={setForm}
-                  required={!!CATEGORY_SUBTYPES[form.category]}
-                  error={subtypeAttempted && !!CATEGORY_SUBTYPES[form.category] && !form.subtype} />
-              </div>
-            </div>
-
-            {/* Priority Date + Date of Birth — side by side; DOB required, no default */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              <div style={{ minWidth: 0 }}>
-                <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.pd}</div>
-                <DateDropdown value={form.priorityDate} allowEmpty minYear={2010} newestYearFirst
-                  triggerStyle={{
-                    padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)',
-                    ...(pdAttempted && !form.priorityDate ? { border: '1px solid var(--gc-red)' } : {}),
-                  }}
-                  onChange={(pd) => { setForm({ ...form, priorityDate: pd }); setPdAttempted(false); }} />
-              </div>
-              <div style={{ minWidth: 0 }}>
                 <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.dob}</div>
                 <YearMonthDropdown value={form.birthYearMonth}
                   triggerStyle={{
@@ -14536,6 +14506,39 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                   }}
                   onChange={(ym) => { setForm({ ...form, birthYearMonth: ym }); setDobAttempted(false); }} />
               </div>
+            </div>
+
+            {/* Category — full width now, so SubtypeChips lay out on one row */}
+            <div>
+              <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.category}</div>
+              <CategoryDropdown value={form.category}
+                placeholder={t.categoryPlaceholder}
+                triggerStyle={{
+                  padding: '9px 9px', background: 'var(--gc-paper-soft)',
+                  ...(categoryAttempted && !form.category ? { border: '1px solid var(--gc-red)' } : {}),
+                }}
+                onChange={(newCat) => {
+                  if (newCat === form.category) return;
+                  const isF2C = newCat === 'F2A' || newCat === 'F2B';
+                  const newPetitioner = isF2C ? 'LPR' : 'USC';
+                  setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: defaultSubtype(newCat) });
+                  setSubtypeAttempted(false);
+                  setCategoryAttempted(false);
+                }} />
+              <SubtypeChips userCase={form} setUserCase={setForm}
+                required={!!CATEGORY_SUBTYPES[form.category]}
+                error={subtypeAttempted && !!CATEGORY_SUBTYPES[form.category] && !form.subtype} />
+            </div>
+
+            {/* Priority Date — full width, alone now that DOB moved up next to name */}
+            <div>
+              <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.pd}</div>
+              <DateDropdown value={form.priorityDate} allowEmpty minYear={2010} newestYearFirst
+                triggerStyle={{
+                  padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)',
+                  ...(pdAttempted && !form.priorityDate ? { border: '1px solid var(--gc-red)' } : {}),
+                }}
+                onChange={(pd) => { setForm({ ...form, priorityDate: pd }); setPdAttempted(false); }} />
             </div>
 
             {/* Role — required, no default; both options start unselected */}
@@ -16810,9 +16813,15 @@ export default function App() {
           </header>
 
           {nicknameGreeting && (
-            <div style={{ width: '100%', background: 'var(--gc-paper-soft)', borderBottom: '1px solid var(--gc-rule-soft)' }}>
-              <div className="max-w-3xl mx-auto" style={{ padding: '9px 12px' }}>
-                <p style={{ fontSize: '16px', color: 'var(--gc-ink)' }}>
+            <div className="max-w-3xl mx-auto" style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px 0' }}>
+              {/* Same card look as the case card below (surface bg + gc-rule border + 4px
+                  radius) and the same gc-serif family as its title — the old edge-to-edge
+                  muted-grey banner read as a system notice, not part of the case UI. */}
+              <div style={{
+                background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)',
+                borderRadius: '4px', padding: '9px 14px',
+              }}>
+                <p className="gc-serif" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--gc-ink)', letterSpacing: '-0.005em' }}>
                   {lang === 'en' ? <>Hi, <b>{nicknameGreeting}</b></> : <><b>{nicknameGreeting}</b>，你好</>}
                 </p>
               </div>
