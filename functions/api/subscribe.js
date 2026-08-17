@@ -238,6 +238,7 @@ export async function onRequestPost(context) {
   let existingCase = null;
   let existingAlerts = null;
   let existingLanguage = null;
+  let existingName = null;
   if (isUpdate) {
     try {
       const existing = JSON.parse(existingRaw);
@@ -247,6 +248,7 @@ export async function onRequestPost(context) {
       existingCase = existing.userCase || null;
       existingAlerts = existing.alerts || null;
       existingLanguage = existing.language || null;
+      existingName = existing.name || null;
     } catch {}
   }
 
@@ -274,7 +276,11 @@ export async function onRequestPost(context) {
     confirmed: wasConfirmed,
     confirmedAt,
     email: emailKey,
-    name: (typeof name === 'string' ? name.trim().slice(0, 50) : ''),
+    // Same "absence isn't the same as clearing" rule as alerts/userCase below — a
+    // request that omits name (every path except SubscribeModal's own form: the nav
+    // alerts tab, InlineSubscribeCTA) used to overwrite a name already on file with
+    // '', because this field never got the fallback the others already had.
+    name: (typeof name === 'string' && name.trim()) ? name.trim().slice(0, 50) : (existingName || ''),
     userCase: mergedCase || null,
     // A request that omits alerts entirely is not the same as one turning them all
     // off: `alerts || {}` used to silently unsubscribe an existing subscriber from

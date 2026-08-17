@@ -653,6 +653,47 @@ selected 态（跟这次请求无关，没有必要多花一轮截图）。
 
 ---
 
+## 第 24 轮（2026-08-17）：改名字这件事的 audit——发现一个真 bug，顺手补了修改入口
+
+**起因**：用户问"订阅那里有给改名字的机会吗"，让我 audit 一下。查完发现不只是缺入口，
+是一个**真的会丢数据的 bug**。
+
+**发现的 bug**：`functions/api/subscribe.js` 组装 `record` 时，`name` 字段是
+`name: (typeof name === 'string' ? name.trim().slice(0, 50) : '')`——不管客户端这次
+有没有传，一律用这次的值覆盖。同一个函数里 `alerts`/`userCase` 两个字段早就为同样的
+问题打过补丁（注释原话："a request that omits alerts entirely is not the same as
+one turning them all off"），唯独 `name` 没跟上。后果：`SubscribeModal` 里的
+`nickname` state 每次打开都是空字符串（不会从 `gc_nickname` 读现有值），只要老订阅者
+打开订阅弹窗只是想改改提醒开关、不重新打一遍名字就点提交，后端会把之前存的名字
+直接清空成 `''`。`SmartAlerts`（提醒设置页）和 `InlineSubscribeCTA` 这两条路径的
+POST body 本来就不带 `name` 字段（第 17 轮就记录过这个已知缺口），同样会踩这个坑。
+
+**改了什么**：
+- `functions/api/subscribe.js`——`name` 改成 `(typeof name === 'string' && name.trim())
+  ? name.trim().slice(0, 50) : (existingName || '')`，跟 `alerts`/`userCase` 同一个
+  "没传不等于清空" 规则对齐，新增 `existingName` 读现有记录。这一个改动同时保护了
+  `SmartAlerts`/`InlineSubscribeCTA` 两条不带 `name` 字段的路径——它们本来就会把
+  `name` 清空，现在不会了，不用等它们各自补字段。
+- `src/App.jsx` `SubscribeModal`——新增 `useNickname()` 读 `knownName`，名字这一栏
+  改成跟细分/出生年月同一套"已知值 + 修改链接"模式（`nameKnown && !editName` 显示
+  只读行，否则显示输入框），不再是每次打开都空着的输入框。
+- `SubscribeModal` 的"你已订阅"快捷弹窗（原来只有邮箱 + "提醒设置"/"关闭"两个按钮，
+  没有任何名字相关内容）——新增"称呼：Jack 修改"一行。点"修改"会带着
+  `forceForm=true`（新状态，绕过快捷弹窗直接进完整表单）、预填邮箱、`editName=true`
+  进完整表单，不用重新输入邮箱就能改名字。这一步是必须的：不加的话，已订阅用户
+  从"订阅"按钮点进来只会看到快捷弹窗，永远碰不到我在表单里加的"已知值+修改"UI。
+
+**验证方式**：本地 dev server + Playwright，三个场景各截一张图：（1）没订阅过但
+`gc_nickname` 已知（比如刚在首屏填过名字）——打开订阅弹窗直接显示"称呼：Jack 修改"；
+（2）已订阅——快捷弹窗新增的那行；（3）点快捷弹窗的"修改"——确认能落到可编辑的
+完整表单，邮箱自动带出。三张图给用户看过。后端那处 fallback 逻辑没有单独跑单元测试
+（这个函数目前没有测试套件），靠代码走查确认跟 `alerts`/`userCase` 那两处的判断结构
+完全一致。
+
+**状态**：已 commit 并推 main。
+
+---
+
 ## 别重踩的坑
 
 - **推 `main` 即上线**（Cloudflare Pages 自动部署），推送前先问用户。改动走功能分支 + PR。

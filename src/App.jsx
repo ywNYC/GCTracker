@@ -14726,8 +14726,15 @@ const useNickname = () => {
 const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passport', prefillEmail = '' }) => {
   const { lang } = useLang();
   const isSubscribed = useSubscribed();
+  const knownName = useNickname();
   const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
+  // Same known-value + one-tap-edit pattern as subtype/birth below (see comment a few
+  // lines down) — a name saved earlier (onboarding, or a prior visit here) used to show
+  // as a blank input every time this modal reopened, so leaving it blank and resubmitting
+  // silently wiped the name already on file (fixed on the backend too, see subscribe.js).
+  const nameKnown = !!knownName;
+  const [editName, setEditName] = useState(false);
   // The two inline entry points hand off to this modal when the case is missing
   // subtype/birth (see openSubscribeModal). Carry over whatever they already typed
   // so the handoff costs one tap, not a retype — only on open, never overwriting
@@ -14766,10 +14773,16 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
       return () => clearTimeout(timer);
     }
   }, [status, onClose]);
+  // Escape hatch out of the "already a subscriber" quick view below, into the full
+  // form — the quick view used to be a dead end for renaming: its only button sent
+  // you to the alerts tab, which has no name field at all (see SmartAlerts above,
+  // it never sends `name`). Clicking "修改" there sets this + prefills email/edit
+  // mode so changing just the name doesn't also demand retyping the address.
+  const [forceForm, setForceForm] = useState(false);
   if (!show) return null;
 
   // Already a subscriber (and not mid-flow): no form — just say so and offer settings.
-  if (isSubscribed && status !== 'sent' && status !== 'updated') {
+  if (isSubscribed && status !== 'sent' && status !== 'updated' && !forceForm) {
     let savedEmail = '';
     try { savedEmail = window.localStorage.getItem('gc_subscribedEmail') || ''; } catch { /* noop */ }
     return (
@@ -14790,6 +14803,17 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
             {savedEmail
               ? (lang === 'en' ? <>Updates go to <b>{savedEmail}</b>.</> : <>更新会发到 <b>{savedEmail}</b>。</>)
               : (lang === 'en' ? 'Bulletin updates are on for this browser.' : lang === 'tw' ? '這個瀏覽器已開啟排期郵件更新。' : '这个浏览器已开启排期邮件更新。')}
+          </div>
+          <div className="flex items-center justify-between" style={{ marginTop: '6px', fontSize: '11.5px', color: 'var(--gc-ink-soft)' }}>
+            <span>
+              {lang === 'en' ? 'Call you: ' : lang === 'tw' ? '稱呼：' : '称呼：'}
+              {knownName ? <b>{knownName}</b> : (lang === 'en' ? 'not set' : lang === 'tw' ? '未設定' : '未设置')}
+            </span>
+            <button type="button"
+              onClick={() => { setEmail(savedEmail); setNickname(knownName || ''); setEditName(true); setForceForm(true); }}
+              style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-green-ink)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+              {lang === 'en' ? 'Edit' : lang === 'tw' ? '修改' : '修改'}
+            </button>
           </div>
           <div className="flex items-center justify-between" style={{ marginTop: '12px' }}>
             <button type="button" onClick={() => { onClose(); window.dispatchEvent(new Event('gc-goto-alerts')); }}
@@ -14826,6 +14850,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
       birthYearMonth: userCase.birthYearMonth || birthYM,
     };
     setUserCase(finalUserCase);
+    const finalName = (nameKnown && !editName) ? knownName : nickname.trim();
     setStatus('loading');
     try {
       const resp = await fetch('/api/subscribe', {
@@ -14833,7 +14858,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
-          name: nickname.trim(),
+          name: finalName,
           userCase: finalUserCase,
           alerts,
           language: subLang,
@@ -14844,7 +14869,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
         try {
           window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase());
           window.sessionStorage.setItem('gc_subNudgeShown', '1');
-          if (nickname.trim()) window.localStorage.setItem('gc_nickname', nickname.trim());
+          if (finalName) window.localStorage.setItem('gc_nickname', finalName);
         } catch { /* noop */ }
         announceSubscribed();
         // Updating an already-confirmed subscriber sends no confirmation mail — saying
@@ -14981,14 +15006,27 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                   : (lang === 'en' ? 'Something went wrong — try again' : lang === 'tw' ? '出錯了，再試一次' : '出错了，再试一次')}
               </div>
             )}
-            <input
-              type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
-              placeholder={lang === 'en' ? 'What should we call you? (optional)' : lang === 'tw' ? '怎麼稱呼您（可選）' : '怎么称呼您（可选）'}
-              style={{
-                width: '100%', fontSize: '13px', padding: '9px 10px', boxSizing: 'border-box',
-                border: '1px solid var(--gc-rule)', borderRadius: '4px',
-                background: 'var(--gc-paper)', color: 'var(--gc-ink)', marginTop: '6px',
-              }} />
+            {nameKnown && !editName ? (
+              <div className="flex items-center justify-between" style={{ fontSize: '11.5px', color: 'var(--gc-ink-soft)', marginTop: '6px' }}>
+                <span>
+                  {lang === 'en' ? 'Call you: ' : lang === 'tw' ? '稱呼：' : '称呼：'}
+                  <b>{knownName}</b>
+                </span>
+                <button type="button" onClick={() => { setNickname(knownName); setEditName(true); }}
+                  style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-green-ink)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                  {lang === 'en' ? 'Edit' : lang === 'tw' ? '修改' : '修改'}
+                </button>
+              </div>
+            ) : (
+              <input
+                type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
+                placeholder={lang === 'en' ? 'What should we call you? (optional)' : lang === 'tw' ? '怎麼稱呼您（可選）' : '怎么称呼您（可选）'}
+                style={{
+                  width: '100%', fontSize: '13px', padding: '9px 10px', boxSizing: 'border-box',
+                  border: '1px solid var(--gc-rule)', borderRadius: '4px',
+                  background: 'var(--gc-paper)', color: 'var(--gc-ink)', marginTop: '6px',
+                }} />
+            )}
             {catHasSubtype && (
               <div style={{ marginTop: '8px' }}>
                 {subtypeKnown && !editSubtype ? (
