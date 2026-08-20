@@ -1133,7 +1133,41 @@ EB1 10/EB4 8/EW 7/F2B 6/EB5 5/F2A 3/SR 1）。方案是把这两个population �
 多——本地验证 EB2·中国·2021Q1 那批 17 人里，等待时长直方图五档全部有数（大头落在"5 年以
 上"，16/17 人），阶段图只有 14 个人有数据，两张图并存但样本量不同，已经在两处文案里注明。
 
-**尚未推送**——这次改完本地验证过，还没 push。
+业主说「推」，commit `a85f447` 推了 main，线上验证过（同样撞了一次刚部署完的边缘缓存瞬时
+空档，重试后正常）。
+
+### 追加三：社区 tab 有时候巨慢——找到了，`subscriberPopulation()` 冷缓存要 12 秒
+
+业主反馈"这个社区的信息load的太慢"。实测：`SUBSCRIBERS` 缓存命中时 `/api/tracker?owner=`
+只要 0.3 秒；手动删掉缓存 key 模拟一次冷启动，同一个请求要 **12.2 秒**——15 分钟 TTL 一过期，
+不管哪个访客的请求先落地，就要替全站垫掉这笔"整个 KV 命名空间顺序 get 一遍"的账，这正是"社区
+tab 偶尔转半天"的根因。
+
+原实现（第 29 轮首次加的 `subscriberPopulation()`）问题出在两处：① `list()` 拿到 key 列表后
+用一个普通 `for` 循环逐个 `await env.SUBSCRIBERS.get(k.name)`，~100+ 个 key 全部串行，每个
+KV 读几十到上百毫秒累加起来就是十几秒；② 缓存一过期，"谁的请求先到"就要替所有人垫上这笔重建
+成本，慢的观感是随机摊派到某个倒霉访客身上的。
+
+改法（`SUB_CACHE_KEY` 从 `v1` 换成 `v2`，结构也变了，旧 key 不再用）：
+- **拆 chunk 并行 fetch**：`rebuildSubscriberPopulation()` 把 candidate keys 切成 20 个一组，
+  组内 `Promise.all` 并发 `.get()`，组间还是顺序（避免瞬间开几百个并发连接）。
+- **stale-while-revalidate，不再让用户等重建**：缓存里现在存 `{builtAt, rows}`。缓存存在但
+  超过 15 分钟（`SUB_STALE_MS`）没刷新时，直接把（哪怕过期的）`rows` 立刻返回给这次请求，同时
+  用 `context.waitUntil()` 在后台悄悄触发重建——下一个请求就能读到新缓存，没人会因为撞上重建
+  窗口被卡住。只有"缓存整个不存在"（比如这段代码刚上线、从没人访问过）这一种情况才会真的同步
+  等一次重建，且并行 fetch 之后这一次也从 12 秒降到大约 1-2 秒。
+- `hydrate()` 加了第三个参数 `waitUntil`，从 `onRequestPost`/`onRequestGet` 的 `context`
+  里解构出来一路传进去（Pages Functions 的 `context.waitUntil(promise)` 是标准 API，让一个
+  后台任务在响应已经发出之后继续跑完，不拖慢这次响应）。
+
+本地 `wrangler pages dev --local` 验证过：`v2` 缓存不存在时会走一次同步 `rebuildSubscriberPopulation`
+（本地场景下这是唯一可测的路径，`waitUntil` 触发的后台刷新在本地日志里看不出秒级差异，
+逻辑走查过没问题），返回结果 `total`/`waitHist` 数值跟改动前一致，没有引入错误。
+
+**尚未推送**——这次改完本地验证过，还没 push。生产环境上一次真实的冷启动计时（12.2 秒
+那次）已经把旧的 `cs:subpop:v1` 缓存 key 删掉了，推上去之后线上会有一次真正的冷启动（新的
+`v2` key 从零建），预期在几秒内完成（不是 12 秒），之后就一直是 stale-while-revalidate 的
+快路径。
 
 ---
 
@@ -1159,6 +1193,11 @@ EB1 10/EB4 8/EW 7/F2B 6/EB5 5/F2A 3/SR 1）。方案是把这两个population �
   裸数字/短记录当 JSON 解析出错或者当假订阅者混进统计——第 29 轮之前已经因为漏了 `trkl:`
   导致 `subs.sh` 崩溃过一次（commit `f156f60`）。全量 list+get 有 KV 读取成本，遍历结果要缓存
   （15 分钟 TTL 起步），不要每个请求都扫一遍。
+- **KV 全量遍历，`.get()` 千万别写成一个个 `await` 的 `for` 循环。** 100+ 个 key 顺序 get，
+  实测冷启动要 12 秒——用户请求同步等着这个循环跑完。要么切 chunk 用 `Promise.all` 并行
+  （见 `subscriberPopulation()`/`rebuildSubscriberPopulation()`），要么干脆别让用户等：缓存
+  过期时先把（哪怕过期的）缓存值原样返回，用 `context.waitUntil()` 在后台重建，下一个请求
+  才用得上新值——stale-while-revalidate，没人会因为撞上重建窗口被卡住。
 
 ---
 

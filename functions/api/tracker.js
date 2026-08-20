@@ -103,37 +103,68 @@ function aggregate(rows, myStageIdx) {
 // report those dates, so mixing them in would make it look like ~90 people
 // "haven't filed" when we simply don't know.
 // ============================================================
-const SUB_CACHE_KEY = 'cs:subpop:v1';
-const SUB_CACHE_TTL = 900; // 15min — bounds KV list+get cost under real traffic
+// v1 measured 12s on a cold cache (list() then a plain `for` loop awaiting one
+// env.SUBSCRIBERS.get() at a time — ~100+ sequential round trips) — whichever
+// visitor's request landed right after the 15min TTL expired paid that tax
+// synchronously. v2: fetch in parallel chunks (cuts a cold rebuild to ~1-2s),
+// AND never block a request on a stale cache — serve what's cached (however
+// old) immediately and kick the rebuild off in the background via waitUntil.
+// Only a true first-ever cold start (empty cache, nobody has visited yet since
+// this code shipped) still blocks once.
+const SUB_CACHE_KEY = 'cs:subpop:v2';
+const SUB_STALE_MS = 15 * 60 * 1000;  // older than this → serve stale, refresh in background
+const SUB_CACHE_TTL = 3600;           // KV expirationTtl safety net if nothing ever refreshes it
+const SUB_FETCH_CHUNK = 20;           // parallel .get() batch size
 const SUB_SKIP_PREFIXES = ['rl:', 'an:', 'ev:', 'es:', 'pr:', 'prl:', 'cd:', 'crl:', 'trkl:'];
 
-async function subscriberPopulation(env) {
-  try {
-    const cached = await env.SUBSCRIBERS.get(SUB_CACHE_KEY);
-    if (cached) return JSON.parse(cached);
-  } catch { /* fall through to a live rebuild */ }
-
+async function rebuildSubscriberPopulation(env) {
   const rows = [];
   try {
     let cursor;
     do {
       const list = await env.SUBSCRIBERS.list({ cursor });
-      for (const k of list.keys) {
-        if (SUB_SKIP_PREFIXES.some((p) => k.name.startsWith(p))) continue;
-        let rec;
-        try { rec = JSON.parse(await env.SUBSCRIBERS.get(k.name)); } catch { continue; }
-        if (!rec || rec.confirmed !== true) continue;
-        const uc = rec.userCase;
-        if (!uc || !CATS.includes(uc.category) || !COUNTRIES.includes(uc.country)) continue;
-        if (!isDate(uc.priorityDate) || uc.priorityDate < MIN_PD || uc.priorityDate > today()) continue;
-        rows.push({ cat: uc.category, country: uc.country, priority_date: uc.priorityDate });
+      const candidates = list.keys.filter((k) => !SUB_SKIP_PREFIXES.some((p) => k.name.startsWith(p)));
+      for (let i = 0; i < candidates.length; i += SUB_FETCH_CHUNK) {
+        const chunk = candidates.slice(i, i + SUB_FETCH_CHUNK);
+        const vals = await Promise.all(chunk.map((k) => env.SUBSCRIBERS.get(k.name).catch(() => null)));
+        for (const raw of vals) {
+          if (!raw) continue;
+          let rec;
+          try { rec = JSON.parse(raw); } catch { continue; }
+          if (!rec || rec.confirmed !== true) continue;
+          const uc = rec.userCase;
+          if (!uc || !CATS.includes(uc.category) || !COUNTRIES.includes(uc.country)) continue;
+          if (!isDate(uc.priorityDate) || uc.priorityDate < MIN_PD || uc.priorityDate > today()) continue;
+          rows.push({ cat: uc.category, country: uc.country, priority_date: uc.priorityDate });
+        }
       }
       cursor = list.list_complete ? null : list.cursor;
     } while (cursor);
-  } catch { return rows; } // partial/failed listing still returns what we got
+  } catch { /* partial listing still returns what we got so far */ }
 
-  try { await env.SUBSCRIBERS.put(SUB_CACHE_KEY, JSON.stringify(rows), { expirationTtl: SUB_CACHE_TTL }); } catch {}
+  try {
+    await env.SUBSCRIBERS.put(SUB_CACHE_KEY, JSON.stringify({ builtAt: Date.now(), rows }), { expirationTtl: SUB_CACHE_TTL });
+  } catch {}
   return rows;
+}
+
+// waitUntil is optional (undefined in contexts that don't pass one through) —
+// falls back to blocking on the rebuild rather than silently skipping it.
+async function subscriberPopulation(env, waitUntil) {
+  let cached = null;
+  try {
+    const raw = await env.SUBSCRIBERS.get(SUB_CACHE_KEY);
+    if (raw) cached = JSON.parse(raw);
+  } catch { /* fall through to a live rebuild */ }
+
+  if (cached) {
+    if (Date.now() - (cached.builtAt || 0) > SUB_STALE_MS) {
+      const refresh = rebuildSubscriberPopulation(env).catch(() => {});
+      if (waitUntil) waitUntil(refresh); else await refresh;
+    }
+    return cached.rows;
+  }
+  return rebuildSubscriberPopulation(env);
 }
 
 // total/medianWait/meanWait only — no stage fields, so this is the shape
@@ -186,14 +217,14 @@ async function recentTicker(env) {
     .slice(0, 3);
 }
 
-async function hydrate(env, ownerId) {
+async function hydrate(env, ownerId, waitUntil) {
   const me = await env.DB.prepare(`SELECT * FROM cases WHERE owner_id = ?`).bind(ownerId).first();
   if (!me) return null;
 
   const { results: catRows } = await env.DB.prepare(
     `SELECT * FROM cases WHERE cat = ? AND country = ?`
   ).bind(me.cat, me.country).all();
-  const subPop = await subscriberPopulation(env);
+  const subPop = await subscriberPopulation(env, waitUntil);
   const subCatRows = subPop.filter((r) => r.cat === me.cat && r.country === me.country);
 
   const myQuarter = quarterOf(me.priority_date);
@@ -255,7 +286,7 @@ async function hydrate(env, ownerId) {
 }
 
 export async function onRequestPost(context) {
-  const { request, env } = context;
+  const { request, env, waitUntil } = context;
   if (!env.DB) return json({ error: 'D1 binding DB not configured' }, 500);
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
@@ -320,12 +351,12 @@ export async function onRequestPost(context) {
     createdAt, new Date().toISOString(), ipHash
   ).run();
 
-  const payload = await hydrate(env, ownerId);
+  const payload = await hydrate(env, ownerId, waitUntil);
   return json({ ok: true, ...payload });
 }
 
 export async function onRequestGet(context) {
-  const { request, env } = context;
+  const { request, env, waitUntil } = context;
   if (!env.DB) return json({ error: 'D1 binding DB not configured' }, 500);
 
   const url = new URL(request.url);
@@ -343,7 +374,7 @@ export async function onRequestGet(context) {
 
   const owner = url.searchParams.get('owner');
   if (owner) {
-    const payload = await hydrate(env, owner);
+    const payload = await hydrate(env, owner, waitUntil);
     if (!payload) return json({ ok: true, record: null });
     return json({ ok: true, ...payload });
   }
