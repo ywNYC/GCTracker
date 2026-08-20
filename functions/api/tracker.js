@@ -201,6 +201,37 @@ function waitHistogram(rows, myMonths) {
   return { counts, max: Math.max(1, ...counts.map((c) => c.count)) };
 }
 
+// Same wait-time buckets, but each bar is split by another field (country when
+// scope drops the country filter, cat when scope drops both) so you can see
+// composition, not just totals — e.g. "5+ years" is almost all China/India.
+// Caps at the 8 biggest values by total count (entity-ranked, not per-bucket,
+// so the same entity doesn't get folded in one bar and named in another) and
+// folds the rest into '__other__' — an unbounded stack would need as many
+// distinct hues as CATS has entries (11), well past what a stacked bar can
+// stay readable at.
+function stackedWaitHistogram(rows, stackKeyField, myMonths) {
+  const totals = new Map();
+  for (const r of rows) totals.set(r[stackKeyField], (totals.get(r[stackKeyField]) || 0) + 1);
+  const named = [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k).slice(0, 8);
+  const namedIdx = new Map(named.map((k, i) => [k, i]));
+  const OTHER = named.length; // last slot
+
+  const buckets = WAIT_BUCKETS.map((b) => ({
+    key: b.key, label: b.label, mine: false, total: 0,
+    segments: [...named.map((k) => ({ key: k, count: 0 })), { key: '__other__', count: 0 }],
+  }));
+  for (const r of rows) {
+    const bIdx = bucketIdxOf(monthsBetween(r.priority_date, r.d_approved || today()));
+    buckets[bIdx].total += 1;
+    buckets[bIdx].segments[namedIdx.has(r[stackKeyField]) ? namedIdx.get(r[stackKeyField]) : OTHER].count += 1;
+  }
+  buckets[bucketIdxOf(myMonths)].mine = true;
+
+  const usedOther = buckets.some((b) => b.segments[OTHER].count > 0);
+  if (!usedOther) buckets.forEach((b) => { b.segments.pop(); });
+  return { buckets, max: Math.max(1, ...buckets.map((b) => b.total)), order: usedOther ? [...named, '__other__'] : named };
+}
+
 async function recentTicker(env) {
   const { results } = await env.DB.prepare(
     `SELECT cat, country, priority_date, updated_at FROM cases WHERE d_approved IS NOT NULL ORDER BY updated_at DESC LIMIT 20`
@@ -224,6 +255,8 @@ async function hydrate(env, ownerId, waitUntil) {
   const { results: catRows } = await env.DB.prepare(
     `SELECT * FROM cases WHERE cat = ? AND country = ?`
   ).bind(me.cat, me.country).all();
+  const { results: catOnlyD1Rows } = await env.DB.prepare(`SELECT * FROM cases WHERE cat = ?`).bind(me.cat).all();
+  const { results: allD1Rows } = await env.DB.prepare(`SELECT * FROM cases`).all();
   const subPop = await subscriberPopulation(env, waitUntil);
   const subCatRows = subPop.filter((r) => r.cat === me.cat && r.country === me.country);
 
@@ -258,6 +291,15 @@ async function hydrate(env, ownerId, waitUntil) {
   const myMonths = monthsBetween(me.priority_date, me.d_approved || today());
   const waitHist = waitHistogram(mergedCatRows, myMonths);
 
+  // Two wider scopes, on top of the cat+country default above: same category
+  // across every country (stacked by country — same category, different
+  // countries wait very differently under the per-country visa bulletin), and
+  // no filter at all (stacked by category — the whole site's composition).
+  const mergedCatOnly = [...catOnlyD1Rows, ...subPop.filter((r) => r.cat === me.cat)];
+  const catOnlyPopAgg = aggregatePop(mergedCatOnly);
+  const mergedAll = [...allD1Rows, ...subPop];
+  const allPopAgg = aggregatePop(mergedAll);
+
   return {
     record: {
       cat: me.cat, country: me.country, priorityDate: me.priority_date,
@@ -280,6 +322,18 @@ async function hydrate(env, ownerId, waitUntil) {
       approvedN: catStageAgg.approvedN, stageDist: catStageAgg.stageDist, stageN: catRows.length, walked: catStageAgg.walked,
       waitHist,
       chart: { buckets, max: Math.max(1, ...buckets.map((b) => b.count)) },
+    },
+    scopes: {
+      catOnly: {
+        total: catOnlyPopAgg.total, medianWait: catOnlyPopAgg.medianWait, meanWait: catOnlyPopAgg.meanWait,
+        enough: catOnlyPopAgg.total >= K_MIN, needMore: Math.max(0, K_MIN - catOnlyPopAgg.total),
+        stackBy: 'country', stackedHist: stackedWaitHistogram(mergedCatOnly, 'country', myMonths),
+      },
+      all: {
+        total: allPopAgg.total, medianWait: allPopAgg.medianWait, meanWait: allPopAgg.meanWait,
+        enough: allPopAgg.total >= K_MIN, needMore: Math.max(0, K_MIN - allPopAgg.total),
+        stackBy: 'cat', stackedHist: stackedWaitHistogram(mergedAll, 'cat', myMonths),
+      },
     },
     ticker: await recentTicker(env),
   };

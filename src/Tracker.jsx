@@ -38,6 +38,10 @@ const CENTER_LABEL = {
   'other-center': '其他中心', guangzhou: '广州领事馆', 'other-consulate': '其他领事馆',
   unknown: '不确定',
 };
+const stackLabel = (stackBy, key) => {
+  if (key === '__other__') return '其他';
+  return stackBy === 'country' ? (COUNTRY_LABEL[key] || key) : (CAT_LABEL[key]?.split(' ')[0] || key);
+};
 
 const STEPS = [
   { key: 'filed', label: '递交' },
@@ -89,6 +93,13 @@ const C = {
 };
 const CARD_FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif';
 const CARD_SERIF = '"Songti SC","Iowan Old Style",Palatino,Georgia,serif';
+
+// 分类别/分国家堆叠图用的定序分类色——8 档验证过（dataviz skill 的默认色板，
+// light 模式，adjacent-pair 通过），顺序固定不能按出现频率重排。第 9 个及以后
+// 一律折进 "__other__"（灰色，不占这 8 个验证过的色号）。
+const STACK_PALETTE = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+const STACK_OTHER_COLOR = '#9a9a92';
+const stackColorAt = (i) => STACK_PALETTE[i] || STACK_OTHER_COLOR;
 
 const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 const monthsSince = (d) => Math.max(0, Math.round(daysBetween(d, TODAY) / 30.44));
@@ -320,6 +331,48 @@ const BarHistogram = ({ dist }) => {
       <div className="flex items-start" style={{ gap: '7px', marginTop: '4px' }}>
         {counts.map((c) => (
           <div key={c.key} style={{ flex: 1, textAlign: 'center', fontSize: '9.5px', fontWeight: c.mine ? 700 : 500, color: c.mine ? C.amber : 'var(--gc-muted)' }}>{c.label}</div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// 堆叠柱状图：等待时长分桶不变，每根柱子内部再按 country 或 cat 分段——用来看
+// "同类别不分国家"/"不限（全站）"这两个更宽口径下，构成是什么样的。segments 的
+// 先后顺序就是图例顺序，颜色按位置从 STACK_PALETTE 定序取，不跟着人数重新排序。
+const StackedBarHistogram = ({ hist, stackBy }) => {
+  const { buckets, max, order } = hist;
+  return (
+    <div>
+      <div className="flex items-end" style={{ gap: '7px', height: '100px' }}>
+        {buckets.map((b) => (
+          <div key={b.key} className="flex flex-col items-center" style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
+            <span className="gc-mono" style={{ fontSize: '10px', fontWeight: b.mine ? 700 : 500, color: b.mine ? C.amber : 'var(--gc-ink-soft)', marginBottom: '3px' }}>{b.total}</span>
+            <div style={{
+              width: '100%', maxWidth: '34px', display: 'flex', flexDirection: 'column-reverse',
+              height: `${Math.max(4, (b.total / (max || 1)) * 70)}px`,
+              borderRadius: '3px 3px 0 0', overflow: 'hidden',
+              outline: b.mine ? `2px solid ${C.amber}` : 'none', outlineOffset: '1px',
+            }}>
+              {b.segments.filter((s) => s.count > 0).map((s) => (
+                <div key={s.key} title={`${stackLabel(stackBy, s.key)}：${s.count} 人`}
+                  style={{ height: `${(s.count / (b.total || 1)) * 100}%`, background: stackColorAt(order.indexOf(s.key)) }} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-start" style={{ gap: '7px', marginTop: '4px' }}>
+        {buckets.map((b) => (
+          <div key={b.key} style={{ flex: 1, textAlign: 'center', fontSize: '9.5px', fontWeight: b.mine ? 700 : 500, color: b.mine ? C.amber : 'var(--gc-muted)' }}>{b.label}</div>
+        ))}
+      </div>
+      <div className="flex flex-wrap" style={{ gap: '8px 12px', marginTop: '10px' }}>
+        {order.map((k, i) => (
+          <span key={k} className="flex items-center gap-1" style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)' }}>
+            <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: stackColorAt(i), display: 'inline-block', flexShrink: 0 }} />
+            {stackLabel(stackBy, k)}
+          </span>
         ))}
       </div>
     </div>
@@ -605,7 +658,8 @@ const LockedTeaser = ({ summary, onFill }) => {
 // 消失；类别整体样本几乎总是够，就不再需要"只看我这批 / 整个类别"这个切换了。
 // b 多带 rank/fresh/sameStep（跟"我"有关的字段），catData 多带 chart（季度直方图）。
 // ============================================================
-const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
+const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
+  const [range, setRange] = useState('catCountry'); // catCountry | catOnly | all
   if (!me || !b || !catData) {
     return (
       <div>
@@ -651,7 +705,57 @@ const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
         </p>
       </div>
 
-      {locked ? (
+      {/* 范围选择：默认同类别+同国家；也能看不分国家（同类别全球）或完全不限（全站）——
+          后两档样本更大，用堆叠柱状图看构成（按国家/按类别分段），不是只看总数。 */}
+      {scopes && (
+        <div className="flex gap-2" style={{ marginBottom: '10px' }}>
+          {[
+            ['catCountry', `${CAT_LABEL[me.cat]?.split(' ')[0] || me.cat}·${COUNTRY_LABEL[me.country]}`],
+            ['catOnly', `${CAT_LABEL[me.cat]?.split(' ')[0] || me.cat}·不分国家`],
+            ['all', '不限（全站）'],
+          ].map(([v, l]) => (
+            <button key={v} onClick={() => setRange(v)}
+              style={{
+                flex: 1, padding: '8px 4px', fontSize: '12px', fontWeight: 600, borderRadius: '3px',
+                border: `1px solid ${range === v ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
+                background: range === v ? 'var(--gc-green-soft)' : 'var(--gc-surface)',
+                color: range === v ? 'var(--gc-green-ink)' : 'var(--gc-muted)',
+              }}>{l}</button>
+          ))}
+        </div>
+      )}
+
+      {range !== 'catCountry' && scopes ? (
+        (() => {
+          const s = scopes[range];
+          const rangeLabel = range === 'catOnly' ? `${CAT_LABEL[me.cat]?.split(' ')[0] || me.cat}（不分国家）` : '全站（不限类别和国家）';
+          return s.enough ? (
+            <>
+              <div style={{ ...cardBox, background: 'var(--gc-paper-soft)' }}>
+                <p style={{ fontSize: '14px', color: 'var(--gc-ink)', lineHeight: 1.8 }}>
+                  {rangeLabel}一共 <b>{s.total}</b> 个人，中位已等 <b>{s.medianWait}</b> 个月，平均已等 <b>{s.meanWait}</b> 个月。
+                </p>
+              </div>
+              <div style={cardBox}>
+                <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>大家等了多久，按{s.stackBy === 'country' ? '国家' : '类别'}分</p>
+                <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 10px', lineHeight: 1.6 }}>
+                  优先日到现在（已批准的算到批准那天），按人数分桶，每根柱子内部再按{s.stackBy === 'country' ? '国家' : '类别'}分段。
+                </p>
+                <StackedBarHistogram hist={s.stackedHist} stackBy={s.stackBy} />
+              </div>
+            </>
+          ) : (
+            <div style={{ ...cardBox, background: 'var(--gc-amber-soft)', borderColor: 'var(--gc-amber-border)' }}>
+              <p className="flex items-center gap-1.5" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-amber-ink)', marginBottom: '6px' }}>
+                <Lock size={13} /> {rangeLabel}还差 {s.needMore} 个人
+              </p>
+              <p style={{ fontSize: '13px', color: 'var(--gc-amber-ink)', lineHeight: 1.75 }}>
+                不到 {K_MIN} 个人的范围一律不出数。
+              </p>
+            </div>
+          );
+        })()
+      ) : locked ? (
         <div style={{ ...cardBox, background: 'var(--gc-amber-soft)', borderColor: 'var(--gc-amber-border)' }}>
           <p className="flex items-center gap-1.5" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-amber-ink)', marginBottom: '6px' }}>
             <Lock size={13} /> 这个类别 + 国家还差 {b.needMore} 个人
@@ -893,7 +997,7 @@ const TrackerPage = ({ userCase }) => {
         <>
           {view === 'form' && <FormView initial={initial} onSubmit={submit} submitting={submitting} submitError={submitError} />}
           {view === 'card' && hydrated?.record && <CardView me={hydrated.record} b={hydrated.batch} autoJoined={autoJoined} onBack={() => setView('form')} onBatch={() => setView('batch')} />}
-          {view === 'batch' && <BatchView me={hydrated?.record} b={hydrated?.batch} catData={hydrated?.cat} summary={summary} onBack={() => setView(hydrated?.record ? 'card' : 'form')} onFill={() => setView('form')} />}
+          {view === 'batch' && <BatchView me={hydrated?.record} b={hydrated?.batch} catData={hydrated?.cat} scopes={hydrated?.scopes} summary={summary} onBack={() => setView(hydrated?.record ? 'card' : 'form')} onFill={() => setView('form')} />}
         </>
       )}
     </div>

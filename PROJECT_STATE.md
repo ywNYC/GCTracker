@@ -1164,10 +1164,47 @@ KV 读几十到上百毫秒累加起来就是十几秒；② 缓存一过期，"
 （本地场景下这是唯一可测的路径，`waitUntil` 触发的后台刷新在本地日志里看不出秒级差异，
 逻辑走查过没问题），返回结果 `total`/`waitHist` 数值跟改动前一致，没有引入错误。
 
-**尚未推送**——这次改完本地验证过，还没 push。生产环境上一次真实的冷启动计时（12.2 秒
-那次）已经把旧的 `cs:subpop:v1` 缓存 key 删掉了，推上去之后线上会有一次真正的冷启动（新的
-`v2` key 从零建），预期在几秒内完成（不是 12 秒），之后就一直是 stale-while-revalidate 的
-快路径。
+业主说「推」，commit `c7794b5` 推了 main。线上第一次打 `v2`（新缓存 key，之前从没建过）实测
+0.41 秒，比预估的"并行后 1-2 秒"还快，第二次（缓存命中）0.3 秒——12 秒的卡顿确认修好了。
+
+### 追加四：范围选择器——不分国家 / 不分类别和国家，配堆叠柱状图
+
+业主要求：除了"同类别同国家"这个默认口径，还要能看"不分国家、只按类别"和"完全不限（全站）"
+这两档更宽的口径，而且要用 stacked column chart（堆叠柱状图）呈现，"给用户多点选择"。
+
+数据面（`functions/api/tracker.js`）：
+- `hydrate()` 里新增两个 D1 查询：`WHERE cat=?`（不带 country 条件）和不带 WHERE 的全表查询，
+  分别跟 `subscriberPopulation()` 里同口径过滤的订阅者合并，得到 `mergedCatOnly`/`mergedAll`
+  两个更大的样本。
+- 新增 `stackedWaitHistogram(rows, stackKeyField, myMonths)`：复用已有的 5 档等待时长分桶，
+  但每个桶内部再按 `stackKeyField`（`'country'` 或 `'cat'`）细分。**按总量取 top 8 折叠"其他"**
+  ——这是关键设计点：折叠判断用的是该字段在全部行里的总次数排序，不是逐桶单独排序，不然同一个
+  类别可能在这根柱子里叫得出名字、换根柱子就被叠进"其他"，观感会很跳。CATS 有 11 种，真实数据
+  已经有 9 种非零（`subs.sh -a`：EB2/F4/EB3/EB1/EB4/EW/F2B/EB5/F2A），会真的触发折叠；
+  COUNTRIES 只有 6 种，不会触发。
+- `hydrate()` 返回体新增 `scopes: {catOnly: {...}, all: {...}}`，各自带 `total/medianWait/
+  meanWait/enough/needMore/stackBy/stackedHist`。
+
+配色面：直接抄 `dataviz` skill 里 `references/palette.md` 的 8 色定序分类色板（validated，
+light 模式 adjacent-pair 全过），第 9 个起统一用灰色 `__other__`，不占这 8 个验证过的色号。
+手动挑的一版颜色跑 `scripts/validate_palette.js` 直接 FAIL（lightness/chroma/CVD 都不过），
+改用 skill 自带的参考色板才过——这是这次唯一按 skill 流程走完整验证的一步，其余没有对每个
+UI 颜色改动都跑校验器（成本考虑），后续如果业主对配色有反馈再针对性检查。
+
+前端（`src/Tracker.jsx`）：
+- `BatchView` 加了三个 tab（`range` state：`catCountry`/`catOnly`/`all`），tab1 保持原有全部
+  内容不变，tab2/3 换成一个简化面板（总数/中位数/平均数 + `StackedBarHistogram`）。
+- 新增 `StackedBarHistogram` 组件（柱子内部按 `order` 顺序堆叠色块 + 图例，颜色按位置从
+  `STACK_PALETTE` 取，不跟着人数动态重排——"颜色跟着实体走，不跟着排名走"）。
+- `stackLabel(stackBy, key)` 把后端给的 code（`'China'`/`'EB2'`/`'__other__'`）映射成已有的
+  `COUNTRY_LABEL`/`CAT_LABEL` 显示名。
+
+本地验证：`node -e` 单独跑了一遍 `stackedWaitHistogram` 折叠逻辑（11 个类别、9 个非零，验证
+top8+其他折叠、总数守恒），`wrangler pages dev --local` + Playwright 截图（`shot_scopes.mjs`）
+确认三个 tab 都能点、堆叠图和图例正常渲染（本地样本只有 1 个类别/国家，没能视觉验证多色堆叠，
+折叠逻辑靠上面那次独立脚本验证过）。
+
+**尚未推送**——这次改完本地验证过，还没 push。
 
 ---
 
