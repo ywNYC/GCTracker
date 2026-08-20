@@ -592,10 +592,12 @@ const LockedTeaser = ({ summary, onFill }) => {
 
 // ============================================================
 // 我这一批 —— 图表 + 统计，永远不出现个案明细
-// b = 批次口径（后端算好），catData = 整类别口径（后端算好）
+// b/catData 现在是同一个总体口径（同类别 + 同国家，D1 已登记 ∪ 已确认邮件订阅者，
+// 不再按季度切细）——原来切季度会导致大多数人那个季度凑不够 K_MIN，图表整块
+// 消失；类别整体样本几乎总是够，就不再需要"只看我这批 / 整个类别"这个切换了。
+// b 多带 rank/fresh/sameStep（跟"我"有关的字段），catData 多带 chart（季度直方图）。
 // ============================================================
 const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
-  const [scope, setScope] = useState('mine');   // mine = 只看我这批，cat = 看整个类别
   if (!me || !b || !catData) {
     return (
       <div>
@@ -607,8 +609,8 @@ const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
     );
   }
 
-  const data = scope === 'mine' ? b : catData;
-  const chart = catData.chart;   // 图表永远是整类别粒度，只是把「我这批」那根高亮
+  const data = b;
+  const chart = catData.chart;   // 季度直方图，把「我」在的那一季高亮
 
   const cardBox = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '18px', marginBottom: '10px' };
   const CW = 320, CH = 132, PAD_L = 8, PAD_R = 8, PAD_T = 16, PAD_B = 26;
@@ -624,7 +626,7 @@ const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
   const minePt = pts.find((p) => p.b.mine);
 
   // ③ 样本门槛：不够 5 人，细分一律不出数（enough/needMore 是后端算的）
-  const locked = scope === 'mine' && !b.enough;
+  const locked = !b.enough;
 
   return (
     <div>
@@ -633,42 +635,31 @@ const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
       </button>
 
       <div style={cardBox}>
-        <p className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)' }}>{b.label}</p>
+        <p className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)' }}>{CAT_LABEL[me.cat] || me.cat} · {COUNTRY_LABEL[me.country]}</p>
+        <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 0' }}>你自己的优先日落在 {b.short}</p>
         {/* ⑨ 数据新鲜度：让人知道这堆数字值多少 */}
-        <p className="flex items-center gap-1.5" style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '5px 0 12px' }}>
-          <RefreshCw size={11} /> {b.fresh === null ? '还没有别人更新过这一批' : `这批数据${b.fresh === 0 ? '今天' : ` ${b.fresh} 天前`}刚有人更新过`}，来自 {b.total} 个人
+        <p className="flex items-center gap-1.5" style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '5px 0 0' }}>
+          <RefreshCw size={11} /> {b.fresh === null ? '还没有别人更新过' : `${b.fresh === 0 ? '今天' : ` ${b.fresh} 天前`}刚有人更新过`}，来自 {b.total} 个人
         </p>
-        <div className="flex gap-2">
-          {[['mine', `只看我这批（${b.total}）`], ['cat', `整个 ${me.cat}·${COUNTRY_LABEL[me.country]}（${catData.total}）`]].map(([v, l]) => (
-            <button key={v} onClick={() => setScope(v)}
-              style={{
-                flex: 1, padding: '8px', fontSize: '12.5px', fontWeight: 600, borderRadius: '3px',
-                border: `1px solid ${scope === v ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
-                background: scope === v ? 'var(--gc-green-soft)' : 'var(--gc-surface)',
-                color: scope === v ? 'var(--gc-green-ink)' : 'var(--gc-muted)',
-              }}>{l}</button>
-          ))}
-        </div>
       </div>
 
       {locked ? (
         <div style={{ ...cardBox, background: 'var(--gc-amber-soft)', borderColor: 'var(--gc-amber-border)' }}>
           <p className="flex items-center gap-1.5" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-amber-ink)', marginBottom: '6px' }}>
-            <Lock size={13} /> 这一批还差 {b.needMore} 个人
+            <Lock size={13} /> 这个类别 + 国家还差 {b.needMore} 个人
           </p>
           <p style={{ fontSize: '13px', color: 'var(--gc-amber-ink)', lineHeight: 1.75 }}>
-            不到 {K_MIN} 个人的批次一律不出数——人太少的话，光看类别加日期就能猜到是谁。
-            先看右边那个整类别的口径，或者把卡发给同批的人。
+            不到 {K_MIN} 个人的组合一律不出数——人太少的话，光看类别加日期就能猜到是谁。把卡发给同类别的人，凑够了就自动解锁。
           </p>
         </div>
       ) : (
         <>
           <div style={{ ...cardBox, background: 'var(--gc-paper-soft)' }}>
             <p style={{ fontSize: '14px', color: 'var(--gc-ink)', lineHeight: 1.8 }}>
-              这{scope === 'mine' ? '一批' : '个类别'}一共 <b>{data.total}</b> 个人，
+              同类别同国家一共 <b>{data.total}</b> 个人，
               中位已等 <b>{data.medianWait}</b> 个月，平均已等 <b>{data.meanWait}</b> 个月。
               {data.stageN > 0 && <> 其中 {data.stageN} 个登记过完整进度，<b>{data.approvedN}</b> 个已经批准。</>}
-              {scope === 'mine' && <> 你在这批里排第 <b>{b.rank}</b> 位。</>}
+              你排第 <b>{b.rank}</b> 位。
             </p>
           </div>
 
@@ -726,7 +717,7 @@ const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
               </>
             ) : (
               <p style={{ fontSize: '12.5px', color: 'var(--gc-muted)', margin: '3px 0 0', lineHeight: 1.7 }}>
-                这{scope === 'mine' ? '批' : '类'}里还没人登记过逐步进度（多数人只留了类别和优先日）——凑齐第一个人就会出现在这里。
+                这类里还没人登记过逐步进度（多数人只留了类别和优先日）——凑齐第一个人就会出现在这里。
               </p>
             )}
           </div>
@@ -734,7 +725,7 @@ const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
           {/* ④ 只到月，不到日——后端已经粗化过了 */}
           {data.stageN > 0 && (
             <div style={cardBox}>
-              <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>这{scope === 'mine' ? '批' : '类'}人各步都在什么时候走过</p>
+              <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>这类人各步都在什么时候走过</p>
               <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 10px', lineHeight: 1.6 }}>
                 「走过这一步的人」不是「停在这一步的人」，所以人数会比上面那张图多。只到月份，不显示具体哪一天，也不显示是谁。
               </p>

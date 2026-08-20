@@ -175,8 +175,13 @@ async function hydrate(env, ownerId) {
   const subCatRows = subPop.filter((r) => r.cat === me.cat && r.country === me.country);
 
   const myQuarter = quarterOf(me.priority_date);
-  const mates = catRows.filter((r) => quarterOf(r.priority_date) === myQuarter);        // D1-only: stage funnel needs real stage dates
-  const subMates = subCatRows.filter((r) => quarterOf(r.priority_date) === myQuarter);  // subscriber-only, same quarter
+  // "batch" used to mean "same quarter" — narrow enough that most visitors' quarter
+  // had nobody else in it, tripping the K_MIN gate even though the category as a
+  // whole has plenty of people. It now means "same cat+country", same population as
+  // `cat` below; only the label ("2024 年 Q3 这一批") still names your own quarter.
+  // D1-only for stage funnel (subscribers never report stage dates).
+  const mates = catRows;
+  const subMates = subCatRows;
   const mergedBatchRows = [...mates, ...subMates];                                       // for total/median/mean/rank
   const myStageIdx = stageIdxOf(me);
 
