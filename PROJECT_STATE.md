@@ -105,6 +105,12 @@ Codemagic——**这一步的 API Key 权限建议选 Admin**（低权限角色�
 
 （PR #3 —— 预测页改用真实数据 —— 已于 08-07 合并上线，交叉点 2037→2033。）
 
+**2026-08-20 已修复并推送**：`functions/api/admin/subscribers.js` 的按前缀跳过名单漏了
+`trkl:`（`tracker.js` 排期查询页的限流计数器前缀），导致这些裸数字计数器被当成订阅记录混进
+`/api/admin/subscribers` 返回列表，kb 侧 `subs.sh` 读取时因拿到 int 而不是 dict 报错崩溃。
+commit `f156f60`，已推送到 main（只改了这一行，跟本轮 iOS 打包的未提交改动互不冲突），会跟着
+Cloudflare Pages 自动部署上线。kb 侧脚本此前已加的防御（跳过非 dict 项）保留，双重保险。
+
 ---
 
 ## PR #3 做了什么（等合并）
@@ -1014,6 +1020,70 @@ Cloudflare 自动建了预览部署：`https://f8956006.greencardtracker-brv.pag
 
 ---
 
+## 第 29 轮（2026-08-20，接第 28 轮）：D1 绑定完成、合并 main 上线、自动加入、图表换真实大样本
+
+### D1 绑定 + 合并 main（业主在 Dashboard 手动操作，我这边验证）
+
+业主在 Cloudflare Pages Dashboard → Settings → Bindings 里，给 Production 和 Preview 两个环境
+都加了 D1 database 绑定（`DB` → `gctracker`）。绑定生效需要新部署（Retry 不算），先用一个空
+commit 触发（`7fd2811`），确认 `/api/tracker` 在生产环境不再 500。业主问清楚 `feat/tracker`
+分支是什么、确认「做！」之后合并进 `main`，`gc.jmjvc.us` 正式带上众包进度墙功能。合并后
+`curl` 一度收到旧 HTML（边缘缓存没刷新，不是真故障），加时间戳参数重试后恢复正常。
+
+### 自动加入（不用重填表单）
+
+业主原话「有没有默认就有……不需要给那么多其他信息」——选了「自动用已知信息交一条，别再问
+一遍」而不是「只读预览不留数据」。逻辑：进「社区」tab 时如果本站已经知道你的类别+优先日
+（首次引导时填过），自动 POST 一条到 D1（阶段日期全留空），直接出卡，跳过填表页。`CardView`
+加了 `autoJoined` 时的透明提示（「用你已经填过的……不想加入的话点『改一下我填的』可以改」），
+不完全隐式。commit `fd46342`，已推 main。上线后清测试记录时，D1 里发现一条不是我建的真实
+记录（EB3·台湾·2024-07-15）——大概率是自动加入功能已经被真实访客用了，没有删，只删了自己
+那条测试记录。
+
+### 图表"太单调"——换成真实的 90+ 订阅者做样本，不再只看 D1 那 1、2 条
+
+业主看完线上效果说位置图/阶段图太单调，要求"无论是谁一点进去都要看到 bar chart、histogram、
+line chart，还要有排名、平均数、中位数"。根因不是图表组件本身有问题（`RankBar`、
+`StageHistogram`、`BatchView` 里的季度折线图早就是真正的图表组件），是数据源太小——D1
+`cases` 表是全新的 opt-in 表，刚上线时只有个位数真实记录，`total`/`enough` 卡在 K_MIN=5
+门槛下面，图表整块被隐藏。
+
+真正的大样本其实早就在了：`SUBSCRIBERS` KV 里有 90+ 个已确认邮件订阅者，每人的
+`userCase.{category,country,priorityDate}` 从订阅表单收集，跟 `cases` 表问的是同一件事，
+只是入口不同（`~/kb/scripts/gctracker/subs.sh -a` 能查，08-20 实测 EB2 21/F4 20/EB3 16/
+EB1 10/EB4 8/EW 7/F2B 6/EB5 5/F2A 3/SR 1）。方案是把这两个population 合并，但只合并"总人数/
+中位数/平均数/排名/季度分布直方图"这几项——阶段进度（递交/收件/指纹……）不合并，因为订阅者
+没填过那些日期，硬合并会让"大家走到哪一步了"图表显示成一堆假的"还没递交"。
+
+改动在 `functions/api/tracker.js`：
+- 新增 `subscriberPopulation(env)`：遍历 `SUBSCRIBERS` KV（复用
+  `admin/subscribers.js` 那套按前缀跳过限流/分析/进度墙/社区互动等非订阅者 key 的过滤逻辑），
+  取 `confirmed===true` 且类别/国别/优先日合法的记录，结果缓存进 KV（`cs:subpop:v1`，15 分钟
+  TTL）——避免每次请求都全量 list+get 一遍 KV。
+- 新增 `aggregatePop(rows)`：只算 `total`/`medianWait`/`meanWait`，D1 行和订阅者行统一按
+  `priority_date` 算等待时长（订阅者没有 `d_approved`，自动按"还在等"处理，语义正确）。
+- `hydrate()` 改成两条平行的聚合：`stageAgg`（D1-only，喂 `stageDist`/`walked`/`approvedN`，
+  语义不变）+ `popAgg`（D1 ∪ 订阅者合并，喂 `total`/`rank`/`medianWait`/`meanWait`/K_MIN 门槛
+  判断、以及 `cat.chart.buckets` 季度直方图）。返回结构新增 `stageN` 字段区分"填过完整进度的
+  人数"和"总人数"两个不同分母。
+
+前端 `src/Tracker.jsx` 配合调整：
+- `CardView` 的"位置图+阶段图"从硬性 `b.total > 1` 才显示，改成看 `b.enough`（K_MIN 判断），
+  不够时显示"还差 N 人"提示而不是整块消失（跟 `BatchView` 已有的 `locked` 套路保持一致）。
+  阶段图额外加了"只算 N 个登记过完整进度的人"的说明，避免"排第 9 位/共 16 人"和"阶段图只有
+  1 个批准"两个数字放在一起显得矛盾。
+- `BatchView` 汇总段落加了平均等待（原来只有中位数），阶段相关的两个板块（阶段柱状图、
+  "各步都在什么时候走过"）在 `stageN === 0` 时改成一句提示文字，不再渲染全零的空图表。
+
+本地用 `wrangler pages dev --local` 真实 D1+KV 验证过：手动往本地 KV 塞了几条模拟订阅者记录
+（不同季度/已确认/未确认都测了），确认未确认的被过滤掉、跨季度的正确分流进 `cat` 但不进
+`batch`、`stageDist`/`walked` 不被订阅者数据污染，Playwright 截图（`shot_bigpop.mjs`，未提交）
+确认位置条形图、阶段柱状图、季度折线图三种图表和排名/中位数/平均数文案都正常渲染。
+
+**尚未推送**——这轮改完在本地验证通过，正等业主看完再决定是否推 `main`。
+
+---
+
 ## 别重踩的坑
 
 - **推 `main` 即上线**（Cloudflare Pages 自动部署），推送前先问用户。改动走功能分支 + PR。
@@ -1029,6 +1099,13 @@ Cloudflare 自动建了预览部署：`https://f8956006.greencardtracker-brv.pag
 - **Retry deployment 不会应用新的 KV 绑定/变量**，它重放旧部署的配置快照，必须触发新部署。
 - **`gh auth login` 默认权限不含 `workflow`**，要动 `.github/workflows/` 需 `gh auth refresh -s workflow`。
 - **限流计数器和订阅数据同在 `SUBSCRIBERS` KV**，前缀 `rl:`，遍历订阅者时必须跳过。
+- **`SUBSCRIBERS` KV 里混了一堆用途的 key**（限流 `rl:`/`trkl:`、分析 `an:`、邮件事件
+  `ev:`/`es:`、进度墙 `pr:`/`prl:`、社区互动 `cd:`/`crl:`），真正的订阅者记录是裸 email 做
+  key、没有前缀。新写任何"遍历全部订阅者"的逻辑，前缀跳过表必须完整抄一份（见
+  `admin/subscribers.js` 或第 29 轮 `subscriberPopulation()`），漏一个前缀就会把非订阅者的
+  裸数字/短记录当 JSON 解析出错或者当假订阅者混进统计——第 29 轮之前已经因为漏了 `trkl:`
+  导致 `subs.sh` 崩溃过一次（commit `f156f60`）。全量 list+get 有 KV 读取成本，遍历结果要缓存
+  （15 分钟 TTL 起步），不要每个请求都扫一遍。
 
 ---
 

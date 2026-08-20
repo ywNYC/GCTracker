@@ -91,6 +91,63 @@ function aggregate(rows, myStageIdx) {
   };
 }
 
+// ============================================================
+// Subscriber population — the opt-in `cases` D1 table starts near-empty on
+// launch day, so an early adopter sees "共 1 人" and every chart stays
+// hidden, not because the site is dead but because nobody else has clicked
+// "加入" yet. SUBSCRIBERS KV already holds every confirmed email
+// subscriber's {category, country, priorityDate} from the signup form —
+// same population asking the same question, just a different entry point —
+// so total/median/mean/rank/the quarter histogram merge it in. Stage-by-
+// stage progress (filed/receipt/bio/...) stays D1-only: subscribers never
+// report those dates, so mixing them in would make it look like ~90 people
+// "haven't filed" when we simply don't know.
+// ============================================================
+const SUB_CACHE_KEY = 'cs:subpop:v1';
+const SUB_CACHE_TTL = 900; // 15min — bounds KV list+get cost under real traffic
+const SUB_SKIP_PREFIXES = ['rl:', 'an:', 'ev:', 'es:', 'pr:', 'prl:', 'cd:', 'crl:', 'trkl:'];
+
+async function subscriberPopulation(env) {
+  try {
+    const cached = await env.SUBSCRIBERS.get(SUB_CACHE_KEY);
+    if (cached) return JSON.parse(cached);
+  } catch { /* fall through to a live rebuild */ }
+
+  const rows = [];
+  try {
+    let cursor;
+    do {
+      const list = await env.SUBSCRIBERS.list({ cursor });
+      for (const k of list.keys) {
+        if (SUB_SKIP_PREFIXES.some((p) => k.name.startsWith(p))) continue;
+        let rec;
+        try { rec = JSON.parse(await env.SUBSCRIBERS.get(k.name)); } catch { continue; }
+        if (!rec || rec.confirmed !== true) continue;
+        const uc = rec.userCase;
+        if (!uc || !CATS.includes(uc.category) || !COUNTRIES.includes(uc.country)) continue;
+        if (!isDate(uc.priorityDate) || uc.priorityDate < MIN_PD || uc.priorityDate > today()) continue;
+        rows.push({ cat: uc.category, country: uc.country, priority_date: uc.priorityDate });
+      }
+      cursor = list.list_complete ? null : list.cursor;
+    } while (cursor);
+  } catch { return rows; } // partial/failed listing still returns what we got
+
+  try { await env.SUBSCRIBERS.put(SUB_CACHE_KEY, JSON.stringify(rows), { expirationTtl: SUB_CACHE_TTL }); } catch {}
+  return rows;
+}
+
+// total/medianWait/meanWait only — no stage fields, so this is the shape
+// merged D1+subscriber rows can share (subscriber rows have no d_approved,
+// which correctly falls back to "still waiting since priority_date").
+function aggregatePop(rows) {
+  const waits = rows.map((r) => monthsBetween(r.priority_date, r.d_approved || today()));
+  return {
+    total: rows.length,
+    medianWait: median(waits),
+    meanWait: waits.length ? Math.round(waits.reduce((a, b) => a + b, 0) / waits.length) : null,
+  };
+}
+
 async function recentTicker(env) {
   const { results } = await env.DB.prepare(
     `SELECT cat, country, priority_date, updated_at FROM cases WHERE d_approved IS NOT NULL ORDER BY updated_at DESC LIMIT 20`
@@ -114,19 +171,26 @@ async function hydrate(env, ownerId) {
   const { results: catRows } = await env.DB.prepare(
     `SELECT * FROM cases WHERE cat = ? AND country = ?`
   ).bind(me.cat, me.country).all();
+  const subPop = await subscriberPopulation(env);
+  const subCatRows = subPop.filter((r) => r.cat === me.cat && r.country === me.country);
 
   const myQuarter = quarterOf(me.priority_date);
-  const mates = catRows.filter((r) => quarterOf(r.priority_date) === myQuarter);
+  const mates = catRows.filter((r) => quarterOf(r.priority_date) === myQuarter);        // D1-only: stage funnel needs real stage dates
+  const subMates = subCatRows.filter((r) => quarterOf(r.priority_date) === myQuarter);  // subscriber-only, same quarter
+  const mergedBatchRows = [...mates, ...subMates];                                       // for total/median/mean/rank
   const myStageIdx = stageIdxOf(me);
 
-  const batchAgg = aggregate(mates, myStageIdx);
-  const rank = mates.filter((r) => r.priority_date < me.priority_date).length + 1;
+  const stageAgg = aggregate(mates, myStageIdx);
+  const popAgg = aggregatePop(mergedBatchRows);
+  const rank = mergedBatchRows.filter((r) => r.priority_date < me.priority_date).length + 1;
   const others = mates.filter((r) => r.owner_id !== ownerId);
   const fresh = others.length ? Math.min(...others.map((r) => Math.max(0, Math.floor((Date.now() - Date.parse(r.updated_at)) / 86400000)))) : null;
 
-  const catAgg = aggregate(catRows, myStageIdx);
+  const mergedCatRows = [...catRows, ...subCatRows];
+  const catPopAgg = aggregatePop(mergedCatRows);
+  const catStageAgg = aggregate(catRows, myStageIdx);
   const chartMap = new Map();
-  for (const r of catRows) {
+  for (const r of mergedCatRows) {
     const q = quarterOf(r.priority_date);
     const cur = chartMap.get(q) || { q, count: 0, mine: q === myQuarter };
     cur.count += 1;
@@ -143,12 +207,18 @@ async function hydrate(env, ownerId) {
       label: `${batchShort(me.priority_date)} · ${me.cat} · ${me.country}`,
       short: batchShort(me.priority_date),
       rank, fresh,
-      enough: batchAgg.total >= K_MIN,
-      needMore: Math.max(0, K_MIN - batchAgg.total),
+      enough: popAgg.total >= K_MIN,
+      needMore: Math.max(0, K_MIN - popAgg.total),
       sameStep: mates.filter((r) => r.owner_id !== ownerId && stageIdxOf(r) === myStageIdx).length,
-      ...batchAgg,
+      total: popAgg.total, medianWait: popAgg.medianWait, meanWait: popAgg.meanWait,
+      approvedN: stageAgg.approvedN,
+      stageDist: stageAgg.stageDist, stageN: mates.length, walked: stageAgg.walked,
     },
-    cat: { ...catAgg, chart: { buckets, max: Math.max(1, ...buckets.map((b) => b.count)) } },
+    cat: {
+      total: catPopAgg.total, medianWait: catPopAgg.medianWait, meanWait: catPopAgg.meanWait,
+      approvedN: catStageAgg.approvedN, stageDist: catStageAgg.stageDist, stageN: catRows.length, walked: catStageAgg.walked,
+      chart: { buckets, max: Math.max(1, ...buckets.map((b) => b.count)) },
+    },
     ticker: await recentTicker(env),
   };
 }

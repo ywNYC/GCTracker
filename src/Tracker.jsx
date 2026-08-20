@@ -379,17 +379,38 @@ const CardView = ({ me, b, autoJoined, onBack, onBatch }) => {
         </p>
       </div>
 
-      {/* "你在哪个位置"：分段条形图（前面/你/后面）+ 阶段直方图（大家走到哪一步了） */}
-      {b.total > 1 && (
-        <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '16px 18px', marginBottom: '10px' }}>
-          <p className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>你在这一批里的位置</p>
-          <RankBar rank={b.rank} total={b.total} />
-          <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '8px', marginBottom: '14px' }}>
-            位置按优先日先后排，不是案子的等待进度。
+      {/* "你在哪个位置"：分段条形图（前面/你/后面）+ 阶段直方图（大家走到哪一步了）
+          总人数/排名现在是「D1 已登记 + 已确认邮件订阅」合并算的，样本比刚上线时
+          大得多；不到 K_MIN 的冷门类别才退回"还差 N 人"提示，不再整块隐藏。 */}
+      <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '16px 18px', marginBottom: '10px' }}>
+        {b.enough ? (
+          <>
+            <p className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>你在这一批里的位置</p>
+            <RankBar rank={b.rank} total={b.total} />
+            <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '8px' }}>
+              位置按优先日先后排，不是案子的等待进度。同批 <b>{b.total}</b> 人里，中位等 <b>{b.medianWait}</b> 个月，平均等 <b>{b.meanWait}</b> 个月。
+            </p>
+            {b.stageN > 0 && (
+              <>
+                <p className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', margin: '14px 0 8px' }}>大家走到哪一步了</p>
+                <StageHistogram stageDist={b.stageDist} />
+                <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px' }}>
+                  只算 {b.stageN} 个填过完整进度的人，不是全部 {b.total} 人——多数订阅者只留了类别和优先日，没有逐步日期。
+                </p>
+              </>
+            )}
+          </>
+        ) : (
+          <p style={{ fontSize: '13px', color: 'var(--gc-amber-ink)', lineHeight: 1.75 }}>
+            这一批目前只有 <b>{b.total}</b> 人，还差 <b>{b.needMore}</b> 人才够 {K_MIN} 人的最低展示门槛——人太少的话，光看类别加优先日就能猜到是谁，所以先不出细分图。把卡发给同批的人，凑够了就自动解锁。
           </p>
-          <p className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>大家走到哪一步了</p>
-          <StageHistogram stageDist={b.stageDist} />
-        </div>
+        )}
+      </div>
+
+      {b.approvedN > 0 && (
+        <p style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', marginBottom: '10px' }}>
+          这批已经批准 <b>{b.approvedN}</b> 个（来自 {b.stageN} 个登记过完整进度的人）。
+        </p>
       )}
 
       <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '18px' }}>
@@ -645,8 +666,8 @@ const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
           <div style={{ ...cardBox, background: 'var(--gc-paper-soft)' }}>
             <p style={{ fontSize: '14px', color: 'var(--gc-ink)', lineHeight: 1.8 }}>
               这{scope === 'mine' ? '一批' : '个类别'}一共 <b>{data.total}</b> 个人，
-              中位已等 <b>{data.medianWait}</b> 个月，
-              已经批准 <b>{data.approvedN}</b> 个。
+              中位已等 <b>{data.medianWait}</b> 个月，平均已等 <b>{data.meanWait}</b> 个月。
+              {data.stageN > 0 && <> 其中 {data.stageN} 个登记过完整进度，<b>{data.approvedN}</b> 个已经批准。</>}
               {scope === 'mine' && <> 你在这批里排第 <b>{b.rank}</b> 位。</>}
             </p>
           </div>
@@ -683,40 +704,51 @@ const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
 
           <div style={cardBox}>
             <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>大家走到哪一步了</p>
-            <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 12px', lineHeight: 1.6 }}>
-              每人只算最靠后的那一步。{data.stageDist.notFiled > 0 && `另有 ${data.stageDist.notFiled} 人还没递交。`}
-            </p>
-            {data.stageDist.counts.map((c) => (
-              <div key={c.key} className="flex items-center gap-2" style={{ marginBottom: '7px' }}>
-                <span style={{ width: '54px', flexShrink: 0, fontSize: '12.5px', fontWeight: c.mine ? 700 : 500, color: c.mine ? 'var(--gc-amber-ink)' : 'var(--gc-ink-soft)' }}>{c.label}</span>
-                <div style={{ flex: 1, height: '15px', background: 'var(--gc-paper-soft)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{
-                    width: `${(c.count / data.stageDist.max) * 100}%`, height: '100%',
-                    background: c.mine ? 'var(--gc-amber-fill)' : 'var(--gc-green-fill)',
-                    borderRight: c.count ? `2px solid ${c.mine ? 'var(--gc-amber)' : 'var(--gc-green)'}` : 'none',
-                  }} />
-                </div>
-                <span className="gc-mono" style={{ width: '36px', flexShrink: 0, textAlign: 'right', fontSize: '12px', color: 'var(--gc-ink-soft)' }}>{c.count} 人</span>
-              </div>
-            ))}
+            {data.stageN > 0 ? (
+              <>
+                <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 12px', lineHeight: 1.6 }}>
+                  只算 {data.stageN} 个登记过完整进度的人（不是全部 {data.total} 人），每人只算最靠后的那一步。
+                  {data.stageDist.notFiled > 0 && `另有 ${data.stageDist.notFiled} 人还没递交。`}
+                </p>
+                {data.stageDist.counts.map((c) => (
+                  <div key={c.key} className="flex items-center gap-2" style={{ marginBottom: '7px' }}>
+                    <span style={{ width: '54px', flexShrink: 0, fontSize: '12.5px', fontWeight: c.mine ? 700 : 500, color: c.mine ? 'var(--gc-amber-ink)' : 'var(--gc-ink-soft)' }}>{c.label}</span>
+                    <div style={{ flex: 1, height: '15px', background: 'var(--gc-paper-soft)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${(c.count / data.stageDist.max) * 100}%`, height: '100%',
+                        background: c.mine ? 'var(--gc-amber-fill)' : 'var(--gc-green-fill)',
+                        borderRight: c.count ? `2px solid ${c.mine ? 'var(--gc-amber)' : 'var(--gc-green)'}` : 'none',
+                      }} />
+                    </div>
+                    <span className="gc-mono" style={{ width: '36px', flexShrink: 0, textAlign: 'right', fontSize: '12px', color: 'var(--gc-ink-soft)' }}>{c.count} 人</span>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <p style={{ fontSize: '12.5px', color: 'var(--gc-muted)', margin: '3px 0 0', lineHeight: 1.7 }}>
+                这{scope === 'mine' ? '批' : '类'}里还没人登记过逐步进度（多数人只留了类别和优先日）——凑齐第一个人就会出现在这里。
+              </p>
+            )}
           </div>
 
           {/* ④ 只到月，不到日——后端已经粗化过了 */}
-          <div style={cardBox}>
-            <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>这{scope === 'mine' ? '批' : '类'}人各步都在什么时候走过</p>
-            <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 10px', lineHeight: 1.6 }}>
-              「走过这一步的人」不是「停在这一步的人」，所以人数会比上面那张图多。只到月份，不显示具体哪一天，也不显示是谁。
-            </p>
-            {STEPS.slice().reverse().map((s) => {
-              const w = data.walked[s.key];
-              if (!w) return null;
-              return (
-                <p key={s.key} style={{ fontSize: '13px', color: 'var(--gc-ink-soft)', lineHeight: 1.9 }}>
-                  <b>{s.label}</b>：{w.count} 人走过，最早 <span className="gc-mono">{w.first}</span>，最近 <span className="gc-mono">{w.last}</span>
-                </p>
-              );
-            })}
-          </div>
+          {data.stageN > 0 && (
+            <div style={cardBox}>
+              <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>这{scope === 'mine' ? '批' : '类'}人各步都在什么时候走过</p>
+              <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 10px', lineHeight: 1.6 }}>
+                「走过这一步的人」不是「停在这一步的人」，所以人数会比上面那张图多。只到月份，不显示具体哪一天，也不显示是谁。
+              </p>
+              {STEPS.slice().reverse().map((s) => {
+                const w = data.walked[s.key];
+                if (!w) return null;
+                return (
+                  <p key={s.key} style={{ fontSize: '13px', color: 'var(--gc-ink-soft)', lineHeight: 1.9 }}>
+                    <b>{s.label}</b>：{w.count} 人走过，最早 <span className="gc-mono">{w.first}</span>，最近 <span className="gc-mono">{w.last}</span>
+                  </p>
+                );
+              })}
+            </div>
+          )}
 
           <BatchPoll b={b} />
 
