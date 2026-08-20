@@ -148,6 +148,28 @@ function aggregatePop(rows) {
   };
 }
 
+// How long people have actually waited (priority_date → approved, or → today if
+// still waiting), bucketed — not what step they're on. Uses the same merged
+// D1+subscriber population as popAgg, so it's populated even for visitors who
+// never filled in stage dates (unlike the old stage-progress funnel).
+const WAIT_BUCKETS = [
+  { key: 'lt1', label: '不到1年', maxMonths: 12 },
+  { key: '1to2', label: '1-2年', maxMonths: 24 },
+  { key: '2to3', label: '2-3年', maxMonths: 36 },
+  { key: '3to5', label: '3-5年', maxMonths: 60 },
+  { key: 'gt5', label: '5年以上', maxMonths: Infinity },
+];
+const bucketIdxOf = (months) => {
+  const i = WAIT_BUCKETS.findIndex((b) => months < b.maxMonths);
+  return i < 0 ? WAIT_BUCKETS.length - 1 : i;
+};
+function waitHistogram(rows, myMonths) {
+  const counts = WAIT_BUCKETS.map((b) => ({ key: b.key, label: b.label, count: 0, mine: false }));
+  for (const r of rows) counts[bucketIdxOf(monthsBetween(r.priority_date, r.d_approved || today()))].count += 1;
+  counts[bucketIdxOf(myMonths)].mine = true;
+  return { counts, max: Math.max(1, ...counts.map((c) => c.count)) };
+}
+
 async function recentTicker(env) {
   const { results } = await env.DB.prepare(
     `SELECT cat, country, priority_date, updated_at FROM cases WHERE d_approved IS NOT NULL ORDER BY updated_at DESC LIMIT 20`
@@ -202,6 +224,8 @@ async function hydrate(env, ownerId) {
     chartMap.set(q, cur);
   }
   const buckets = [...chartMap.values()].sort((a, b) => a.q.localeCompare(b.q));
+  const myMonths = monthsBetween(me.priority_date, me.d_approved || today());
+  const waitHist = waitHistogram(mergedCatRows, myMonths);
 
   return {
     record: {
@@ -218,10 +242,12 @@ async function hydrate(env, ownerId) {
       total: popAgg.total, medianWait: popAgg.medianWait, meanWait: popAgg.meanWait,
       approvedN: stageAgg.approvedN,
       stageDist: stageAgg.stageDist, stageN: mates.length, walked: stageAgg.walked,
+      waitHist,
     },
     cat: {
       total: catPopAgg.total, medianWait: catPopAgg.medianWait, meanWait: catPopAgg.meanWait,
       approvedN: catStageAgg.approvedN, stageDist: catStageAgg.stageDist, stageN: catRows.length, walked: catStageAgg.walked,
+      waitHist,
       chart: { buckets, max: Math.max(1, ...buckets.map((b) => b.count)) },
     },
     ticker: await recentTicker(env),

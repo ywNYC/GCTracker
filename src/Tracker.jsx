@@ -296,10 +296,11 @@ const RankBar = ({ rank, total }) => {
   );
 };
 
-// 阶段直方图：b.stageDist 后端已经按"每人只算最靠后一步"分好桶了，这里只是
-// 画出来——柱子高度是人数，你自己在的那根柱子用琥珀色。
-const StageHistogram = ({ stageDist }) => {
-  const { counts, max } = stageDist;
+// 通用柱状直方图：吃 {counts:[{key,label,count,mine}], max} 这个形状——阶段分布
+// （b.stageDist）和等待时长分布（b.waitHist）后端都按这个形状算好了，这里共用一份
+// 画法。柱子高度是人数，你自己落在的那根柱子用琥珀色。
+const BarHistogram = ({ dist }) => {
+  const { counts, max } = dist;
   return (
     <div>
       <div className="flex items-end" style={{ gap: '7px', height: '72px' }}>
@@ -390,10 +391,17 @@ const CardView = ({ me, b, autoJoined, onBack, onBatch }) => {
             <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '8px' }}>
               位置按优先日先后排，不是案子的等待进度。同批 <b>{b.total}</b> 人里，中位等 <b>{b.medianWait}</b> 个月，平均等 <b>{b.meanWait}</b> 个月。
             </p>
+
+            <p className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', margin: '14px 0 8px' }}>大家等了多久</p>
+            <BarHistogram dist={b.waitHist} />
+            <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px' }}>
+              等待时长 = 优先日到现在（已批准的算到批准那天），按人数分桶，不看具体某一天。
+            </p>
+
             {b.stageN > 0 && (
               <>
                 <p className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', margin: '14px 0 8px' }}>大家走到哪一步了</p>
-                <StageHistogram stageDist={b.stageDist} />
+                <BarHistogram dist={b.stageDist} />
                 <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px' }}>
                   只算 {b.stageN} 个填过完整进度的人，不是全部 {b.total} 人——多数订阅者只留了类别和优先日，没有逐步日期。
                 </p>
@@ -691,6 +699,14 @@ const BatchView = ({ me, b, catData, summary, onBack, onFill }) => {
                 </g>
               ))}
             </svg>
+          </div>
+
+          <div style={cardBox}>
+            <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>大家等了多久</p>
+            <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 10px', lineHeight: 1.6 }}>
+              优先日到现在（已批准的算到批准那天），按人数分桶。
+            </p>
+            <BarHistogram dist={data.waitHist} />
           </div>
 
           <div style={cardBox}>
