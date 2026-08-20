@@ -931,7 +931,86 @@ POST body 本来就不带 `name` 字段（第 17 轮就记录过这个已知缺�
 1. 业主去 Dashboard 把 D1 绑到 `greencardtracker` 项目（变量名 `DB`），绑完触发新部署——
    这步做完之前，推上 `main` 后线上的 `/api/tracker` 会因为 `env.DB` 不存在直接报 500。
 2. `BatchPoll` 投票百分比还是占位数字，要接真数据是另一轮的事。
-3. 全程没 commit、没 push，等业主看完说推再推。
+3. ~~全程没 commit、没 push，等业主看完说推再推~~ ——第 28 轮已经 commit + push
+   到 `feat/tracker`（不是 main），见下方。
+
+---
+
+## 第 28 轮（2026-08-20）：「如果」tab 让位给「社区」，位置图重做，commit + push 到 feat/tracker（未合并 main）
+
+同一天内、接第 27 轮之后继续。业主在会话里连续给了三轮反馈，这轮全部做完了：
+
+### 1. 导航结构变了：「如果」(CompareHub) 让位给「社区」
+
+业主原话「这个可以把'如果'这个tab替代，换成'社区'」——不新开导航位（依然只有 6 个 tab），
+把原来挂在「如果」位置的 `CompareHub` 挪进新「社区」tab 底部的 `<details>`（默认收起，
+标题「如果换类别、换身份会更快吗」），`CompareHub` 组件本身一行没删，只是不再占独立导航位。
+新「社区」tab（`tab === 'compare'` 这个 id 复用了，只是 label/icon 换了）内容从上到下是：
+`TrackerPage`（案件进度墙，从「动态」tab 挪过来）→ `CommunityHub`（投票/打卡墙/调查，
+原来缩在「总结」页最底下，现在提到独立 tab）→ 收起的 `CompareHub`。
+翻译对象里 `navCompare` 的三语字符串（`如果`/如果`/`What if`）改成了 `社区`/`社區`/`Community`，
+key 名字没动（省得再改别处引用）。图标从 `Target` 换成 `Users`。
+
+新增组件 `CommunityPage`（`src/App.jsx`，紧跟在 `CompareHub` 定义之后），是这轮唯一新增的
+拼装组件，纯粹组合上面三块，没有自己的业务逻辑。
+
+**「动态」tab 现在干净了**——`TrackerPage` 的挂载点从 `tab === 'update'` 分支移到了
+`tab === 'compare'` 分支，「总结」页底部也不再渲染 `CommunityHub`。
+
+### 2. 打卡墙默认收起到 5 条
+
+业主原话「打卡墙占用位置太多，收起来」。`CommunityHub`（`src/App.jsx`，`wall` tab 渲染块）
+新增本地状态 `wallExpanded`（默认 `false`），列表默认 `wall.entries.slice(0, 5)`，超过 5 条
+才出现「展开全部 N 条」按钮，点了变「收起」。纯前端截断，不改 `/api/community` 返回的数据
+（后端本来就只返回最近 20 条，这条不用动）。
+
+### 3. 「你在哪个位置」重做了两轮才定型
+
+第一版做了两个方案给业主看（位置刻度尺 `RankGauge` + 排队点阵 `RankQueueDots`），业主反馈
+「都做的不怎么样，有没有bar chart或者histogram」，两个方案整个删掉重做，换成：
+
+- **`RankBar`**（分段条形图）：整条按"前面 N 人 / 你 / 后面 M 人"分三段，你那一段固定
+  给最小可视宽度（否则人多时你那一段会细成看不见的一条线），下面配一行直接标数字的说明，
+  另加一句「位置按优先日先后排，不是案子的等待进度」——防止被当成完成度进度条看。
+- **`StageHistogram`**（阶段直方图）：真正的柱状图，直接吃 `b.stageDist`（后端第 27 轮
+  已经算好、`CardView` 本来就有这个 prop，零新增数据），你自己在的那根柱子琥珀色高亮。
+
+两个都只用 `rank`/`total`/`stageDist`，不需要任何人的原始逐条数据，后端一行没改。
+
+### 4. 进度卡（`ProgressCardSVG`）数字顶到统计框上边框——第 26 轮遗留的排版 bug，这轮修了
+
+业主反馈「文字都顶到边框上沿了」。根因：`bigNum()` 里数字用 86px 字号，原来基线定在
+`y=522`，而统计框 `<rect y="468" height="176">` 顶边在 468——86px 字体的上伸部分大概
+65px 高，`522-65=457`，比框顶（468）还高 11px，数字顶部实际上探出了框的上边框。
+改法：把整组文字（数字/label/sub-label）基线整体下移，数字 `522→548`、label `570→594`、
+sub-label `608→624`，两条分隔竖线 `y1/y2` 从 `502/612` 改成 `526/620`，"还差 N 人"那个
+分支的三行文字同步下移对齐。这是 `ProgressCardSVG` 里的问题，第 26 轮写的时候就带着，
+不是这轮新引入的——以后再手调这张卡的坐标，字号超过 60px 的文字都要留这个心。
+
+### 验证方式
+
+`npm run build` → `wrangler pages dev dist` 本地起真后端 → Playwright 截图验证（脚本
+`shot_community.mjs`/`shot_rankcharts.mjs`/`shot_barchart_wall.mjs`/`shot_verify_fix.mjs`，
+未跟踪，跟第 26/27 轮的 `shot_tracker*.mjs` 一个套路）：导航栏文字确认变了、社区页三块都在、
+CompareHub 展开后功能完整、打卡墙收起/展开都好使、进度卡数字不再顶边框。每次测完照
+`CLAUDE.md` 规矩清过 `dist/`。
+
+### 状态：已 commit + push 到 `feat/tracker`，没碰 main
+
+业主原话「改完后你先commit和push，我看看真实长什么样」——这次不是只截图了，是真推了。
+commit `33d9fff`，`git push -u origin feat/tracker`（**不是 main**，生产站 gc.jmjvc.us 没受影响）。
+Cloudflare 自动建了预览部署：`https://f8956006.greencardtracker-brv.pages.dev`。
+
+**这个提交范围是精心挑过的，没有顺手带上第 25 轮那堆 iOS/Capacitor 的未提交改动**
+（`capacitor.config.ts`、`codemagic.yaml`、`ios/` 依然是未跟踪状态，这轮没碰它们，
+以后 `git status` 看到这几个还在很正常，不是漏提交）。`package.json`/`package-lock.json`/
+`node_modules/.package-lock.json` 这三个文件例外——iOS 那轮加的 `@capacitor/*`、
+`typescript` 依赖跟这轮加的 `wrangler` 已经混在同一份 `package.json` 里没法干净拆开，
+这轮直接原样提交了整份（多出来的 capacitor 依赖躺在 devDependencies 里不影响这次的构建）。
+
+**这个预览链接上 `/api/tracker` 会报错**——D1 还没在 Dashboard 绑定（见第 27 轮「下一步」
+第 1 条），社区 tab 的导航结构、CompareHub 收起、打卡墙收起这些纯前端改动能看，
+但填表提交会因为 `env.DB` 不存在直接 500。已经明确告诉业主这条限制。
 
 ---
 
