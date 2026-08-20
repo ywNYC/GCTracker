@@ -328,7 +328,7 @@ const StageHistogram = ({ stageDist }) => {
 // ============================================================
 // 卡片页
 // ============================================================
-const CardView = ({ me, b, onBack, onBatch }) => {
+const CardView = ({ me, b, autoJoined, onBack, onBatch }) => {
   const svgRef = useRef(null);
   const [pngUrl, setPngUrl] = useState(null);
   const stage = myStageIdx(me.dates);
@@ -363,6 +363,12 @@ const CardView = ({ me, b, onBack, onBatch }) => {
       <button onClick={onBack} className="flex items-center gap-1" style={{ fontSize: '13px', color: 'var(--gc-muted)', marginBottom: '10px' }}>
         <ChevronLeft size={14} /> 改一下我填的
       </button>
+
+      {autoJoined && (
+        <p style={{ fontSize: '11.5px', color: 'var(--gc-muted)', marginBottom: '10px', lineHeight: 1.6 }}>
+          用你已经填过的类别和优先日自动帮你加入了这一批，没让你重填一遍——不想加入的话点上面「改一下我填的」可以改。
+        </p>
+      )}
 
       {/* ⑤ 即时共鸣：填完那一秒就告诉你有多少人跟你一样 */}
       <div style={{ background: 'var(--gc-amber-soft)', border: '1px solid var(--gc-amber-border)', borderRadius: '4px', padding: '14px', marginBottom: '10px' }}>
@@ -748,6 +754,25 @@ const TrackerPage = ({ userCase }) => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [autoJoined, setAutoJoined] = useState(false); // 用已知案子信息自动提交的，不是手动点的
+
+  // 提交/更新一条记录，返回后端算好的聚合数据。手动填表和自动加入两条路都走这个。
+  const postCase = async (f) => {
+    const r = await fetch(`${API_BASE}/api/tracker`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ownerId, cat: f.cat, country: f.country, priorityDate: f.priorityDate, path: f.path, center: f.center, dates: f.dates }),
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok || !data?.ok) {
+      const code = data?.error;
+      throw new Error(
+        code === 'rate limited' ? '同一网络今天提交次数用完了，明天再试'
+          : code === 'too large' ? '提交内容太大了'
+            : code || '提交失败，稍后再试'
+      );
+    }
+    return data;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -759,13 +784,30 @@ const TrackerPage = ({ userCase }) => {
         ]);
         if (cancelled) return;
         if (summaryRes) setSummary(summaryRes);
-        if (ownerRes?.record) { setHydrated(ownerRes); setView('card'); }
+        if (ownerRes?.record) { setHydrated(ownerRes); setView('card'); return; }
+
+        // 没有记录：如果本站已经知道你的类别+优先日（在别处设置案子时填过），
+        // 直接用这份信息自动加入这一批，不用再问一遍——阶段日期留空。
+        // 自动加入的这条随时能在卡片页点「改一下我填的」改掉或重填。
+        const autoCat = CATS.includes(userCase?.category) ? userCase.category : null;
+        const autoCountry = COUNTRIES.includes(userCase?.country) ? userCase.country : null;
+        const autoPd = userCase?.priorityDate;
+        const pdValid = typeof autoPd === 'string' && autoPd >= MIN_PD && autoPd <= TODAY;
+        if (autoCat && autoCountry && pdValid) {
+          try {
+            const data = await postCase({ cat: autoCat, country: autoCountry, priorityDate: autoPd, path: 'aos', center: 'unknown', dates: {} });
+            if (cancelled) return;
+            setHydrated(data);
+            setView('card');
+            setAutoJoined(true);
+          } catch { /* 自动加入失败（比如限流）就老实回填表页，不拿错误吓用户 */ }
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [ownerId]);
+  }, [ownerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initial = useMemo(() => (hydrated?.record ? { ...hydrated.record, dates: { ...hydrated.record.dates } } : {
     cat: CATS.includes(userCase?.category) ? userCase.category : 'EB2',
@@ -780,21 +822,10 @@ const TrackerPage = ({ userCase }) => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const r = await fetch(`${API_BASE}/api/tracker`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownerId, cat: f.cat, country: f.country, priorityDate: f.priorityDate, path: f.path, center: f.center, dates: f.dates }),
-      });
-      const data = await r.json().catch(() => null);
-      if (!r.ok || !data?.ok) {
-        const code = data?.error;
-        throw new Error(
-          code === 'rate limited' ? '同一网络今天提交次数用完了，明天再试'
-            : code === 'too large' ? '提交内容太大了'
-              : code || '提交失败，稍后再试'
-        );
-      }
+      const data = await postCase(f);
       setHydrated(data);
       setView('card');
+      setAutoJoined(false); // 手动提交过一次之后，「自动加入」的提示就不用再显示了
     } catch (e) {
       setSubmitError(e.message === 'Failed to fetch' ? '连不上服务器，等会儿再试' : e.message);
     } finally {
@@ -822,7 +853,7 @@ const TrackerPage = ({ userCase }) => {
       ) : (
         <>
           {view === 'form' && <FormView initial={initial} onSubmit={submit} submitting={submitting} submitError={submitError} />}
-          {view === 'card' && hydrated?.record && <CardView me={hydrated.record} b={hydrated.batch} onBack={() => setView('form')} onBatch={() => setView('batch')} />}
+          {view === 'card' && hydrated?.record && <CardView me={hydrated.record} b={hydrated.batch} autoJoined={autoJoined} onBack={() => setView('form')} onBatch={() => setView('batch')} />}
           {view === 'batch' && <BatchView me={hydrated?.record} b={hydrated?.batch} catData={hydrated?.cat} summary={summary} onBack={() => setView(hydrated?.record ? 'card' : 'form')} onFill={() => setView('form')} />}
         </>
       )}
