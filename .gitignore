@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.env
+.env.local
+
+# Local-only Wrangler config for `wrangler pages dev` (D1/KV binding resolution).
+# Deliberately NOT committed: this Pages project is git-integrated (Cloudflare
+# builds from source, not from wrangler.toml), and Cloudflare Pages will start
+# reading a committed wrangler.toml for its own config if one appears in the
+# repo — that's a production-build risk we don't want. See PROJECT_STATE.md 第 27 轮.
+wrangler.toml
+.wrangler/
+
+# iOS / Capacitor build products (kept out even though ios/ project files are committed)
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+ios/.build/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+*.ipa
+*.dSYM.zip
+*.dSYM

@@ -716,7 +716,7 @@ const buildCaseUrl = (siteUrl, userCase, { email, subtypeToken } = {}) => {
   return `${base}/?${p.toString()}`;
 };
 
-export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, notices, noticeI18n, bulletinMonthLabel, language, siteUrl, unsubscribeUrl, subtypeToken, name }) => {
+export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, notices, noticeI18n, bulletinMonthLabel, language, siteUrl, unsubscribeUrl, subtypeToken, name, batchNews }) => {
   const lang = language === 'en' ? 'en' : 'zh';
   const caseUrl = buildCaseUrl(siteUrl, userCase, { email, subtypeToken });
   // Optional — most records predate this field. Absent name falls back to the
@@ -725,6 +725,19 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   const greetingText = plainName ? (lang === 'en' ? `Hi ${plainName},\n\n` : `${plainName}，你好：\n\n`) : '';
   const greetingHtml = plainName
     ? `<div style="font-size:13px; color:#2a2a2a; margin-bottom:4px;">${lang === 'en' ? `Hi ${escapeHtml(plainName)},` : `${escapeHtml(plainName)}，你好：`}</div>`
+    : '';
+
+  // 进度墙的批次动态（可选）。传进来的是已经聚合好的数字，**绝不含任何个人字段**：
+  // {label:'2021 年 Q1', moved: 3, approved: 1, total: 12}。不传时下面两个变量都是空串，
+  // 整封邮件与加这个字段之前逐字节一致——存量订阅者收到的东西不会因为这次改动变样。
+  const bn = batchNews && Number.isFinite(batchNews.total) ? batchNews : null;
+  const batchLine = bn
+    ? (lang === 'en'
+        ? `Your batch (${bn.label}, ${bn.total} people on the wall): ${bn.moved} moved a step forward this month, ${bn.approved} approved.`
+        : `你这批（${bn.label}，墙上共 ${bn.total} 人）本月有 ${bn.moved} 个人往前走了一步，${bn.approved} 个已经批准。`)
+    : '';
+  const batchHtml = bn
+    ? `<div style="font-size:12px; color:#3a3a3a; margin-top:10px; padding:9px 12px; background:#f2f5f1; border-left:2px solid #0e6b3e;">${escapeHtml(batchLine)}</div>`
     : '';
 
   const category = formatCategory(userCase?.category);
@@ -997,6 +1010,7 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
 
   const text = [
     `${greetingText}${headline}`,
+    ...(batchLine ? ['', batchLine] : []),
     '',
     lang === 'en' ? 'YOUR CASE' : '你的案子',
     `${lang === 'en' ? 'Category' : '类别'}: ${category}`,
@@ -1079,6 +1093,7 @@ ${emailHead(subject)}
             <div style="font-family:'Courier New',monospace; font-size:10px; letter-spacing:0.15em; color:${eyebrowColor}; text-transform:uppercase; margin-bottom:8px;">${lang === 'en' ? '— Bulletin Update —' : '— 排期更新 —'}</div>
             ${greetingHtml}
             <div class="headline" style="font-family:Georgia,serif; font-size:26px; line-height:1.3; font-weight:400; letter-spacing:-0.01em; margin-bottom:6px; color:#1a1a1a;">${headlineHtml}</div>
+            ${batchHtml}
           </td>
         </tr>
 

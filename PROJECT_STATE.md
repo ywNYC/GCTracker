@@ -1,6 +1,90 @@
-# 交接 · 2026-08-07（第二次更新）
+# 交接 · 2026-08-17（iOS App 打包，进行中，未提交未推送）
 
 下一轮会话从这份开始读。项目规则见 `CLAUDE.md`（同目录，会自动加载）。
+
+---
+
+## 本轮在做什么：把网页版打包成 iOS App，纯云端流程（用户没有 Mac）
+
+用 Capacitor 包 iOS 壳 + Codemagic 云端 macOS 编译签名上传 TestFlight，用户全程手机操作、
+git push 触发。按用户原始 11 步计划走，**当前只做完阶段1全部 + 阶段2第4步（codemagic.yaml），
+阶段2第5步起（连接 Codemagic 到 GitHub）还没做**，暂停在等用户说「继续」。
+
+**所有改动都还只在本地工作区，没有 `git add`/commit/push。**
+
+### 两个关键架构决定（别在后续会话里无意中推翻）
+
+1. **Codemagic 触发规则 = 只看 `ios/**`、`capacitor.config.ts`、`codemagic.yaml` 这几个路径的改动**
+   （`codemagic.yaml` 里 `triggering.when.changeset.includes`），不是「main 有任何推送就编译」。
+   **原因**：本仓库已经有个云端 routine 每月 10–23 号自动抓公告数据、自动提交推送到 main
+   好几次（见下方旧记录）。如果 Codemagic 盯着「main 任何推送」，那个自动抓取 routine
+   每次跑都会顺带触发一次完整 iOS 编译+签名+上传 TestFlight，属于误触发。此决定是问过用户后选的。
+2. **App 用「本地打包 + 接口指向线上地址」，不是「整站套壳」。** 原因：App.jsx 里有约20处
+   `fetch('/api/...')`、`fetch('/bulletin.json')` 这类相对路径调用（订阅、社区墙、投票、公告数据），
+   如果直接把 `dist/` 原样塞进 App，这些相对路径会打到 App 本地根本不存在的后端，功能全废。
+   两条路都跟用户确认过：整站套壳虽然功能最新但苹果审核容易因「功能太薄」卡在 4.2 条款；
+   最终选的是本地打包保留原生壳（审核更容易过），但接口调用统一加了 `API_BASE` 前缀，
+   iOS 构建时注入 `VITE_API_BASE=https://gc.jmjvc.us`，网页版构建不设这个变量、行为完全不变。
+
+### 已完成的改动（全部本地，未提交）
+
+- `package.json`/`package-lock.json`：新增 `@capacitor/core`、`@capacitor/ios`、
+  `@capacitor/cli`（devDep）、`typescript`（devDep，capacitor.config.ts 需要它才能被解析）。
+- `capacitor.config.ts`（新建）：`appId: com.jmjvc.gctracker`，`appName: 绿卡晴雨表`，
+  `webDir: dist`。
+- `src/App.jsx`：顶部新增 `const API_BASE = import.meta.env.VITE_API_BASE || '';`
+  （紧跟 `_gcMath.js` 的 import 之后），下方 23 处 fetch 调用（`/api/community`、
+  `/api/subscribe`、`/api/update-subtype`、`SUBSCRIBE_API` 常量、`bulletin.json`、
+  `history.json`、`notice-translations.json`、`uscis-charts.json`）全部改成
+  `` `${API_BASE}/...` `` 模板字符串前缀。改完跑过 `npm run build` 确认能正常编译。
+  以后如果 App.jsx 里再加新的 fetch 相对路径调用，记得也要套这个前缀，否则 iOS 版会失灵。
+- `.gitignore`（新建）：覆盖 `node_modules/`、`dist/`、`ios/App/Pods`、`ios/App/build` 等，
+  **不影响已经被跟踪的 node_modules/dist 旧文件**（那是历史遗留问题，见下方「其他已知问题」
+  第4条，这轮没动，删除已跟踪文件要先问用户）。
+- `ios/`（新建，`npx cap add ios` 生成，37个文件）：用的是 Capacitor 8 的 Swift Package
+  Manager 方案（`ios/App/CapApp-SPM/`），**不是 CocoaPods，没有 Podfile/Pods 目录**，
+  git 体积干净很多。
+- App 图标 + 启动屏：照着 `public/favicon.svg` 的绿色渐变卡片图标风格，本地用
+  `qlmanage`（渲染 SVG）+ Python Pillow（拼合/转格式）生成，没找外部素材：
+  - `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`：1024×1024，
+    RGB 无 alpha（App Store 要求图标必须不透明），去掉了 favicon 原本的圆角
+    （iOS 系统会自动做圆角遮罩，图标源文件必须是满血方形，不能自己预先切圆角）。
+  - `ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732*.png`（3份同一张图）：
+    2732×2732，白底居中放大版 logo（这个不走系统遮罩，保留了原本的圆角徽章造型）。
+- `ios/APP_VERSION`（新建，纯文本，当前内容 `1.0.0`）：App 的 marketing version
+  （CFBundleShortVersionString）唯一数据源，`codemagic.yaml` 构建脚本会读这个文件写入
+  Xcode 项目。**以后想发新版本号，改这个文件就行**（放在 `ios/` 下是有意的，正好落在
+  上面第1条的触发路径范围内，改了会自动触发编译）。build number（CFBundleVersion）
+  用构建时间戳自动生成，不用管。
+- `codemagic.yaml`（新建）：workflow 名 `ios-release`。`npm ci` → `npm run build`
+  （注入 `VITE_API_BASE`）→ `npx cap sync ios` → 写版本号 → `app-store-connect
+  fetch-signing-files` + `xcode-project use-profiles`（自动签名，靠 App Store Connect
+  API Key，见下面「还没做」）→ `xcode-project build-ipa` → 发布到 TestFlight
+  （`submit_to_testflight: true`，`submit_to_app_store: false`——不会自动提交正式审核，
+  这个得用户在 App Store Connect 里手动点）。`integrations.app_store_connect` 填的名字
+  是 `gctracker_appstore`——**这个名字必须和用户在 Codemagic 网站上创建 App Store
+  Connect 集成时用的名字完全一致**，是后续步骤（阶段3）里要做的事，还没做。
+
+### 副作用，无害但会出现在 diff 里
+
+`npm run build` 顺带把已经提交过的 `dist/` 快照重新生成了一版（`index.html` 内容变、
+旧的 `dist/assets/index-*.js` 文件名哈希变了导致旧文件显示为删除）。纯粹是构建产物刷新，
+不是逻辑改动。
+
+### 还没做（按用户原计划的阶段/步骤编号）
+
+阶段2第5步：手机浏览器上把 Codemagic 连到这个 GitHub 仓库（`ywNYC/GCTracker`）。
+阶段3（第6-7步）：App Store Connect API Key（.p8 + Key ID + Issuer ID）生成，上传到
+Codemagic——**这一步的 API Key 权限建议选 Admin**（低权限角色可能没法自动建证书/描述文件，
+是 Codemagic 自动签名最常见的失败点）。
+阶段4（第8-9步）：App Store 上架素材清单（名称/描述/关键词/隐私政策URL/截图尺寸）；
+隐私清单（App 收集 Resend 邮箱订阅数据，需要在 Privacy Nutrition Label 里如实填）。
+阶段5（第10-11步）：怎么在手机上看构建日志、常见失败点排查（证书过期/Bundle ID冲突/
+4.2审核被拒）。
+
+**这轮的改动还没提交没推送**，且推送到 main 前用户有过「须先问」的习惯（见 kb 记忆
+`gctracker-project.md`），下一轮/下一步操作前要按这个规矩来，不能因为只是加了 ios/
+文件就默认直接推。
 
 ---
 
@@ -705,6 +789,149 @@ POST body 本来就不带 `name` 字段（第 17 轮就记录过这个已知缺�
 特殊青少年"。截图给用户看过，用户还没回复要不要推送。
 
 **状态**：已 commit 并推 main（`cc76063`）。
+
+---
+
+## 第 26 轮（2026-08-20）：众包案件进度墙草稿（`src/Tracker.jsx`，全 mock 数据，未提交未推送）
+
+在 `feat/tracker` 分支上做的，叠在第 25 轮那堆 iOS/Capacitor 未提交改动之上。
+**目前只有前端，数据全是 `MOCK_CASES` 假数据，D1 和 `/api/tracker` 一行没写。**
+方案与十条社区化改造记在 `TRACKER-PLAN.md`（未跟踪文件，在仓库根目录）。
+
+### 三个被业主当场推翻的设计（别在后续会话里改回去）
+
+1. **不新开导航位、不做 `/tracker` 路由。** 原方案是 `public/_redirects` + `pathname`
+   判断整页渲染，业主原话「你可以放在 6 个选项里面的其中一个你不要再新开设」。
+   现在挂在**「动态」tab 内**（`src/App.jsx` 第 17002-17003 行，跟在 `MonthlyUpdate`
+   下面）。`_redirects` 已删除，tab 白名单里的 `'tracker'` 项也已撤掉。
+2. **不列个人明细。** 原方案有一张「每行一个匿名案件」的可筛选列表页，业主原话
+   「不可以把所有人的信息都这样子呈现出来……太多信息了」。列表整个删掉，换成
+   季度分桶的波浪图（琥珀色标「你这批」）+ 各阶段人数条 + 一句话小结。
+3. **各类别变化表默认收起。** `src/App.jsx` 第 7123-7174 行，原来那个 15 类别表格
+   包进了原生 `<details>/<summary>`（不引库、不加 state），summary 上写
+   「· 展开看全部 15 个类别」。理由是业主认为图表和统计才是「动态」页的核心。
+
+### 核心口径：一切围绕「批次」，不围绕「个人」
+
+批次 = `类别 | 出生地 | 优先日所在季度`，例如「2021 年 Q1 · EB-2 · 中国大陆」。
+这条同时解决社区感和隐私——页面上永远只出现批次，不出现个人。
+进度卡的主角也从「我等了多少个月」改成「我这批 7 个人，我排第 4」。
+
+四条防线写在 `src/Tracker.jsx` 顶部，**上线时必须挪到后端取数层，前端藏没用**：
+
+- `K_MIN = 5`：任何切片样本不足 5 人就不出数，页面直说「还差 N 人」
+- `coarse()`：对外日期一律粗化到 `YYYY-MM`，只有本人看自己的卡才到日
+- 统计一律中位数，不用均值
+- 卡面统计用**人数不用百分比**（「这批已批准 1 人」而不是「0% 批准」）——
+  第一版冷启动显示「你排第 1 位、0% 批准」是最难堪的失败模式
+
+### `src/Tracker.jsx` 里有什么（801 行，组件都带 ①-⑩ 注释对应 TRACKER-PLAN 的十条建议）
+
+`computeBatch()` 算批次统计 → `ProgressCardSVG`（1080×1440 竖版卡）→
+`ApprovalTicker`（匿名喜报滚动）→ `BatchPoll`（按批次的月度一题）→
+`CardView`（回声条 + PNG 下载 + 长按保存的 `<img>`）→ `FormView`（填优先日时实时提示
+落在哪一批）→ `LockedTeaser`（没填表只看全站粗汇总）→ `BatchView`（波浪图 + 阶段条）。
+
+一个已修的坑：数据新鲜度算「这批最近多久前有人更新」时**必须排除自己**——
+把自己刚提交的 0 天算进去，永远显示「0 天前」，没有信息量。
+
+### 邮件模板已经改了（唯一一处碰到线上代码路径的改动）
+
+`functions/api/_emailTemplates.js` 的 `renderMonthlyUpdateEmail` 多了个可选参数
+`batchNews`，形如 `{label:'2021 年 Q1', moved:3, approved:1, total:12}`，
+渲染成正文里一行「你这批本月有 3 个人往前走了一步」。**不传时输出与改动前逐字节相同**，
+所以现在推上去也不会影响月度信。`send-monthly.js` 还没有传这个参数，等后端能出数了再接。
+
+### 截图
+
+`shots/` 目录（未跟踪）：`t*` 第一版草稿、`u*` 改成图表并挪进 tab、`v*` 类别表收起、
+`w1`-`w5` 十条社区化改造后的最终草稿。`shot_tracker.mjs` 是 Playwright 截图脚本
+（要先 `npm run dev`，脚本用 `addInitScript` 预置 localStorage 的 `userCase`）。
+**seed 的 `userCase` 必须带 `inUS: true`**，否则 App 的加载判断不认，会 fallback 成
+默认优先日 2024-07-15，填表的日期单调校验就过不了、提交按钮一直是灰的。
+
+### 下一步要业主先拍板三件事，backend 才能动
+
+1. 去 Cloudflare 后台建 D1 库并绑成变量名 `DB`（AI 做不了，仓库里没有 `wrangler.toml`）；
+   绑完必须触发**新部署**，Retry deployment 不生效
+2. 同意加 `wrangler` 到 devDependencies，否则本地跑不了 Pages Functions，
+   「改完先跑本地看效果」做不到
+3. 同意把 KV 里已有的 `cd:timeline:*` / `pr:*` 记录迁进 D1 当冷启动种子（只读不删）
+
+写 `functions/api/tracker.js` 时记住：**所有 fetch 都要写成 `` `${API_BASE}/api/tracker` ``**，
+不然 iOS 版这个功能整个失灵。
+
+**状态**：未 commit、未推送，业主还没说要推。
+
+---
+
+## 第 27 轮（2026-08-20）：接后端——D1 建了、`/api/tracker` 写了、`Tracker.jsx` 全部换成真数据
+
+还在 `feat/tracker` 分支，叠在第 26 轮之上，**依然未 commit、未推送**。这轮把上一轮的 mock 换成真 D1 + Pages Function，`src/Tracker.jsx` 里唯一一处 `TODO(api)` 已清掉。
+
+### D1：库建了，但生产环境还没绑定
+
+这台机器上其实有现成的 wrangler OAuth 登录（`ywang0226@gmail.com`），比原计划设想的"AI 完全做不了"要多一点权限：
+
+- 已用 `wrangler d1 create gctracker` 建库，`database_id = 3efb6f15-556a-4188-89df-cceae87af893`，
+  已跑 `d1/tracker-schema.sql` 建表（`--remote` 真库和 `--local` 本地库都跑过）。
+- **生产 Pages 项目 `greencardtracker` 还没绑定这个 D1**，这步业主要自己去 Dashboard 做：
+  Settings → Functions → D1 database bindings → 变量名填 `DB` → 选 `gctracker`，绑完触发一次新部署。
+  **没有直接用 Cloudflare API 绑**是有意为之——查了下项目现有 `env_vars` 里的
+  `ADMIN_TOKEN`/`UNSUBSCRIBE_SECRET` 是 `secret_text`，GET 接口只回空字符串（API 不吐真值），
+  如果照搬 GET 到的 `deployment_configs.production` 整段 PATCH 回去，等于把这两个密钥焊成空值——
+  退订链接和 `/api/admin/send-monthly` 会全线失效且没法恢复。业主选了"去 Dashboard 手动绑"这条路。
+
+### KV → D1 迁移：决定不搬，原因是两份旧数据压根没有优先日
+
+`TRACKER-PLAN.md` 原计划写"搬只读不删、推荐搬"，但真去看了 `cd:timeline:*`（`community.js`）和
+`pr:*`（`progress.js`）两份 KV 数据的字段，发现**都没有 priority date 这个字段**——
+`cd:timeline:*` 存的是"递交日"不是"优先日"（两者对 F4/EB2 中国这类排队大类可以差好几年），
+`pr:*` 只有 `filedMonth`，同样不是优先日。而这整个进度墙功能的批次机制（`quarterOf(priorityDate)`）
+完全靠优先日分批，编一个假优先日会直接污染真实用户会看到的"这批中位等待""这批排第几"这些数字。
+所以这轮**没有写迁移脚本**，D1 从空表开始积累真实提交，不算漏做，是数据完整性判断下的取舍。
+
+### `functions/api/tracker.js`（新建）
+
+`POST`（提交/更新，`ownerId` 唯一键 upsert）、`GET ?owner=`（老用户回访水合）、
+`GET ?summary=1`（没填表的人看的全站粗汇总）。**K_MIN=5、日期粗化到月、中位数**这三条
+全部在这个文件里算，前端拿到的永远是算好的聚合数字（`batch`/`cat` 两个对象），
+除了自己的记录（`record`）之外**看不到任何一条别人的原始逐条数据**——
+这是第 26 轮结尾明确要求的"上线时必须挪进后端取数层"。
+限流复用 `SUBSCRIBERS` KV，前缀 `trkl:`，3 次/IP/天（比 community.js 的 20 次更严，照抄 TRACKER-PLAN 的建议值）。
+
+### `src/Tracker.jsx`：`MOCK_CASES` 整段删了，`computeBatch`/图表分桶/阶段分布/日期粗化全部移除
+
+浏览器端新增 `localStorage` 存的匿名 `ownerId`（key `gc_tracker_owner_id`），页面挂载时并发拉
+`GET ?summary=1` + `GET ?owner=<id>`，有记录就直接进卡片页（老用户回访不用重填）。
+`CardView`/`BatchView` 现在吃的是后端返回的 `batch`/`cat` 聚合对象，不再自己拿 `rows` 数组算——
+这个改动是这轮的核心，不只是换数据源，是把"谁能看到什么"的边界从前端约定改成后端强制。
+`BatchPoll`（月度一题）**这轮没碰**，百分比还是写死的占位数字——`Tracker.jsx` 里当时只标了
+一处 `TODO(api)`（就是 `MOCK_CASES` 那行），投票没标，视为本轮范围外。
+
+### 本地联调：真跑通了，不是只测到 fetch 拼对
+
+装了 `wrangler`（devDependencies）。**新建了 `wrangler.toml`，但特意没提交**——加进了
+`.gitignore`（连同 `.wrangler/`）。原因：这个 Pages 项目是 Git 集成部署（Cloudflare 从源码构建，
+不是从 `wrangler.toml` 构建），但较新版本的 Cloudflare Pages 一旦检测到仓库里有
+`wrangler.toml`（尤其带 `pages_build_output_dir`）会开始用它接管构建配置，有动到生产部署行为的风险。
+这份 `wrangler.toml` 只用来给本机 `wrangler pages dev`/`wrangler d1 execute --local` 解析绑定名，
+下一轮想在本地跑 `/api/*` 记得它还在（未跟踪，`git status` 看不到很正常）。
+
+用 `wrangler pages dev dist --port 8791` 起本地服务器（真跑 Pages Functions + 本地 D1 SQLite），
+`curl` 验证了：新提交建批次、同 `ownerId` 二次提交是更新不是建新记录、K_MIN 从"还差 N 人"到
+"enough=true"的临界点、无效 `cat`/日期早于优先日会被拒、限流第 4 次真的 429。
+又用 Playwright（`shot_tracker_live.mjs`，未跟踪，仿照第 26 轮的 `shot_tracker.mjs`）跑了完整浏览器流程：
+填表提交 → 卡片页（真实批次统计渲染正确）→ 批次页（图表/阶段分布/走过的日期范围全部来自真数据）→
+刷新页面回到"动态" tab（验证 `GET ?owner=` 真的能把老用户直接带回卡片页，不用重填）。
+截图在 `shots/live1`-`live4`。跑完照 `CLAUDE.md` 规矩 `git checkout -- dist/ && git clean -fdq dist/` 清过了。
+
+### 下一步
+
+1. 业主去 Dashboard 把 D1 绑到 `greencardtracker` 项目（变量名 `DB`），绑完触发新部署——
+   这步做完之前，推上 `main` 后线上的 `/api/tracker` 会因为 `env.DB` 不存在直接报 500。
+2. `BatchPoll` 投票百分比还是占位数字，要接真数据是另一轮的事。
+3. 全程没 commit、没 push，等业主看完说推再推。
 
 ---
 

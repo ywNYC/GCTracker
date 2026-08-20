@@ -17,6 +17,14 @@ import {
   estimateMonthsToReachPD,
 } from '../functions/api/_gcMath.js';
 
+// Native app build (Capacitor iOS) points relative API/data paths at production,
+// since the bundled webview has no local Pages Functions runtime of its own.
+// Web build (Cloudflare Pages) leaves this empty so paths stay relative, unchanged.
+const API_BASE = import.meta.env.VITE_API_BASE || '';
+
+// 众包案件进度墙（挂在「动态」tab 内；草稿：数据还是 mock，见 TRACKER-PLAN.md）
+import TrackerPage from './Tracker.jsx';
+
 // ============================================================
 // i18n — Translation dictionaries (EN / Simplified / Traditional)
 // ============================================================
@@ -26,7 +34,7 @@ const translations = {
     appSubtitle: 'Know where you stand. Know what to do next.',
     bulletinMonth: 'Bulletin',
     navUpdate: 'Updates',
-    navCompare: 'What if',
+    navCompare: 'Community',
     compareByCountry: 'By Country',
     compareByCountryDesc: 'See how the same case fares in different countries.',
     navFAQ: 'FAQ',
@@ -297,7 +305,7 @@ const translations = {
     navAlerts: '订阅',
     navTrends: '预测',
     navUpdate: '动态',
-    navCompare: '如果',
+    navCompare: '社区',
     compareByCountry: '按国家',
     compareByCountryDesc: '看同一情况在不同国家的排期。',
     navFAQ: '常见问题',
@@ -566,7 +574,7 @@ const translations = {
     navAlerts: '訂閱',
     navTrends: '預測',
     navUpdate: '動態',
-    navCompare: '如果',
+    navCompare: '社區',
     compareByCountry: '按國家',
     compareByCountryDesc: '看同一情況在不同國家的排期。',
     navFAQ: '常見問題',
@@ -3416,9 +3424,9 @@ const ActionCenter = ({ userCase }) => {
   });
   useEffect(() => {
     if (!crowdOpen || tlAgg) return;
-    fetch(`/api/community?type=timeline&cat=${userCase.category}`)
+    fetch(`${API_BASE}/api/community?type=timeline&cat=${userCase.category}`)
       .then((r) => r.json()).then(setTlAgg).catch(() => setTlAgg({ total: 0 }));
-    fetch(`/api/community?type=rfe&cat=${userCase.category}`)
+    fetch(`${API_BASE}/api/community?type=rfe&cat=${userCase.category}`)
       .then((r) => r.json()).then(setRfeAgg).catch(() => {});
   }, [crowdOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const submitTimeline = async () => {
@@ -3427,7 +3435,7 @@ const ActionCenter = ({ userCase }) => {
     try {
       const dates = {};
       Object.entries(tlDates).forEach(([k, v]) => { if (v) dates[k] = v; });
-      const r = await fetch('/api/community', {
+      const r = await fetch(`${API_BASE}/api/community`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'timeline', cat: userCase.category, country: userCase.country, path: inUS ? 'aos' : 'cp', center: tlCenter, dates }),
       });
@@ -3439,7 +3447,7 @@ const ActionCenter = ({ userCase }) => {
   };
   const submitRfe = async (got, type2) => {
     try {
-      const r = await fetch('/api/community', {
+      const r = await fetch(`${API_BASE}/api/community`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'rfe', cat: userCase.category, country: userCase.country, got, rfeType: type2 }),
       });
@@ -3802,7 +3810,7 @@ const CommunityHub = ({ userCase }) => {
   const post = async (payload, doneKey) => {
     setBusy(doneKey);
     try {
-      const r = await fetch('/api/community', {
+      const r = await fetch(`${API_BASE}/api/community`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...payload, cat: userCase.category, country: userCase.country }),
       });
@@ -3820,7 +3828,7 @@ const CommunityHub = ({ userCase }) => {
   const [voted, setVoted] = useState(() => done(pollKey));
   useEffect(() => {
     if (tab === 'poll' && voted && !pollAgg) {
-      fetch(`/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json()).then(setPollAgg).catch(() => {});
+      fetch(`${API_BASE}/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json()).then(setPollAgg).catch(() => {});
     }
   }, [tab, voted]); // eslint-disable-line react-hooks/exhaustive-deps
   const vote = async (choice) => {
@@ -3832,7 +3840,7 @@ const CommunityHub = ({ userCase }) => {
         const base = prev || { total: 0, choices: {} };
         return { total: base.total + 1, choices: { ...base.choices, [choice]: (base.choices[choice] || 0) + 1 } };
       });
-      fetch(`/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json())
+      fetch(`${API_BASE}/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json())
         .then((data) => setPollAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
         .catch(() => {});
     }
@@ -3844,9 +3852,10 @@ const CommunityHub = ({ userCase }) => {
   const [wallMsg, setWallMsg] = useState('');
   const [wall, setWall] = useState(null);
   const [walled, setWalled] = useState(() => done('wall'));
+  const [wallExpanded, setWallExpanded] = useState(false); // 默认只显示前 5 条，别把页面撑太长
   useEffect(() => {
     if (tab === 'wall' && !wall) {
-      fetch('/api/community?type=wall').then((r) => r.json()).then(setWall).catch(() => {});
+      fetch(`${API_BASE}/api/community?type=wall`).then((r) => r.json()).then(setWall).catch(() => {});
     }
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   const checkIn = async () => {
@@ -3854,7 +3863,7 @@ const CommunityHub = ({ userCase }) => {
     if (await post({ type: 'wall', days: myDays, message: wallMsg }, 'wall')) {
       setWalled(true);
       setWall(null);
-      fetch('/api/community?type=wall').then((r) => r.json()).then(setWall).catch(() => {});
+      fetch(`${API_BASE}/api/community?type=wall`).then((r) => r.json()).then(setWall).catch(() => {});
     }
   };
 
@@ -3865,14 +3874,14 @@ const CommunityHub = ({ userCase }) => {
   const [swDone, setSwDone] = useState(() => done('switch'));
   useEffect(() => {
     if (tab === 'survey' && swDone && !swAgg) {
-      fetch(`/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json()).then(setSwAgg).catch(() => {});
+      fetch(`${API_BASE}/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json()).then(setSwAgg).catch(() => {});
     }
   }, [tab, swDone]); // eslint-disable-line react-hooks/exhaustive-deps
   const [costDone, setCostDone] = useState(() => done('cost'));
   const [costAgg, setCostAgg] = useState(null);
   useEffect(() => {
     if (tab === 'survey' && costDone && !costAgg) {
-      fetch(`/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json()).then(setCostAgg).catch(() => {});
+      fetch(`${API_BASE}/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json()).then(setCostAgg).catch(() => {});
     }
   }, [tab, costDone]); // eslint-disable-line react-hooks/exhaustive-deps
   const [qText, setQText] = useState('');
@@ -3977,15 +3986,23 @@ const CommunityHub = ({ userCase }) => {
               {wall === null ? (
                 <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>…</div>
               ) : wall.entries?.length ? (
-                wall.entries.map((e, i) => (
-                  <div key={i} className="flex items-baseline" style={{ gap: '8px', padding: '3px 0', borderBottom: i < wall.entries.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none' }}>
-                    <span className="gc-mono" style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-green-ink)', flexShrink: 0 }}>
-                      {Number(e.days).toLocaleString('en-US')}{L('天', '天', 'd')}
-                    </span>
-                    {e.cat && <span className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', flexShrink: 0 }}>{e.cat}</span>}
-                    <span style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', minWidth: 0 }}>{e.message || L('……', '……', '…')}</span>
-                  </div>
-                ))
+                <>
+                  {(wallExpanded ? wall.entries : wall.entries.slice(0, 5)).map((e, i, arr) => (
+                    <div key={i} className="flex items-baseline" style={{ gap: '8px', padding: '3px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none' }}>
+                      <span className="gc-mono" style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-green-ink)', flexShrink: 0 }}>
+                        {Number(e.days).toLocaleString('en-US')}{L('天', '天', 'd')}
+                      </span>
+                      {e.cat && <span className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', flexShrink: 0 }}>{e.cat}</span>}
+                      <span style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', minWidth: 0 }}>{e.message || L('……', '……', '…')}</span>
+                    </div>
+                  ))}
+                  {wall.entries.length > 5 && (
+                    <button type="button" onClick={() => setWallExpanded((v) => !v)}
+                      style={{ border: 'none', background: 'transparent', padding: '6px 0 0', cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', fontWeight: 700 }}>
+                      {wallExpanded ? L('收起', '收起', 'Collapse') : L(`展开全部 ${wall.entries.length} 条`, `展開全部 ${wall.entries.length} 條`, `Show all ${wall.entries.length}`)}
+                    </button>
+                  )}
+                </>
               ) : (
                 <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>
                   {L('还没有人打卡——做第一个。', '還沒有人打卡——做第一個。', 'No check-ins yet — be the first.')}
@@ -4025,7 +4042,7 @@ const CommunityHub = ({ userCase }) => {
                               const base = prev || { total: 0, actions: {} };
                               return { total: base.total + 1, actions: { ...base.actions, [swAction]: (base.actions[swAction] || 0) + 1 } };
                             });
-                            fetch(`/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json())
+                            fetch(`${API_BASE}/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json())
                               .then((data) => setSwAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
                               .catch(() => {});
                           }
@@ -4077,7 +4094,7 @@ const CommunityHub = ({ userCase }) => {
                             const base = prev || { total: 0, brackets: {} };
                             return { total: base.total + 1, brackets: { ...base.brackets, [id]: (base.brackets[id] || 0) + 1 } };
                           });
-                          fetch(`/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json())
+                          fetch(`${API_BASE}/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json())
                             .then((data) => setCostAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
                             .catch(() => {});
                         }
@@ -5914,7 +5931,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                         if (pgDone) return null;
                         const send = async (plan) => {
                           try {
-                            await fetch('/api/community', {
+                            await fetch(`${API_BASE}/api/community`, {
                               method: 'POST', headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ type: 'postgc', plan, cat: userCase.category, country: userCase.country }),
                             });
@@ -6457,8 +6474,8 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
         );
       })()}
 
-      {/* Community — poll, milestone wall, surveys. All users, all statuses. */}
-      <CommunityHub userCase={userCase} />
+      {/* Community — moved to its own "社区" tab (see CommunityPage), so it no longer
+          renders here. Kept CommunityHub itself unchanged; only its mount point moved. */}
 
       {/* Status share modal (#11) — a self-contained, screenshot-friendly card:
           brand + month + case + hero estimate. No canvas export; the card IS the
@@ -7109,8 +7126,14 @@ const MonthlyUpdate = ({ userCase }) => {
           </div>
         );
       })()}
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{t.categoryChanges}</div>
+      {/* 各类别变化：15 行占满整屏，默认收起——动态页真正的核心是上面的本月解读
+          和下面的进度墙图表，这张全类别对照表是查阅用的，需要时再展开。
+          用原生 details/summary，不引入新状态也不引入新组件库。 */}
+      <details style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '8px 10px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
+          {t.categoryChanges}<span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · tap to see all 15 categories' : lang === 'tw' ? ' · 展開看全部 15 個類別' : ' · 展开看全部 15 个类别'}</span>
+        </summary>
+        <div style={{ height: '8px' }} />
         <div className="space-y-1">
           {changes.map(ch => (
             <div key={ch.cat} className={`flex items-center gap-2 p-2 rounded-lg ${
@@ -7157,7 +7180,7 @@ const MonthlyUpdate = ({ userCase }) => {
             </div>
           ))}
         </div>
-      </div>
+      </details>
     
 
     </div>
@@ -7859,7 +7882,7 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
   // Default: /api/subscribe (Cloudflare Pages Function, same domain, no CORS).
   // If using a standalone Worker instead, replace with full URL:
   //   const SUBSCRIBE_API = 'https://greencard-api.YOUR_ACCOUNT.workers.dev/subscribe';
-  const SUBSCRIBE_API = '/api/subscribe';
+  const SUBSCRIBE_API = `${API_BASE}/api/subscribe`;
 
   const handleSubscribe = async () => {
     if (!validateEmail(email)) {
@@ -8697,6 +8720,42 @@ const CompareHub = ({ userCase }) => {
           ? 'Estimates use the same 12-month real pace as the Overview. Individual cases vary — talk to a lawyer before acting.'
           : '估算与总结页同口径（近 12 个月实速）。个案有差异，行动前请咨询律师。'}
       </p>
+    </div>
+  );
+};
+
+// ============================================================
+// CommunityPage — 「社区」tab（原「如果」/CompareHub 的位置）。
+// 不新增导航位，是把已有的三块拼到一起：案件进度墙（原挂在「动态」）+
+// 同路人互动（原挂在「总结」页底部，poll/打卡墙/调查全部原样保留）+
+// CompareHub（原「如果」的全部内容，没删，收进默认收起的 <details> 里）。
+// ============================================================
+const CommunityPage = ({ userCase }) => {
+  const { lang } = useLang();
+  return (
+    <div className="space-y-2">
+      <div style={{ padding: '4px 0 0' }}>
+        <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>{lang === 'en' ? 'COMMUNITY' : '社区'}</div>
+        <h2 className="gc-serif" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 2px' }}>
+          {lang === 'en' ? "You're not doing this alone" : '你不是一个人在等'}
+        </h2>
+        <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: 0 }}>
+          {lang === 'en' ? 'Everything below is anonymous, crowd-sourced — no email, no case number.' : '下面全部匿名众包——不收邮箱，不收案号。'}
+        </p>
+      </div>
+
+      <TrackerPage userCase={userCase} />
+
+      <CommunityHub userCase={userCase} />
+
+      <details style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '8px 10px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
+          {lang === 'en' ? 'What if I switch category or status?' : '如果换类别、换身份会更快吗'}
+          <span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · tap for the auto-computed comparison' : ' · 展开看自动算好的对比'}</span>
+        </summary>
+        <div style={{ height: '8px' }} />
+        <CompareHub userCase={userCase} />
+      </details>
     </div>
   );
 };
@@ -14853,7 +14912,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
     const finalName = (nameKnown && !editName) ? knownName : nickname.trim();
     setStatus('loading');
     try {
-      const resp = await fetch('/api/subscribe', {
+      const resp = await fetch(`${API_BASE}/api/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -15190,7 +15249,7 @@ const SubtypeUpdateModal = ({ userCase, email, token, currentName = '', theme = 
       const body = token
         ? { email, token, ...(needsSubtype ? { subtype: pick } : {}), ...(needsBirth ? { birthYearMonth: birthYM } : {}), ...(needsName && trimmedName ? { name: trimmedName } : {}) }
         : { email, userCase: merged, ...(needsName && trimmedName ? { name: trimmedName } : {}) };
-      const resp = await fetch(token ? '/api/update-subtype' : '/api/subscribe', {
+      const resp = await fetch(token ? `${API_BASE}/api/update-subtype` : `${API_BASE}/api/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -15328,7 +15387,7 @@ const InlineSubscribeCTA = ({ userCase, label }) => {
     }
     setStatus('loading');
     try {
-      const resp = await fetch('/api/subscribe', {
+      const resp = await fetch(`${API_BASE}/api/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -15479,11 +15538,11 @@ export default function App() {
   // Rebuilt newest-first so the picker lists recent months at the top.
   useEffect(() => {
     let cancelled = false;
-    fetch('/notice-translations.json', { cache: 'no-cache' })
+    fetch(`${API_BASE}/notice-translations.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d2) => { if (d2?.months) { NOTICE_I18N = d2; setBulletinTick((t) => t + 1); } })
       .catch(() => {});
-    fetch('/bulletin.json', { cache: 'no-cache' })
+    fetch(`${API_BASE}/bulletin.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.current) {
@@ -15502,7 +15561,7 @@ export default function App() {
         }
       })
       .catch(() => {});
-    fetch('/history.json', { cache: 'no-cache' })
+    fetch(`${API_BASE}/history.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('history-fetch-not-ok'))))
       .then((hist) => {
         if (cancelled || !hist || !Array.isArray(hist.months)) return;
@@ -15585,7 +15644,7 @@ export default function App() {
   // failure the static table stays — it was correct as of its comment's month.
   useEffect(() => {
     let cancelled = false;
-    fetch('/uscis-charts.json', { cache: 'no-cache' })
+    fetch(`${API_BASE}/uscis-charts.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('uscis-charts-not-ok'))))
       .then((data) => {
         if (cancelled || !data?.current?.family || !data?.current?.employment) return;
@@ -15610,7 +15669,7 @@ export default function App() {
     // we don't want to overwrite their chosen snapshot with latest data.
     if (isTimeMachineActive) return;
     let cancelled = false;
-    fetch('/bulletin.json', { cache: 'no-cache' })
+    fetch(`${API_BASE}/bulletin.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('fetch-not-ok'))))
       .then((data) => {
         if (cancelled || !data || !data.current || !data.current.finalAction) return;
@@ -16037,7 +16096,7 @@ export default function App() {
     // { id: 'trends', label: t.navTrends, icon: BarChart3 },
     { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
     { id: 'update', label: t.navUpdate, icon: TrendingUp },
-    { id: 'compare', label: t.navCompare, icon: Target },
+    { id: 'compare', label: t.navCompare, icon: Users },
     { id: 'index', label: t.navIndex, icon: ClipboardList },
     { id: 'about', label: lang === 'en' ? 'About' : lang === 'tw' ? '關於' : '关于', icon: Info },
   ];
@@ -16990,7 +17049,9 @@ export default function App() {
               {tab === 'alerts' && <SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
               {tab === 'bulletin' && <BulletinTab userCase={userCase} />}
               {tab === 'about' && <AboutTab />}
-              {tab === 'compare' && <CompareHub userCase={userCase} />}
+              {/* 原「如果」（What-if）tab 让位给「社区」：案件进度墙 + 同路人互动挪进来，
+                  CompareHub 没删，收进页面底部的 <details> 里，默认收起。 */}
+              {tab === 'compare' && <CommunityPage userCase={userCase} />}
               {tab === 'index' && <TheIndex userCase={userCase} setTab={handleTabChange} setUserCase={setUserCase} previousTab={previousTab} onSetupCase={() => { setOnboardingInitialMode('form'); setHasOnboarded(false); }} />}
               {tab === 'help' && <HelpCenter />}
             </div>
