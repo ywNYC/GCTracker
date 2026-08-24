@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-08-09T17:00:10.205Z",
-  "monthCount": 24,
+  "generatedAt": "2026-08-24T22:29:37.031Z",
+  "monthCount": 25,
   "earliest": "2024-09",
-  "latest": "2026-08",
+  "latest": "2026-09",
   "months": [
     {
       "month": "2024-09",
@@ -5230,6 +5230,224 @@
         "F4": {
           "Other": "2010-06-22",
           "China": "2010-06-22",
+          "India": "2006-12-15",
+          "Mexico": "2001-04-30",
+          "Philippines": "2008-03-22"
+        }
+      }
+    },
+    {
+      "month": "2026-09",
+      "sourceUrl": "https://travel.state.gov/content/travel/en/legal/visa-law0/visa-bulletin/2026/visa-bulletin-for-september-2026.html",
+      "finalAction": {
+        "EB1": {
+          "Other": "C",
+          "China": "2023-07-01",
+          "India": "2022-10-15",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB2": {
+          "Other": "C",
+          "China": "2021-09-01",
+          "India": null,
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB3": {
+          "Other": "2024-09-01",
+          "China": "2022-01-01",
+          "India": "2014-01-01",
+          "Mexico": "2024-09-01",
+          "Philippines": "2023-08-01"
+        },
+        "EW": {
+          "Other": "2022-04-01",
+          "China": "2019-05-01",
+          "India": "2014-01-01",
+          "Mexico": "2022-04-01",
+          "Philippines": "2021-12-01"
+        },
+        "EB4": {
+          "Other": "2022-12-15",
+          "China": "2022-12-15",
+          "India": "2022-12-15",
+          "Mexico": "2022-12-15",
+          "Philippines": "2022-12-15"
+        },
+        "SR": {
+          "Other": "2022-12-15",
+          "China": "2022-12-15",
+          "India": "2022-12-15",
+          "Mexico": "2022-12-15",
+          "Philippines": "2022-12-15"
+        },
+        "EB5": {
+          "Other": "C",
+          "China": "2016-12-01",
+          "India": null,
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB5R": {
+          "Other": "C",
+          "China": "C",
+          "India": "C",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB5H": {
+          "Other": "C",
+          "China": "C",
+          "India": "C",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB5I": {
+          "Other": "C",
+          "China": "C",
+          "India": "C",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "F1": {
+          "Other": "2020-01-22",
+          "China": "2020-01-22",
+          "India": "2020-01-22",
+          "Mexico": "2008-01-01",
+          "Philippines": "2013-05-01"
+        },
+        "F2A": {
+          "Other": "2026-08-22",
+          "China": "2026-08-22",
+          "India": "2026-08-22",
+          "Mexico": "2025-08-22",
+          "Philippines": "2026-08-22"
+        },
+        "F2B": {
+          "Other": "2019-08-22",
+          "China": "2019-08-22",
+          "India": "2019-08-22",
+          "Mexico": "2009-02-15",
+          "Philippines": "2013-06-01"
+        },
+        "F3": {
+          "Other": "2014-10-22",
+          "China": "2014-10-22",
+          "India": "2014-10-22",
+          "Mexico": "2001-07-01",
+          "Philippines": "2006-02-22"
+        },
+        "F4": {
+          "Other": "2011-10-22",
+          "China": "2011-10-22",
+          "India": "2006-11-01",
+          "Mexico": "2001-04-08",
+          "Philippines": "2007-08-22"
+        }
+      },
+      "filing": {
+        "EB1": {
+          "Other": "C",
+          "China": "2023-12-01",
+          "India": "2023-12-01",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB2": {
+          "Other": "C",
+          "China": "2022-01-01",
+          "India": "2015-01-15",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB3": {
+          "Other": "C",
+          "China": "2022-01-08",
+          "India": "2015-01-15",
+          "Mexico": "C",
+          "Philippines": "2024-01-01"
+        },
+        "EW": {
+          "Other": "2022-08-01",
+          "China": "2019-10-01",
+          "India": "2015-01-15",
+          "Mexico": "2022-08-01",
+          "Philippines": "2022-08-01"
+        },
+        "EB4": {
+          "Other": "2023-01-01",
+          "China": "2023-01-01",
+          "India": "2023-01-01",
+          "Mexico": "2023-01-01",
+          "Philippines": "2023-01-01"
+        },
+        "SR": {
+          "Other": "2023-01-01",
+          "China": "2023-01-01",
+          "India": "2023-01-01",
+          "Mexico": "2023-01-01",
+          "Philippines": "2023-01-01"
+        },
+        "EB5": {
+          "Other": "C",
+          "China": "2017-03-01",
+          "India": "2024-05-01",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB5R": {
+          "Other": "C",
+          "China": "C",
+          "India": "C",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB5H": {
+          "Other": "C",
+          "China": "C",
+          "India": "C",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "EB5I": {
+          "Other": "C",
+          "China": "C",
+          "India": "C",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "F1": {
+          "Other": "2020-02-01",
+          "China": "2020-02-01",
+          "India": "2020-02-01",
+          "Mexico": "2008-12-01",
+          "Philippines": "2015-04-22"
+        },
+        "F2A": {
+          "Other": "C",
+          "China": "C",
+          "India": "C",
+          "Mexico": "C",
+          "Philippines": "C"
+        },
+        "F2B": {
+          "Other": "2019-09-01",
+          "China": "2019-09-01",
+          "India": "2019-09-01",
+          "Mexico": "2010-05-15",
+          "Philippines": "2013-10-01"
+        },
+        "F3": {
+          "Other": "2014-11-01",
+          "China": "2014-11-01",
+          "India": "2014-11-01",
+          "Mexico": "2001-07-15",
+          "Philippines": "2006-08-08"
+        },
+        "F4": {
+          "Other": "2011-11-01",
+          "China": "2011-11-01",
           "India": "2006-12-15",
           "Mexico": "2001-04-30",
           "Philippines": "2008-03-22"

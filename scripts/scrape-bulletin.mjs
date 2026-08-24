@@ -249,15 +249,20 @@ function parseBulletinExtras(html) {
   // publication line. "U.S." can't false-match — the letter must be followed by ". "
   // then more caps.
   const noticeZone = (() => {
-    const start = text.search(/CATEGORY\s+RANK\s+CUT-?OFFS\s+WHICH\s+WILL\s+APPLY/i);
+    let start = text.search(/CATEGORY\s+RANK\s+CUT-?OFFS\s+WHICH\s+WILL\s+APPLY/i);
+    // Fiscal-year-end bulletins (September) carry no next-month DV advance table,
+    // so that heading is absent — anchor on the current-month DV section instead.
+    if (start === -1) start = text.search(/DIVERSITY\s+IMMIGRANT\s*\(DV\)\s+CATEGORY\s+FOR\s+THE\s+MONTH/i);
     const end = text.search(/Department of State Publication/i);
     if (start === -1) return null;
     return text.slice(start, end === -1 ? undefined : end);
   })();
   if (noticeZone) {
-    const headingRe = /\b([D-Z])\.\s+([A-Z][A-Z0-9 ,\-'’()./&:;]{8,})/g;
+    // Letters start at C: some months (September 2026) place the first notice section
+    // at C rather than D because there is no separate DV advance-notice section.
+    const headingRe = /\b([C-Z])\.\s+([A-Z][A-Z0-9 ,\-'’()./&:;]{8,})/g;
     const found = [];
-    let lastLetter = 'C';
+    let lastLetter = 'B';
     for (const m of noticeZone.matchAll(headingRe)) {
       if (m[1] <= lastLetter) continue; // letters strictly increase; skip echoes
       let title = m[2];
