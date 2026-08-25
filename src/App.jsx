@@ -7046,22 +7046,8 @@ const MonthlyUpdate = ({ userCase }) => {
           <span className="px-2 py-0.5 bg-slate-900 text-white text-[10px] font-bold rounded-full">
             {BULLETIN_CURRENT_MONTH[lang]}
           </span>
-          <span className="inline-flex" style={{ marginLeft: 'auto', border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
-            {/* B leads — same order as the summary card's stations: filing before approval. */}
-            {['B', 'A'].map((c, i) => (
-              <button key={c} type="button" onClick={() => setUpdChart(c)}
-                className="gc-mono"
-                style={{
-                  fontSize: '10px', fontWeight: 700, padding: '3px 9px', lineHeight: 1.4,
-                  border: 'none', cursor: 'pointer',
-                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                  background: updChart === c ? 'var(--gc-green)' : 'var(--gc-surface)',
-                  color: updChart === c ? 'var(--gc-paper)' : 'var(--gc-muted)',
-                }}>
-                {lang === 'en' ? `Chart ${c}` : `表${c}`}
-              </button>
-            ))}
-          </span>
+          {/* 表B/表A toggle moved down into the category-table header, next to the
+              人才/亲属 group toggle — the two selectors live together now. */}
         </div>
         <p className="text-[11px] text-slate-500">{t.updateSubtitle}</p>
       </div>
@@ -7144,6 +7130,22 @@ const MonthlyUpdate = ({ userCase }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>{t.categoryChanges}</span>
           <span className="inline-flex" style={{ marginLeft: 'auto', border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
+            {/* B leads — same order as the summary card's stations: filing before approval. */}
+            {['B', 'A'].map((c, i) => (
+              <button key={c} type="button" onClick={() => setUpdChart(c)}
+                className="gc-mono"
+                style={{
+                  fontSize: '10px', fontWeight: 700, padding: '3px 9px', lineHeight: 1.4,
+                  border: 'none', cursor: 'pointer',
+                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                  background: updChart === c ? 'var(--gc-green)' : 'var(--gc-surface)',
+                  color: updChart === c ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                }}>
+                {lang === 'en' ? `Chart ${c}` : `表${c}`}
+              </button>
+            ))}
+          </span>
+          <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
             {[['emp', lang === 'en' ? 'Employment' : lang === 'tw' ? '人才類' : '人才类'],
               ['family', lang === 'en' ? 'Family' : lang === 'tw' ? '親屬類' : '亲属类']].map(([g, gl], i) => (
               <button key={g} type="button" onClick={() => setCatGroup(g)}
@@ -7214,7 +7216,7 @@ const MonthlyUpdate = ({ userCase }) => {
                   ? ['bad', lang === 'en' ? 'U · no visas' : lang === 'tw' ? 'U · 不發名額' : 'U · 不发名额']
                   : mv.type === 'resumed'
                     ? ['adv', lang === 'en' ? '↑ resumed' : lang === 'tw' ? '↑ 恢復' : '↑ 恢复']
-                    : ['none', lang === 'en' ? '— no change' : lang === 'tw' ? '— 無變化' : '— 无变化'];
+                    : ['none', lang === 'en' ? 'no change' : lang === 'tw' ? '無變化' : '无变化'];
             return <div style={{ marginTop: '4px' }}><Pill tone={tone}>{txt}</Pill></div>;
           };
           // A country cell: pill-only for Current, big full date + movement pill otherwise.
