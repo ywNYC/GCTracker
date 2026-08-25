@@ -4677,7 +4677,7 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
           if (status.status === 'notCurrent') {
             const days = status.days;
             if (days === null) return { icon: '⧖', label: lang === 'en' ? 'Not current' : '排期未到', good: false };
-            return { icon: '⧖', label: lang === 'en' ? `${days.toLocaleString()}d away` : `距 ${days.toLocaleString()} 天`, good: false };
+            return { icon: '⧖', label: lang === 'en' ? `${days.toLocaleString()}d left` : lang === 'tw' ? `還剩 ${days.toLocaleString()} 天` : `还剩 ${days.toLocaleString()} 天`, good: false };
           }
           return { icon: '·', label: '—', good: null };
         };
