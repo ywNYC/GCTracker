@@ -7047,9 +7047,17 @@ const MonthlyUpdate = ({ userCase }) => {
             {BULLETIN_CURRENT_MONTH[lang]}
           </span>
           {/* 表B/表A toggle moved down into the category-table header, next to the
-              人才/亲属 group toggle — the two selectors live together now. */}
+              人才/亲属 group toggle — the two selectors live together now.
+              Next-release countdown rides the title line (replaced the subtitle). */}
+          <span className="text-[11px] text-slate-500">
+            {(() => {
+              const now = new Date();
+              const target = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > 22 ? 1 : 0), 15);
+              const daysTo = Math.max(Math.ceil((target - now) / 86400000), 0);
+              return lang === 'en' ? `next bulletin ~${daysTo}d` : lang === 'tw' ? `下期公告約 ${daysTo} 天後` : `下期公告约 ${daysTo} 天后`;
+            })()}
+          </span>
         </div>
-        <p className="text-[11px] text-slate-500">{t.updateSubtitle}</p>
       </div>
       {!hasPreviousData && (
         <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl mb-2.5 flex items-start gap-2">
@@ -7102,13 +7110,9 @@ const MonthlyUpdate = ({ userCase }) => {
         if (!flat.length) return null;
         const best = flat.reduce((a, b) => (b.d > a.d ? b : a));
         const worst = flat.reduce((a, b) => (b.d < a.d ? b : a));
-        // Expected next release: mid-month per the observed 12th–22nd pattern.
-        const now = new Date();
-        const target = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > 22 ? 1 : 0), 15);
-        const daysTo = Math.max(Math.ceil((target - now) / 86400000), 0);
         return (
           <div className="p-2 bg-slate-50 rounded-xl mb-2.5" style={{ fontSize: '11px', lineHeight: 1.7 }}>
-            {/* Single line: extremes + next-release countdown, separated by dots. */}
+            {/* Single line: this month's extremes. Next-release countdown lives in the title row. */}
             <span style={{ color: 'var(--gc-ink-soft)' }}>
               {lang === 'en' ? 'This month: ' : '本月之最：'}
               <b style={{ color: 'var(--gc-green)' }}>{best.label} +{best.d}{lang === 'en' ? 'd' : '天'}</b>
@@ -7116,10 +7120,6 @@ const MonthlyUpdate = ({ userCase }) => {
                 <span style={{ color: 'var(--gc-rule)' }}> · </span>
                 <b style={{ color: 'var(--gc-red)' }}>{worst.label} −{Math.abs(worst.d)}{lang === 'en' ? 'd' : '天'}</b>
               </>}
-              <span style={{ color: 'var(--gc-rule)' }}> · </span>
-              <span style={{ color: 'var(--gc-muted)' }}>
-                {lang === 'en' ? `next bulletin ~${daysTo}d` : lang === 'tw' ? `下期公告約 ${daysTo} 天後` : `下期公告约 ${daysTo} 天后`}
-              </span>
             </span>
           </div>
         );
