@@ -7138,20 +7138,29 @@ const MonthlyUpdate = ({ userCase }) => {
           {t.categoryChanges}<span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · tap to see all 15 categories' : lang === 'tw' ? ' · 展開看全部 15 個類別' : ' · 展开看全部 15 个类别'}</span>
         </summary>
         <div style={{ height: '8px' }} />
-        {/* Bulletin-style table (modeled on the widely shared 小红书 排期表 screenshots):
-            a fixed header row naming the two country columns once, then per category a
-            row with the cutoff DATE as the big figure and the movement as a colored
-            pill under it — date first, movement as qualifier, columns aligned for
-            straight down-scanning. Theme tokens only, no slate/indigo. */}
+        {/* Faithful copy of the widely-shared 小红书 排期表 layout, in our tokens:
+            numbered circle + category code on the left, FULL cutoff date as the big
+            figure per country column, movement as a rounded pill under the date,
+            "无需排期" rendered as a green pill in place of a date. */}
         {(() => {
-          const cellDate = (d) => d === 'C'
-            ? (lang === 'en' ? 'Current' : lang === 'tw' ? '無需排期' : '无需排期')
-            : formatDateShort(d, lang);
-          const pill = (mv) => {
+          const fmtFull = (ds) => {
+            const [y, m, dd] = ds.split('-').map(Number);
+            return lang === 'en'
+              ? new Date(y, m - 1, dd).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+              : `${y}年${m}月${dd}日`;
+          };
+          const P = { adv: { bg: 'var(--gc-green-soft)', fg: 'var(--gc-green-ink)' },
+                      bad: { bg: 'var(--gc-red-soft)', fg: 'var(--gc-red-ink)' },
+                      none: { bg: 'var(--gc-paper-soft)', fg: 'var(--gc-muted)' } };
+          const Pill = ({ tone, children, big }) => (
+            <span style={{
+              display: 'inline-block', fontSize: big ? '12px' : '10.5px', fontWeight: 700,
+              color: P[tone].fg, background: P[tone].bg, borderRadius: '999px',
+              padding: big ? '4px 12px' : '3px 9px', whiteSpace: 'nowrap',
+            }}>{children}</span>
+          );
+          const mvPill = (mv) => {
             if (!mv) return null;
-            const P = { adv: { bg: 'var(--gc-green-soft)', fg: 'var(--gc-green-ink)' },
-                        bad: { bg: 'var(--gc-red-soft)', fg: 'var(--gc-red-ink)' },
-                        none: { bg: 'var(--gc-paper-soft)', fg: 'var(--gc-muted)' } };
             const [tone, txt] = mv.type === 'advanced'
               ? ['adv', lang === 'en' ? `↑ +${mv.days}d` : `↑ 前进${mv.days}天`]
               : mv.type === 'retrogressed'
@@ -7160,73 +7169,76 @@ const MonthlyUpdate = ({ userCase }) => {
                   ? ['bad', lang === 'en' ? 'U · no visas' : lang === 'tw' ? 'U · 不發名額' : 'U · 不发名额']
                   : mv.type === 'resumed'
                     ? ['adv', lang === 'en' ? '↑ resumed' : lang === 'tw' ? '↑ 恢復' : '↑ 恢复']
-                    : mv.type === 'current'
-                      ? ['adv', lang === 'en' ? 'Current' : lang === 'tw' ? '無需排期' : '无需排期']
-                      : ['none', lang === 'en' ? '— no change' : lang === 'tw' ? '— 無變化' : '— 无变化'];
-            const c = P[tone];
+                    : ['none', lang === 'en' ? '— no change' : lang === 'tw' ? '— 無變化' : '— 无变化'];
+            return <div style={{ marginTop: '4px' }}><Pill tone={tone}>{txt}</Pill></div>;
+          };
+          // A country cell: pill-only for Current, big full date + movement pill otherwise.
+          const cell = (date, mv) => {
+            if (!date) return <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>—</span>;
+            if (date === 'C') return <Pill tone="adv" big>{lang === 'en' ? 'Current' : lang === 'tw' ? '無需排期' : '无需排期'}</Pill>;
+            if (date === 'U') return <Pill tone="bad" big>{lang === 'en' ? 'U · no visas' : lang === 'tw' ? 'U · 不發名額' : 'U · 不发名额'}</Pill>;
             return (
-              <span className="gc-mono" style={{
-                display: 'inline-block', fontSize: '10px', fontWeight: 700,
-                color: c.fg, background: c.bg, borderRadius: '9px',
-                padding: '2px 8px', marginTop: '3px', whiteSpace: 'nowrap',
-              }}>{txt}</span>
+              <>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--gc-ink)', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+                  {fmtFull(date)}
+                </div>
+                {mvPill(mv)}
+              </>
             );
           };
-          const gridCols = '1.1fr 1fr 1fr';
+          // "EB-1 杰出人才" → code "EB-1" big, remainder as the small line under it.
+          const splitLabel = (label) => {
+            const sp = label.indexOf(' ');
+            return sp === -1 ? [label, ''] : [label.slice(0, sp), label.slice(sp + 1)];
+          };
+          const gridCols = '0.85fr 1.1fr 1.1fr';
           return (
             <div>
-              {/* Header row — column identities declared once, not repeated per row */}
+              {/* Header band — grey strip naming the columns once, like the shared table */}
               <div style={{
                 display: 'grid', gridTemplateColumns: gridCols, alignItems: 'center',
-                padding: '6px 6px', borderBottom: '1px solid var(--gc-rule)',
+                padding: '8px 8px', background: 'var(--gc-paper-soft)', borderRadius: '4px',
               }}>
-                <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)' }}>
-                  {lang === 'en' ? 'CATEGORY' : lang === 'tw' ? '簽證類別' : '签证类别'}
+                <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>
+                  {lang === 'en' ? 'Category' : lang === 'tw' ? '簽證類別' : '签证类别'}
                 </div>
-                <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 700, color: 'var(--gc-ink-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-ink-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                   <CountryFlag country={userCase.country} size={12} />
-                  <span>{countryShortLabel(userCase.country, lang)}</span>
+                  <span>{userCase.country === 'China' && lang !== 'en' ? (lang === 'tw' ? '中國大陸' : '中国大陆') : countryShortLabel(userCase.country, lang)}</span>
                 </div>
-                <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 700, color: 'var(--gc-ink-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" style={{ display: 'inline-block', flexShrink: 0 }}>
-                    <circle cx="12" cy="12" r="10" fill="#64748b" stroke="#475569" strokeWidth="0.8" />
-                    <ellipse cx="12" cy="12" rx="10" ry="4.5" fill="none" stroke="#fff" strokeWidth="0.7" opacity="0.9" />
-                    <path d="M 2 12 Q 12 6.5 22 12 M 2 12 Q 12 17.5 22 12" stroke="#fff" strokeWidth="0.7" fill="none" opacity="0.9" />
-                    <line x1="12" y1="2" x2="12" y2="22" stroke="#fff" strokeWidth="0.7" opacity="0.9" />
-                  </svg>
-                  <span>ROW</span>
+                <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-ink-soft)', textAlign: 'center' }}>
+                  {lang === 'en' ? 'ROW' : lang === 'tw' ? '全球 / 港澳台' : '全球 / 港澳台'}
                 </div>
               </div>
-              {changes.map((ch, idx) => (
-                <div key={ch.cat} style={{
-                  display: 'grid', gridTemplateColumns: gridCols, alignItems: 'center',
-                  padding: '9px 6px',
-                  borderBottom: idx === changes.length - 1 ? 'none' : '1px solid var(--gc-rule-soft)',
-                  background: ch.cat === userCase.category ? 'var(--gc-green-soft)' : 'transparent',
-                }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)', paddingRight: '6px', lineHeight: 1.3 }}>
-                    {ch.label}
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div className="gc-mono" style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)', whiteSpace: 'nowrap' }}>
-                      {cellDate(ch.primaryDate)}
+              {changes.map((ch, idx) => {
+                const [code, sub] = splitLabel(ch.label);
+                return (
+                  <div key={ch.cat} style={{
+                    display: 'grid', gridTemplateColumns: gridCols, columnGap: '6px', alignItems: 'center',
+                    padding: '11px 8px',
+                    borderBottom: idx === changes.length - 1 ? 'none' : '1px solid var(--gc-rule-soft)',
+                    background: ch.cat === userCase.category ? 'var(--gc-green-soft)' : 'transparent',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                      {/* Numbered circle — same role as the ①②③ in the shared table */}
+                      <span style={{
+                        width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
+                        background: ch.cat === userCase.category ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
+                        border: '1px solid var(--gc-rule)',
+                        color: ch.cat === userCase.category ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
+                        fontSize: '10px', fontWeight: 700,
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      }}>{idx + 1}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: '14px', fontWeight: 800, color: 'var(--gc-ink)', lineHeight: 1.15, whiteSpace: 'nowrap' }}>{code}</span>
+                        {sub && <span style={{ display: 'block', fontSize: '8.5px', color: 'var(--gc-muted)', lineHeight: 1.25 }}>{sub}</span>}
+                      </span>
                     </div>
-                    {ch.primaryDate !== 'C' && pill(ch.primary)}
+                    <div style={{ textAlign: 'center' }}>{cell(ch.primaryDate, ch.primary)}</div>
+                    <div style={{ textAlign: 'center' }}>{ch.secondaryDate !== null ? cell(ch.secondaryDate, ch.secondary) : <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>—</span>}</div>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    {ch.secondary ? (
-                      <>
-                        <div className="gc-mono" style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)', whiteSpace: 'nowrap' }}>
-                          {cellDate(ch.secondaryDate)}
-                        </div>
-                        {ch.secondaryDate !== 'C' && pill(ch.secondary)}
-                      </>
-                    ) : (
-                      <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>—</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           );
         })()}
