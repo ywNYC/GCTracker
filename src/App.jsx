@@ -6974,7 +6974,10 @@ const MonthlyUpdate = ({ userCase }) => {
   const { t, lang } = useLang();
   const userCountry = resolveCountry(userCase.country);
   // Which chart the whole page reads: A (finalAction) or B (filing).
-  const [updChart, setUpdChart] = useState('A');
+  const [updChart, setUpdChart] = useState('B');
+  // Which half of the category table shows — preset from the user's own case:
+  // an F-case lands on 亲属类, everything else on 职业/人才类.
+  const [catGroup, setCatGroup] = useState(userCase.category?.startsWith('F') ? 'family' : 'emp');
   const chartKey = updChart === 'B' ? 'filing' : 'finalAction';
   const showsTwoColumns = userCase.country === 'China' || userCase.country === 'India'; // These have separate cutoffs from ROW
 
@@ -7013,11 +7016,19 @@ const MonthlyUpdate = ({ userCase }) => {
     ? { type: 'none', days: 0 }
     : computeMovement(bulletinCurrent[chartKey][userCase.category]?.[userCountry], bulletinPrevious[chartKey]?.[userCase.category]?.[userCountry]);
 
-  const impactText = {
+  const impactTextRaw = {
     advanced: t.impactAdvanced, retrogressed: t.impactRetrogressed, none: t.impactNoChange, current: t.impactBecameCurrent,
     unavailable: lang === 'en' ? 'Your category is unavailable this month (U) — no visas issued.' : lang === 'tw' ? '你的類別本月無名額（U）。' : '你的类别本月无名额（U）。',
     resumed: lang === 'en' ? 'Your category resumed — numbers are back.' : lang === 'tw' ? '你的類別恢復名額了。' : '你的类别恢复名额了。',
   }[userImpact.type];
+  // Name the case inline — "你的类别" alone forces the reader to remember what they
+  // filled in; "你的类别 中国大陆·F4" doesn't.
+  const impactCaseTag = `${userCase.country === 'China' && lang !== 'en'
+    ? (lang === 'tw' ? '中國大陸' : '中国大陆')
+    : countryShortLabel(userCase.country, lang)}·${userCase.category}`;
+  const impactText = lang === 'en'
+    ? impactTextRaw.replace(/your category/i, (m) => `${m} (${impactCaseTag})`)
+    : impactTextRaw.replace(/你的[类類][别別]/, (m) => `${m} ${impactCaseTag} `);
   const impactTone = {
     advanced: 'bg-emerald-50 text-emerald-900 border-emerald-200',
     retrogressed: 'bg-red-50 text-red-900 border-red-200',
@@ -7036,7 +7047,8 @@ const MonthlyUpdate = ({ userCase }) => {
             {BULLETIN_CURRENT_MONTH[lang]}
           </span>
           <span className="inline-flex" style={{ marginLeft: 'auto', border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
-            {['A', 'B'].map((c, i) => (
+            {/* B leads — same order as the summary card's stations: filing before approval. */}
+            {['B', 'A'].map((c, i) => (
               <button key={c} type="button" onClick={() => setUpdChart(c)}
                 className="gc-mono"
                 style={{
@@ -7130,19 +7142,32 @@ const MonthlyUpdate = ({ userCase }) => {
           </div>
         );
       })()}
-      {/* 各类别变化：15 行占满整屏，默认收起——动态页真正的核心是上面的本月解读
-          和下面的进度墙图表，这张全类别对照表是查阅用的，需要时再展开。
-          用原生 details/summary，不引入新状态也不引入新组件库。 */}
-      <details style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '8px 10px' }}>
-        <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
-          {t.categoryChanges}<span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · tap to see all 15 categories' : lang === 'tw' ? ' · 展開看全部 15 個類別' : ' · 展开看全部 15 个类别'}</span>
-        </summary>
+      {/* 各类别变化：按 职业(人才)/亲属 分组显示，各组 5–10 行一屏放得下，所以
+          不再折叠。分组默认跟用户自己的类别走——EB* 进来看职业组，F* 看亲属组。 */}
+      <div style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '8px 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>{t.categoryChanges}</span>
+          <span className="inline-flex" style={{ marginLeft: 'auto', border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
+            {[['emp', lang === 'en' ? 'Employment' : lang === 'tw' ? '人才類' : '人才类'],
+              ['family', lang === 'en' ? 'Family' : lang === 'tw' ? '親屬類' : '亲属类']].map(([g, gl], i) => (
+              <button key={g} type="button" onClick={() => setCatGroup(g)}
+                style={{
+                  fontSize: '10px', fontWeight: 700, padding: '3px 9px', lineHeight: 1.4,
+                  border: 'none', cursor: 'pointer',
+                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                  background: catGroup === g ? 'var(--gc-green)' : 'var(--gc-surface)',
+                  color: catGroup === g ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                }}>{gl}</button>
+            ))}
+          </span>
+        </div>
         <div style={{ height: '8px' }} />
         {/* Faithful copy of the widely-shared 小红书 排期表 layout, in our tokens:
             numbered circle + category code on the left, FULL cutoff date as the big
             figure per country column, movement as a rounded pill under the date,
             "无需排期" rendered as a green pill in place of a date. */}
         {(() => {
+          const groupChanges = changes.filter((ch) => (catGroup === 'family' ? ch.cat.startsWith('F') : !ch.cat.startsWith('F')));
           const fmtFull = (ds) => {
             const [y, m, dd] = ds.split('-').map(Number);
             return lang === 'en'
@@ -7210,13 +7235,13 @@ const MonthlyUpdate = ({ userCase }) => {
                   {lang === 'en' ? 'ROW' : lang === 'tw' ? '全球 / 港澳台' : '全球 / 港澳台'}
                 </div>
               </div>
-              {changes.map((ch, idx) => {
+              {groupChanges.map((ch, idx) => {
                 const [code, sub] = splitLabel(ch.label);
                 return (
                   <div key={ch.cat} style={{
                     display: 'grid', gridTemplateColumns: gridCols, columnGap: '6px', alignItems: 'center',
                     padding: '11px 8px',
-                    borderBottom: idx === changes.length - 1 ? 'none' : '1px solid var(--gc-rule-soft)',
+                    borderBottom: idx === groupChanges.length - 1 ? 'none' : '1px solid var(--gc-rule-soft)',
                     background: ch.cat === userCase.category ? 'var(--gc-green-soft)' : 'transparent',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
@@ -7242,8 +7267,8 @@ const MonthlyUpdate = ({ userCase }) => {
             </div>
           );
         })()}
-      </details>
-    
+      </div>
+
 
     </div>
 
