@@ -5113,11 +5113,15 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                       <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: blk.adopted ? 'var(--gc-green)' : 'var(--gc-muted)', letterSpacing: '0.1em', marginBottom: '2px' }}>
                         {blk.title}{blk.adopted ? (lang === 'en' ? ' · ACTIVE' : ' · 采用') : ''}
                       </div>
+                      {/* Movement first and biggest — what changed this month is the
+                          headline; the remaining-gap figure follows it. */}
                       <div className="gc-mono" style={{ fontSize: '13px', fontWeight: 700, color: blk.info.good ? 'var(--gc-green-ink)' : 'var(--gc-ink)', lineHeight: 1.3 }}>
+                        {mvChipText(blk.mv).t && (
+                          <span style={{ fontSize: '17px', fontWeight: 800, color: mvChipText(blk.mv).c, marginRight: '7px' }}>
+                            {mvChipText(blk.mv).t}
+                          </span>
+                        )}
                         {blk.info.label}
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: mvChipText(blk.mv).c, marginLeft: '6px' }}>
-                          {mvChipText(blk.mv).t}
-                        </span>
                       </div>
                       {blk.cut && blk.cut !== 'C' && (
                         <div className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '1px' }}>
@@ -7134,52 +7138,98 @@ const MonthlyUpdate = ({ userCase }) => {
           {t.categoryChanges}<span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · tap to see all 15 categories' : lang === 'tw' ? ' · 展開看全部 15 個類別' : ' · 展开看全部 15 个类别'}</span>
         </summary>
         <div style={{ height: '8px' }} />
-        <div className="space-y-1">
-          {changes.map(ch => (
-            <div key={ch.cat} className={`flex items-center gap-2 p-2 rounded-lg ${
-              ch.cat === userCase.category ? 'bg-indigo-50 border border-indigo-200' : 'bg-slate-50'
-            }`}>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-semibold text-slate-900 truncate">{ch.label}</div>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div className="text-right">
-                  <div className="text-[9px] text-slate-500 flex items-center gap-1 justify-end mb-0">
-                    <CountryFlag country={userCase.country} size={12} />
-                    <span style={{ fontWeight: 600, letterSpacing: '0.03em' }}>
-                      {countryShortLabel(userCase.country, lang)}
-                    </span>
-                  </div>
-                  <div className="text-[10px] font-semibold text-slate-700">
-                    {ch.primaryDate === 'C' ? (lang === 'en' ? 'Current' : '无排期') : formatDateShort(ch.primaryDate, lang)}
-                  </div>
-                  <MovementIndicator movement={ch.primary} compact />
+        {/* Bulletin-style table (modeled on the widely shared 小红书 排期表 screenshots):
+            a fixed header row naming the two country columns once, then per category a
+            row with the cutoff DATE as the big figure and the movement as a colored
+            pill under it — date first, movement as qualifier, columns aligned for
+            straight down-scanning. Theme tokens only, no slate/indigo. */}
+        {(() => {
+          const cellDate = (d) => d === 'C'
+            ? (lang === 'en' ? 'Current' : lang === 'tw' ? '無需排期' : '无需排期')
+            : formatDateShort(d, lang);
+          const pill = (mv) => {
+            if (!mv) return null;
+            const P = { adv: { bg: 'var(--gc-green-soft)', fg: 'var(--gc-green-ink)' },
+                        bad: { bg: 'var(--gc-red-soft)', fg: 'var(--gc-red-ink)' },
+                        none: { bg: 'var(--gc-paper-soft)', fg: 'var(--gc-muted)' } };
+            const [tone, txt] = mv.type === 'advanced'
+              ? ['adv', lang === 'en' ? `↑ +${mv.days}d` : `↑ 前进${mv.days}天`]
+              : mv.type === 'retrogressed'
+                ? ['bad', lang === 'en' ? `↓ ${mv.days ? `-${mv.days}d` : 'back'}` : `↓ 倒退${mv.days ?? ''}天`]
+                : mv.type === 'unavailable'
+                  ? ['bad', lang === 'en' ? 'U · no visas' : lang === 'tw' ? 'U · 不發名額' : 'U · 不发名额']
+                  : mv.type === 'resumed'
+                    ? ['adv', lang === 'en' ? '↑ resumed' : lang === 'tw' ? '↑ 恢復' : '↑ 恢复']
+                    : mv.type === 'current'
+                      ? ['adv', lang === 'en' ? 'Current' : lang === 'tw' ? '無需排期' : '无需排期']
+                      : ['none', lang === 'en' ? '— no change' : lang === 'tw' ? '— 無變化' : '— 无变化'];
+            const c = P[tone];
+            return (
+              <span className="gc-mono" style={{
+                display: 'inline-block', fontSize: '10px', fontWeight: 700,
+                color: c.fg, background: c.bg, borderRadius: '9px',
+                padding: '2px 8px', marginTop: '3px', whiteSpace: 'nowrap',
+              }}>{txt}</span>
+            );
+          };
+          const gridCols = '1.1fr 1fr 1fr';
+          return (
+            <div>
+              {/* Header row — column identities declared once, not repeated per row */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: gridCols, alignItems: 'center',
+                padding: '6px 6px', borderBottom: '1px solid var(--gc-rule)',
+              }}>
+                <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)' }}>
+                  {lang === 'en' ? 'CATEGORY' : lang === 'tw' ? '簽證類別' : '签证类别'}
                 </div>
-                {ch.secondary && (
-                  <>
-                    <div className="w-px h-8 bg-slate-200"></div>
-                    <div className="text-right">
-                      <div className="text-[9px] text-slate-500 flex items-center gap-1 justify-end mb-0">
-                        {/* Globe icon — mirrors the "ROW" pill in the country selector above */}
-                        <svg width="12" height="12" viewBox="0 0 24 24" style={{ display: 'inline-block' }}>
-                          <circle cx="12" cy="12" r="10" fill="#64748b" stroke="#475569" strokeWidth="0.8" />
-                          <ellipse cx="12" cy="12" rx="10" ry="4.5" fill="none" stroke="#fff" strokeWidth="0.7" opacity="0.9" />
-                          <path d="M 2 12 Q 12 6.5 22 12 M 2 12 Q 12 17.5 22 12" stroke="#fff" strokeWidth="0.7" fill="none" opacity="0.9" />
-                          <line x1="12" y1="2" x2="12" y2="22" stroke="#fff" strokeWidth="0.7" opacity="0.9" />
-                        </svg>
-                        <span style={{ fontWeight: 600, letterSpacing: '0.03em' }}>ROW</span>
-                      </div>
-                      <div className="text-[10px] font-semibold text-slate-700">
-                        {ch.secondaryDate === 'C' ? (lang === 'en' ? 'Current' : '无排期') : formatDateShort(ch.secondaryDate, lang)}
-                      </div>
-                      <MovementIndicator movement={ch.secondary} compact />
-                    </div>
-                  </>
-                )}
+                <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 700, color: 'var(--gc-ink-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                  <CountryFlag country={userCase.country} size={12} />
+                  <span>{countryShortLabel(userCase.country, lang)}</span>
+                </div>
+                <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 700, color: 'var(--gc-ink-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" style={{ display: 'inline-block', flexShrink: 0 }}>
+                    <circle cx="12" cy="12" r="10" fill="#64748b" stroke="#475569" strokeWidth="0.8" />
+                    <ellipse cx="12" cy="12" rx="10" ry="4.5" fill="none" stroke="#fff" strokeWidth="0.7" opacity="0.9" />
+                    <path d="M 2 12 Q 12 6.5 22 12 M 2 12 Q 12 17.5 22 12" stroke="#fff" strokeWidth="0.7" fill="none" opacity="0.9" />
+                    <line x1="12" y1="2" x2="12" y2="22" stroke="#fff" strokeWidth="0.7" opacity="0.9" />
+                  </svg>
+                  <span>ROW</span>
+                </div>
               </div>
+              {changes.map((ch, idx) => (
+                <div key={ch.cat} style={{
+                  display: 'grid', gridTemplateColumns: gridCols, alignItems: 'center',
+                  padding: '9px 6px',
+                  borderBottom: idx === changes.length - 1 ? 'none' : '1px solid var(--gc-rule-soft)',
+                  background: ch.cat === userCase.category ? 'var(--gc-green-soft)' : 'transparent',
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)', paddingRight: '6px', lineHeight: 1.3 }}>
+                    {ch.label}
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div className="gc-mono" style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)', whiteSpace: 'nowrap' }}>
+                      {cellDate(ch.primaryDate)}
+                    </div>
+                    {ch.primaryDate !== 'C' && pill(ch.primary)}
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    {ch.secondary ? (
+                      <>
+                        <div className="gc-mono" style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)', whiteSpace: 'nowrap' }}>
+                          {cellDate(ch.secondaryDate)}
+                        </div>
+                        {ch.secondaryDate !== 'C' && pill(ch.secondary)}
+                      </>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>—</span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </details>
     
 
@@ -16908,22 +16958,6 @@ export default function App() {
               </div>
             </div>
           </header>
-
-          {nicknameGreeting && (
-            <div className="max-w-3xl mx-auto" style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px 0' }}>
-              {/* Same card look as the case card below (surface bg + gc-rule border + 4px
-                  radius) and the same gc-serif family as its title — the old edge-to-edge
-                  muted-grey banner read as a system notice, not part of the case UI. */}
-              <div style={{
-                background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)',
-                borderRadius: '4px', padding: '9px 14px',
-              }}>
-                <p className="gc-serif" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--gc-ink)', letterSpacing: '-0.005em' }}>
-                  {lang === 'en' ? <>Hi, <b>{nicknameGreeting}</b></> : <><b>{nicknameGreeting}</b>，你好</>}
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* Time Machine banner — only shown when viewing a non-default month */}
           {isTimeMachineActive && (
