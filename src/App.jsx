@@ -4893,15 +4893,18 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                 const mvP = heroSel === 'B'
                   ? computeMovement(bulletinCurrent.filing[userCase.category]?.[country], bulletinPrevious.filing[userCase.category]?.[country])
                   : computeMovement(bulletinCurrent.finalAction[userCase.category]?.[country], bulletinPrevious.finalAction[userCase.category]?.[country]);
+                // Split into prefix/number/suffix (not one flat string) so the day
+                // count can be rendered larger than the surrounding sentence — this
+                // block is now the card's opening line, ahead of the wait estimate.
                 const delta = mvP.type === 'advanced'
-                  ? { text: lang === 'en' ? `Good news — this month's bulletin cut your wait by ${mvP.days} days ↓` : lang === 'tw' ? `好消息：這個月的公告幫你縮短了 ${mvP.days} 天 ↓` : `好消息：这个月的公告帮你缩短了 ${mvP.days} 天 ↓`, color: 'var(--gc-green)' }
+                  ? { kind: 'days', prefix: lang === 'en' ? 'Good news — this month\'s bulletin cut your wait by ' : lang === 'tw' ? '好消息：這個月的公告幫你縮短了 ' : '好消息：这个月的公告帮你缩短了 ', days: mvP.days, unit: lang === 'en' ? ' days' : ' 天', suffix: ' ↓', color: 'var(--gc-green)' }
                   : mvP.type === 'retrogressed'
-                    ? { text: lang === 'en' ? `Heads up — this month pushed your wait back by ${mvP.days ?? '—'} days ↑` : lang === 'tw' ? `注意：這個月排期倒退，等待拉長了 ${mvP.days ?? '—'} 天 ↑` : `注意：这个月排期倒退，等待拉长了 ${mvP.days ?? '—'} 天 ↑`, color: 'var(--gc-red)' }
+                    ? { kind: 'days', prefix: lang === 'en' ? 'Heads up — this month pushed your wait back by ' : lang === 'tw' ? '注意：這個月排期倒退，等待拉長了 ' : '注意：这个月排期倒退，等待拉长了 ', days: mvP.days ?? '—', unit: lang === 'en' ? ' days' : ' 天', suffix: ' ↑', color: 'var(--gc-red)' }
                     : mvP.type === 'resumed'
-                      ? { text: lang === 'en' ? 'Numbers resumed this month' : '本月恢复名额了', color: 'var(--gc-green)' }
+                      ? { kind: 'text', text: lang === 'en' ? 'Numbers resumed this month' : '本月恢复名额了', color: 'var(--gc-green)' }
                       : mvP.type === 'unavailable'
-                        ? { text: lang === 'en' ? 'No visas issued this month (U)' : lang === 'tw' ? '本月不發名額（U）' : '本月不发名额（U）', color: 'var(--gc-red)' }
-                        : { text: lang === 'en' ? 'This month\'s bulletin didn\'t move — check back next month' : lang === 'tw' ? '這個月排期沒動，下月再看' : '这个月排期没动，下月再看', color: 'var(--gc-muted)' };
+                        ? { kind: 'text', text: lang === 'en' ? 'No visas issued this month (U)' : lang === 'tw' ? '本月不發名額（U）' : '本月不发名额（U）', color: 'var(--gc-red)' }
+                        : { kind: 'text', text: lang === 'en' ? 'This month\'s bulletin didn\'t move — check back next month' : lang === 'tw' ? '這個月排期沒動，下月再看' : '这个月排期没动，下月再看', color: 'var(--gc-muted)' };
                 // Wait-journey progress: share of the predicted total wait already served.
                 const pdD = parseDate(userCase.priorityDate);
                 let pct = null;
@@ -4920,6 +4923,21 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                       </>
                     ) : (
                       <>
+                        {/* Lead with what changed this month — the number people came
+                            back to check — before the standing "how much longer" estimate. */}
+                        <div style={{ marginBottom: '10px' }}>
+                          {delta.kind === 'days' ? (
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: delta.color, lineHeight: 1.35 }}>
+                              {delta.prefix}
+                              <span style={{ fontSize: '22px' }}>{delta.days}{delta.unit}</span>
+                              {delta.suffix}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: delta.color }}>
+                              {delta.text}
+                            </div>
+                          )}
+                        </div>
                         {/* What the number IS, said before the number */}
                         <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
                           {heroSel === 'B'
@@ -5008,9 +5026,6 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                             </div>
                           );
                         })()}
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: delta.color, marginTop: '8px' }}>
-                          {delta.text}
-                        </div>
                         {pct !== null && (
                           <div style={{ marginTop: '10px' }}>
                             <div style={{ height: '6px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -7133,52 +7148,60 @@ const MonthlyUpdate = ({ userCase }) => {
         <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
           {t.categoryChanges}<span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · tap to see all 15 categories' : lang === 'tw' ? ' · 展開看全部 15 個類別' : ' · 展开看全部 15 个类别'}</span>
         </summary>
-        <div style={{ height: '8px' }} />
-        <div className="space-y-1">
-          {changes.map(ch => (
-            <div key={ch.cat} className={`flex items-center gap-2 p-2 rounded-lg ${
-              ch.cat === userCase.category ? 'bg-indigo-50 border border-indigo-200' : 'bg-slate-50'
-            }`}>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-semibold text-slate-900 truncate">{ch.label}</div>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div className="text-right">
-                  <div className="text-[9px] text-slate-500 flex items-center gap-1 justify-end mb-0">
-                    <CountryFlag country={userCase.country} size={12} />
-                    <span style={{ fontWeight: 600, letterSpacing: '0.03em' }}>
-                      {countryShortLabel(userCase.country, lang)}
+        <div style={{ height: '4px' }} />
+        {/* Inbox-style flat list: a lead dot for at-a-glance status (green moved,
+            red retrogressed/U, grey unchanged), hairline dividers instead of boxed
+            per-row cards, and the country/ROW figures folded into one subtitle
+            line — read top-to-bottom like a mail list, not scanned like a table. */}
+        <div>
+          {changes.map((ch, idx) => {
+            const dotColor = (m) => (!m ? 'var(--gc-rule)'
+              : m.type === 'advanced' || m.type === 'resumed' || m.type === 'current' ? 'var(--gc-green)'
+              : m.type === 'retrogressed' || m.type === 'unavailable' ? 'var(--gc-red)'
+              : 'var(--gc-rule)');
+            const isMine = ch.cat === userCase.category;
+            return (
+              <div key={ch.cat} style={{
+                display: 'flex', alignItems: 'flex-start', gap: '9px',
+                padding: '8px 6px',
+                borderTop: idx === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                background: isMine ? 'var(--gc-green-soft)' : 'transparent',
+              }}>
+                <div style={{
+                  width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0,
+                  marginTop: '5px', background: dotColor(ch.primary),
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink)' }}>{ch.label}</div>
+                  <div style={{
+                    fontSize: '10.5px', color: 'var(--gc-ink-soft)', marginTop: '2px',
+                    display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 5px',
+                  }}>
+                    <CountryFlag country={userCase.country} size={11} />
+                    <span className="gc-mono">
+                      {ch.primaryDate === 'C' ? (lang === 'en' ? 'Current' : '无排期') : formatDateShort(ch.primaryDate, lang)}
                     </span>
-                  </div>
-                  <div className="text-[10px] font-semibold text-slate-700">
-                    {ch.primaryDate === 'C' ? (lang === 'en' ? 'Current' : '无排期') : formatDateShort(ch.primaryDate, lang)}
-                  </div>
-                  <MovementIndicator movement={ch.primary} compact />
-                </div>
-                {ch.secondary && (
-                  <>
-                    <div className="w-px h-8 bg-slate-200"></div>
-                    <div className="text-right">
-                      <div className="text-[9px] text-slate-500 flex items-center gap-1 justify-end mb-0">
-                        {/* Globe icon — mirrors the "ROW" pill in the country selector above */}
-                        <svg width="12" height="12" viewBox="0 0 24 24" style={{ display: 'inline-block' }}>
+                    <MovementIndicator movement={ch.primary} compact />
+                    {ch.secondary && (
+                      <>
+                        <span style={{ color: 'var(--gc-rule)' }}>·</span>
+                        <svg width="11" height="11" viewBox="0 0 24 24" style={{ display: 'inline-block', flexShrink: 0 }}>
                           <circle cx="12" cy="12" r="10" fill="#64748b" stroke="#475569" strokeWidth="0.8" />
                           <ellipse cx="12" cy="12" rx="10" ry="4.5" fill="none" stroke="#fff" strokeWidth="0.7" opacity="0.9" />
                           <path d="M 2 12 Q 12 6.5 22 12 M 2 12 Q 12 17.5 22 12" stroke="#fff" strokeWidth="0.7" fill="none" opacity="0.9" />
                           <line x1="12" y1="2" x2="12" y2="22" stroke="#fff" strokeWidth="0.7" opacity="0.9" />
                         </svg>
-                        <span style={{ fontWeight: 600, letterSpacing: '0.03em' }}>ROW</span>
-                      </div>
-                      <div className="text-[10px] font-semibold text-slate-700">
-                        {ch.secondaryDate === 'C' ? (lang === 'en' ? 'Current' : '无排期') : formatDateShort(ch.secondaryDate, lang)}
-                      </div>
-                      <MovementIndicator movement={ch.secondary} compact />
-                    </div>
-                  </>
-                )}
+                        <span className="gc-mono">
+                          {ch.secondaryDate === 'C' ? (lang === 'en' ? 'Current' : '无排期') : formatDateShort(ch.secondaryDate, lang)}
+                        </span>
+                        <MovementIndicator movement={ch.secondary} compact />
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </details>
     
@@ -16910,18 +16933,12 @@ export default function App() {
           </header>
 
           {nicknameGreeting && (
-            <div className="max-w-3xl mx-auto" style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px 0' }}>
-              {/* Same card look as the case card below (surface bg + gc-rule border + 4px
-                  radius) and the same gc-serif family as its title — the old edge-to-edge
-                  muted-grey banner read as a system notice, not part of the case UI. */}
-              <div style={{
-                background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)',
-                borderRadius: '4px', padding: '9px 14px',
-              }}>
-                <p className="gc-serif" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--gc-ink)', letterSpacing: '-0.005em' }}>
-                  {lang === 'en' ? <>Hi, <b>{nicknameGreeting}</b></> : <><b>{nicknameGreeting}</b>，你好</>}
-                </p>
-              </div>
+            <div className="max-w-3xl mx-auto" style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px 0' }}>
+              {/* Plain text, no card box — a one-line greeting boxed in a bordered
+                  card read as a system notice sitting on top of the real content. */}
+              <p className="gc-serif" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--gc-ink)', letterSpacing: '-0.005em' }}>
+                {lang === 'en' ? <>Hi, <b>{nicknameGreeting}</b></> : <><b>{nicknameGreeting}</b>，你好</>}
+              </p>
             </div>
           )}
 
