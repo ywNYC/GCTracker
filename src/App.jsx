@@ -7163,7 +7163,29 @@ const MonthlyUpdate = ({ userCase }) => {
             figure per country column, movement as a rounded pill under the date,
             "无需排期" rendered as a green pill in place of a date. */}
         {(() => {
-          const groupChanges = changes.filter((ch) => (catGroup === 'family' ? ch.cat.startsWith('F') : !ch.cat.startsWith('F')));
+          let groupChanges = changes.filter((ch) => (catGroup === 'family' ? ch.cat.startsWith('F') : !ch.cat.startsWith('F')));
+          // The three EB-5 set-asides are Current in both columns almost every month —
+          // three identical 无需排期 rows say nothing. Collapse them into one row and
+          // only break them out again the month any of them picks up a cutoff date.
+          if (catGroup === 'emp') {
+            const res = ['EB5R', 'EB5H', 'EB5I'];
+            const resRows = groupChanges.filter((r) => res.includes(r.cat));
+            const allCurrent = resRows.length === 3 && resRows.every((r) =>
+              r.primaryDate === 'C' && (r.secondaryDate === null || r.secondaryDate === 'C'));
+            if (allCurrent) {
+              const at = groupChanges.findIndex((r) => r.cat === 'EB5R');
+              groupChanges = groupChanges.filter((r) => !res.includes(r.cat));
+              groupChanges.splice(at, 0, {
+                cat: 'EB5RES',
+                label: lang === 'en' ? 'EB-5 set-asides (rural/high-unemp/infra)'
+                  : lang === 'tw' ? 'EB-5 預留（鄉村/高失業/基建）' : 'EB-5 预留（乡村/高失业/基建）',
+                primaryDate: 'C',
+                secondaryDate: resRows[0].secondaryDate === null ? null : 'C',
+                primary: null, secondary: null,
+                mine: res.includes(userCase.category),
+              });
+            }
+          }
           const fmtFull = (ds) => {
             const [y, m, dd] = ds.split('-').map(Number);
             return lang === 'en'
@@ -7173,11 +7195,13 @@ const MonthlyUpdate = ({ userCase }) => {
           const P = { adv: { bg: 'var(--gc-green-soft)', fg: 'var(--gc-green-ink)' },
                       bad: { bg: 'var(--gc-red-soft)', fg: 'var(--gc-red-ink)' },
                       none: { bg: 'var(--gc-paper-soft)', fg: 'var(--gc-muted)' } };
-          const Pill = ({ tone, children, big }) => (
+          {/* One pill size everywhere — the oversized 无需排期 pill read wider than
+              the movement pills next to it and broke the column rhythm. */}
+          const Pill = ({ tone, children }) => (
             <span style={{
-              display: 'inline-block', fontSize: big ? '12px' : '10.5px', fontWeight: 700,
+              display: 'inline-block', fontSize: '10.5px', fontWeight: 700,
               color: P[tone].fg, background: P[tone].bg, borderRadius: '999px',
-              padding: big ? '4px 12px' : '3px 9px', whiteSpace: 'nowrap',
+              padding: '3px 9px', whiteSpace: 'nowrap',
             }}>{children}</span>
           );
           const mvPill = (mv) => {
@@ -7196,8 +7220,8 @@ const MonthlyUpdate = ({ userCase }) => {
           // A country cell: pill-only for Current, big full date + movement pill otherwise.
           const cell = (date, mv) => {
             if (!date) return <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>—</span>;
-            if (date === 'C') return <Pill tone="adv" big>{lang === 'en' ? 'Current' : lang === 'tw' ? '無需排期' : '无需排期'}</Pill>;
-            if (date === 'U') return <Pill tone="bad" big>{lang === 'en' ? 'U · no visas' : lang === 'tw' ? 'U · 不發名額' : 'U · 不发名额'}</Pill>;
+            if (date === 'C') return <Pill tone="adv">{lang === 'en' ? 'Current' : lang === 'tw' ? '無需排期' : '无需排期'}</Pill>;
+            if (date === 'U') return <Pill tone="bad">{lang === 'en' ? 'U · no visas' : lang === 'tw' ? 'U · 不發名額' : 'U · 不发名额'}</Pill>;
             return (
               <>
                 <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--gc-ink)', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
@@ -7238,15 +7262,15 @@ const MonthlyUpdate = ({ userCase }) => {
                     display: 'grid', gridTemplateColumns: gridCols, columnGap: '6px', alignItems: 'center',
                     padding: '11px 8px',
                     borderBottom: idx === groupChanges.length - 1 ? 'none' : '1px solid var(--gc-rule-soft)',
-                    background: ch.cat === userCase.category ? 'var(--gc-green-soft)' : 'transparent',
+                    background: (ch.cat === userCase.category || ch.mine) ? 'var(--gc-green-soft)' : 'transparent',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
                       {/* Numbered circle — same role as the ①②③ in the shared table */}
                       <span style={{
                         width: '18px', height: '18px', borderRadius: '50%', flexShrink: 0,
-                        background: ch.cat === userCase.category ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
+                        background: (ch.cat === userCase.category || ch.mine) ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
                         border: '1px solid var(--gc-rule)',
-                        color: ch.cat === userCase.category ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
+                        color: (ch.cat === userCase.category || ch.mine) ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
                         fontSize: '10px', fontWeight: 700,
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       }}>{idx + 1}</span>
