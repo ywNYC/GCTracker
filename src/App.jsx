@@ -7101,12 +7101,10 @@ const MonthlyUpdate = ({ userCase }) => {
           </div>
         );
       })()}
-      <div className={`p-2.5 rounded-xl border mb-2.5 ${impactTone}`}>
-        <div className="text-[10px] font-bold uppercase tracking-wider opacity-60 mb-0.5">{t.yourImpact}</div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="text-[13px] font-semibold flex-1 min-w-0">{impactText}</div>
-          <MovementIndicator movement={userImpact} />
-        </div>
+      {/* One line — the sentence already names the case, no eyebrow label needed. */}
+      <div className={`p-2.5 rounded-xl border mb-2.5 flex items-center gap-2 ${impactTone}`}>
+        <div className="text-[13px] font-semibold flex-1 min-w-0">{impactText}</div>
+        <MovementIndicator movement={userImpact} />
       </div>
       {/* B5: this month's extremes — computed from the rows already on screen */}
       {hasPreviousData && (() => {
@@ -7124,6 +7122,7 @@ const MonthlyUpdate = ({ userCase }) => {
         const daysTo = Math.max(Math.ceil((target - now) / 86400000), 0);
         return (
           <div className="p-2 bg-slate-50 rounded-xl mb-2.5" style={{ fontSize: '11px', lineHeight: 1.7 }}>
+            {/* Single line: extremes + next-release countdown, separated by dots. */}
             <span style={{ color: 'var(--gc-ink-soft)' }}>
               {lang === 'en' ? 'This month: ' : '本月之最：'}
               <b style={{ color: 'var(--gc-green)' }}>{best.label} +{best.d}{lang === 'en' ? 'd' : '天'}</b>
@@ -7131,13 +7130,10 @@ const MonthlyUpdate = ({ userCase }) => {
                 <span style={{ color: 'var(--gc-rule)' }}> · </span>
                 <b style={{ color: 'var(--gc-red)' }}>{worst.label} −{Math.abs(worst.d)}{lang === 'en' ? 'd' : '天'}</b>
               </>}
-            </span>
-            <span style={{ color: 'var(--gc-muted)', display: 'block' }}>
-              {lang === 'en'
-                ? `Next bulletin expected mid-month, ~${daysTo} days away (historical 12th–22nd pattern).`
-                : lang === 'tw'
-                  ? `下期公告預計月中發布，約 ${daysTo} 天後（按歷史 12–22 號規律估計）。`
-                  : `下期公告预计月中发布，约 ${daysTo} 天后（按历史 12–22 号规律估计）。`}
+              <span style={{ color: 'var(--gc-rule)' }}> · </span>
+              <span style={{ color: 'var(--gc-muted)' }}>
+                {lang === 'en' ? `next bulletin ~${daysTo}d` : lang === 'tw' ? `下期公告約 ${daysTo} 天後` : `下期公告约 ${daysTo} 天后`}
+              </span>
             </span>
           </div>
         );
@@ -16181,9 +16177,10 @@ export default function App() {
     // 预测 tab 下架：总结页的估算+推导链已覆盖其价值（下月概率的增量不足以撑一个 tab）。
     // ForecastHub 代码保留，恢复时解开此行。
     // { id: 'trends', label: t.navTrends, icon: BarChart3 },
-    { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
+    // 动态在公告前：读者先看"变了什么"，原始公告表退居查阅位。
     { id: 'update', label: t.navUpdate, icon: TrendingUp },
     { id: 'compare', label: t.navCompare, icon: Users },
+    { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
     { id: 'index', label: t.navIndex, icon: ClipboardList },
     { id: 'about', label: lang === 'en' ? 'About' : lang === 'tw' ? '關於' : '关于', icon: Info },
   ];
