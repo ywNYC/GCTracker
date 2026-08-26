@@ -1,25 +1,23 @@
 name: Auto-update Visa Bulletin
 
-# Actual publication dates, from the Wayback Machine's earliest successful capture of
-# each bulletin page (day of the PRIOR month):
-#   Sep→13 · Oct→12 · Nov→15 · Dec→14 · Jan→18 · Feb→12 · Mar→19 · Apr→17 · May→22 · Jul→18
-# Observed range is days 12-22, so days 10-23 covers it with margin on both sides. Note
-# the original '8-21' window would have missed the May bulletin, published on day 22.
+# 抓取窗口与节奏（2026-08-26 按业主要求重设，起因见下面「九月事故」）：
+#   每月 13 号到月底，每天 5 次，24 小时均匀铺开（UTC 1/6/11/16/21 ≈ 美东 21/02/07/12/17 点），
+#   周六周日照跑。历史上公报的真实上线日在上月 12-23 号之间波动，所以窗口开到月底兜底。
 #
-# Do NOT use the bulletin's own "CA/VO: <date>" line to time this. That is an internal
-# Visa Office sign-off date, roughly the 1st-5th, and reading it as the publication date
-# produces a window that misses every release.
+# 九月事故（2026-08-22 至 24）——这套节奏就是为了修它：
+#   旧配置是「工作日每天 4 次、窗口 10-23 号」。九月公报落在 8/22-8/23 那个周末，
+#   周末闸把抓取整段跳过（连通知步骤都在被跳过的 job 里，所以一封邮件都没发）；
+#   本该兜底的周一 8/24 又因为窗口 23 号就关了，一次都没跑。业主最后是自己用浏览器
+#   手动抓的，网站晚了约三天。两个毛病叠加，缺一都不会出事。
 #
-# Four times a day (9am/12pm/3pm/6pm ET = 13/16/19/22 UTC) so a bulletin is picked up
-# within ~3h. Weekdays only, and skipped for the rest of the month once a bulletin has
-# already been captured this month — but both of those live in the `gate` job below,
-# NOT in cron's day-of-week field. GitHub Actions cron uses OR semantics when both
-# day-of-month and day-of-week are restricted (fires if EITHER matches), so
-# '10-23 * 1-5' would actually run on every weekday of every month PLUS every day
-# 10-23 regardless of weekday — not the AND you'd expect.
+# 不要用公告自己的 "CA/VO: <date>" 那行来定时间。那是签证办公室内部签发日（每月 1-5 号左右），
+# 当成上线日会算出一个永远错过发布的窗口。九月那期印的是 August 10，实际上线在 8/22 之后。
+#
+# GitHub Actions 的 cron 在同时限制「日」和「星期」时是 OR 语义（任一匹配就跑），
+# 所以星期永远不写进 cron 字段——现在也不需要了，周末本来就要跑。
 on:
   schedule:
-    - cron: '0 13,16,19,22 10-23 * *'
+    - cron: '0 1,6,11,16,21 13-31 * *'
   workflow_dispatch:
     inputs:
       seed:
@@ -30,44 +28,14 @@ on:
 permissions:
   contents: write
   issues: write
+  actions: read
 
 concurrency:
   group: scrape-bulletin
   cancel-in-progress: false
 
 jobs:
-  gate:
-    runs-on: ubuntu-latest
-    outputs:
-      should_run: ${{ steps.check.outputs.should_run }}
-    steps:
-      # Manual (workflow_dispatch) runs always proceed. Scheduled runs are gated only
-      # on weekend/weekday — NOT on "has bulletin.json already been touched this
-      # month", because that used to count ANY commit to the file (including manual
-      # feature/fix commits unrelated to the scrape), which falsely looked like "already
-      # done" and skipped the real scrape for the rest of the month. The scraper itself
-      # (scripts/scrape-bulletin.mjs) already has the correct idempotency check — it
-      # compares bulletin.json's stored current.month against the actual target month
-      # and no-ops if they already match, or if the target month isn't published yet
-      # (404). So this gate doesn't need to duplicate that logic, and shouldn't.
-      - name: Weekend check
-        id: check
-        run: |
-          if [ "${{ github.event_name }}" != "schedule" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          DOW=$(date -u +%u)  # 1=Mon .. 7=Sun
-          if [ "$DOW" -ge 6 ]; then
-            echo "Weekend (UTC day-of-week $DOW) — skipping."
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-          fi
-
   scrape:
-    needs: gate
-    if: needs.gate.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,34 +45,35 @@ jobs:
         with:
           node-version: '22'
 
+      # 退出码：0 = 正常（写了新数据，或本来就是最新，或目标月份还没发布 404）；
+      #        1 = 瞬时故障（网络/所有 host 都失败），下一档自动重试；
+      #        2 = 解析器真的坏了，要人工修。
+      # continue-on-error 是为了让下面的通知步骤能按退出码分档处理，
+      # 最后一步 Fail the job 再把非 0 的退出码还原成 job 失败。
       - name: Scrape bulletin
         id: scrape
+        continue-on-error: true
         run: |
+          set +e
           if [ "${{ inputs.seed }}" = "true" ]; then
             node scripts/scrape-bulletin.mjs --seed
           else
             node scripts/scrape-bulletin.mjs
           fi
+          CODE=$?
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          exit $CODE
 
-      # USCIS posts its chart designation ~a week after the DOS bulletin, so this
-      # runs on the same daily cadence. Best-effort: a USCIS outage must not turn
-      # the bulletin scrape red (`|| true`); the parser's own exit 2 still shows
-      # in the log for humans.
+      # USCIS 的表格判定一般比国务院公告晚约一周，所以跟着同一节奏跑。
+      # 尽力而为：USCIS 挂了不能把公告抓取带成红色（`|| true`）。
       - name: Scrape USCIS chart designation
         run: node scripts/scrape-uscis-chart.mjs || true
 
-      # Cheap, network-free upsert of the just-scraped month into history.json
-      # (the frontend's speed/forecast archive). Reuses data scrape-bulletin.mjs
-      # already fetched — does NOT refetch older months (that's
-      # backfill-history.mjs, for filling archive gaps, still manual).
-      # No-ops (no write) when the month is already up to date, so it never
-      # causes a spurious commit on days nothing changed.
       - name: Append current month to history.json
         run: node scripts/append-current-to-history.mjs
 
-      # The scrapers write into public/ — Vite serves public/ at the site root,
-      # so these become /bulletin.json, /uscis-charts.json and /history.json
-      # after a Pages build.
+      # 抓到新公告 → 立刻提交 → Cloudflare Pages 自动重新部署。
+      # 这一步不等任何人批准，业主明确要求「哪怕我在睡觉也直接更新网页」。
       - name: Commit if changed
         id: commit
         run: |
@@ -120,10 +89,6 @@ jobs:
           echo "Pushed updated bulletin — Cloudflare Pages will redeploy."
           echo "committed=true" >> "$GITHUB_OUTPUT"
 
-      # send-monthly reads history.json/bulletin.json/uscis-charts.json straight
-      # off the LIVE site (see functions/api/admin/send-monthly.js), not from
-      # this checkout, so it has to wait for the Pages redeploy triggered by the
-      # push above to actually go live before it's safe to call.
       - name: Wait for Cloudflare Pages redeploy
         id: wait_deploy
         if: steps.commit.outputs.committed == 'true'
@@ -139,56 +104,120 @@ jobs:
             echo "Waiting for Pages redeploy... live=$LIVE want=$WANT (attempt $i/30)"
             sleep 10
           done
-          echo "::warning::Timed out waiting for Cloudflare Pages redeploy after 5 minutes — skipping send-monthly this run, next scheduled run will pick up the KV idempotency gate correctly."
+          echo "::warning::Timed out waiting for Cloudflare Pages redeploy after 5 minutes."
 
-      # Idempotent by design (functions/api/admin/send-monthly.js stamps
-      # lastNotifiedMonth per subscriber after a successful send), so calling
-      # this more than once for the same month is safe — already-notified
-      # subscribers are skipped, not double-mailed.
-      - name: Trigger monthly subscriber emails
-        if: steps.commit.outputs.committed == 'true' && steps.wait_deploy.outputs.ready == 'true'
+      # 订阅者邮件不再自动发。业主要求邮件由他本人批准后再发（网页可以自动更新，邮件不行）。
+      # 这里只做 dryRun：算出「如果发，会发给多少人」，写进通知 issue 供他决定。
+      - name: Preview subscriber email (dry run — sends nothing)
+        id: dryrun
+        if: steps.commit.outputs.committed == 'true'
         env:
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
         run: |
           if [ -z "$ADMIN_TOKEN" ]; then
-            echo "::warning::ADMIN_TOKEN secret not set — skipping send-monthly trigger. Run it manually."
+            echo "count=(ADMIN_TOKEN 未配置，没算成)" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          curl -fsS -X POST "https://gc.jmjvc.us/api/admin/send-monthly" \
-            -H "Authorization: Bearer $ADMIN_TOKEN" \
-            -o send-monthly-result.json -w "HTTP %{http_code}\n"
-          echo '```json' >> "$GITHUB_STEP_SUMMARY"
-          cat send-monthly-result.json >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          curl -fsS -X POST "https://gc.jmjvc.us/api/admin/send-monthly?dryRun=1" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" -o dryrun.json || echo '{}' > dryrun.json
+          COUNT=$(node -e "try{const r=JSON.parse(require('fs').readFileSync('dryrun.json','utf8'));console.log(Array.isArray(r.sent)?r.sent.length:'?')}catch{console.log('?')}")
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
 
-      # Owner notification on EVERY scheduled run (not just when a new bulletin lands),
-      # per explicit request: this is the first month running this pipeline, and a
-      # silent skip is indistinguishable from a silent failure, so every run — found a
-      # new bulletin, checked and found nothing new, or errored — opens its own issue.
-      # GitHub's own push/email delivers it, so no polling loop has to burn tokens.
-      - name: Notify owner via issue
-        if: always()
+      - name: Build 小红书 post copy
+        if: steps.commit.outputs.committed == 'true'
+        run: node scripts/build-xhs-post.mjs > xhs-post.txt
+
+      # 抓到了：立刻开 issue（GitHub 自己会发邮件，等于第一时间通知业主），
+      # 正文里直接带上可复制的小红书文案和邮件批准入口。
+      - name: Notify owner — new bulletin captured
+        if: steps.commit.outputs.committed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ steps.commit.outputs.committed }}" = "true" ]; then
-            MONTH=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/bulletin.json','utf8')).current.month)")
-            TITLE="新排期公告已抓取上线：$MONTH"
-            BODY="$(printf '%s 公告已自动抓取并部署。history.json 已自动同步，send-monthly 已自动触发（结果见本次 workflow run 的 Summary）。\n\n还需要人工做的：\n- [ ] 核对 USCIS 采用哪张表（uscis-charts.json 会晚约一周，期间站内用通用说明）\n- [ ] 翻译公告 D 节以后的 notices 进 notice-translations.json\n- [ ] 站内一致性检查（总结页/动态页/邮件预览）\n- [ ] 去 workflow run 的 Summary 确认 send-monthly 是否成功发出（如失败或 ADMIN_TOKEN 未配置需手动补发）\n\n此 issue 由 scrape-bulletin workflow 自动创建。' "$MONTH")"
-          elif [ "${{ steps.scrape.outcome }}" != "success" ]; then
-            TITLE="⚠️ 排期抓取本次运行未成功"
-            BODY="$(printf 'scrape-bulletin.mjs 本次运行的 outcome 是 %s（非 success），需要看一下这次 workflow run 的日志确认原因。\n\n注：exit 1 是网络类瞬时失败，脚本设计上明天同一时段会自动重试；exit 2 是解析器真的坏了，需要人工修。\n\n此 issue 由 scrape-bulletin workflow 自动创建。' "${{ steps.scrape.outcome }}")"
-          else
-            TITLE="✓ 已检查，暂无新公告"
-            BODY="$(printf '本次自动检查已正常完成，尚未发现新一期签证公告（bulletin.json 里存的月份还没变），无需处理。\n\n此 issue 由 scrape-bulletin workflow 自动创建。')"
+          MONTH=$(node -e "console.log(JSON.parse(require('fs').readFileSync('public/bulletin.json','utf8')).current.month)")
+          {
+            echo "$MONTH 公告已经抓到，网站已自动更新上线（不需要你做任何事）。"
+            echo ""
+            echo "**订阅者邮件还没发** —— 按你的要求，邮件要你批准。dryRun 显示这次会发给 ${{ steps.dryrun.outputs.count }} 个订阅者。"
+            echo "要发的话：Actions → \"Send monthly subscriber email\" → Run workflow → 月份填 $MONTH。"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 小红书文案（可直接复制）"
+            echo ""
+            echo '```'
+            cat xhs-post.txt
+            echo '```'
+            echo ""
+            echo "---"
+            echo ""
+            echo "还需要人工做的："
+            echo "- [ ] 批准并发送订阅者邮件"
+            echo "- [ ] 发小红书"
+            echo "- [ ] 核对 USCIS 采用哪张表（uscis-charts.json 一般晚约一周）"
+            echo "- [ ] 翻译公告 D 节以后的 notices 进 notice-translations.json"
+            echo "- [ ] 站内一致性检查（个人页／最新页／邮件预览）"
+          } > issue-body.md
+          gh issue create --title "🎉 新排期公告已上线：$MONTH（网页已更新，邮件待你批准）" --assignee ywNYC --body-file issue-body.md
+
+      # 解析器坏了（exit 2）是真事故，每次都立刻报，不等日报。
+      - name: Notify owner — parser broken
+        if: steps.commit.outputs.committed != 'true' && steps.scrape.outputs.code == '2'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "⚠️ 排期抓取解析失败（需要人工修）" --assignee ywNYC \
+            --body "scrape-bulletin.mjs 退出码 2 —— 页面抓到了但解析不出四张表，通常是国务院改了页面结构。日志见本次 workflow run。这类错误不会自动恢复，要人工修解析器。"
+
+      # 没抓到新公告时，一天只报一次（业主明确要求：不要每次都发）。
+      # 判定「今天最后一档」用当天已跑次数（>=5），不用固定小时——GitHub 的 cron 经常延迟十几分钟，
+      # 按小时判会漏。再加一道「今天是否已发过日报」的去重，防止手动 dispatch 把次数顶上去后重复发。
+      - name: Daily digest — nothing new today
+        if: steps.commit.outputs.committed != 'true' && steps.scrape.outputs.code != '2' && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          # 本月已经抓到目标月份的公告了，就不用再发日报了。
+          ALREADY=$(node -e "
+            const b=JSON.parse(require('fs').readFileSync('public/bulletin.json','utf8'));
+            const n=new Date();
+            const t=new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth()+1, 1));
+            const key=t.getUTCFullYear()+'-'+String(t.getUTCMonth()+1).padStart(2,'0');
+            console.log(b.current.month===key?'yes':'no');
+          ")
+          if [ "$ALREADY" = "yes" ]; then
+            echo "下期公告已经在库里了，本月不再发日报。"
+            exit 0
           fi
-          gh issue create --title "$TITLE" --assignee ywNYC --body "$BODY"
+          RUNS=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/scrape-bulletin.yml/runs?per_page=30" \
+            --jq "[.workflow_runs[] | select(.created_at | startswith(\"$TODAY\"))] | length")
+          if [ "$RUNS" -lt 5 ]; then
+            echo "今天第 $RUNS 档，还没到最后一档，不发日报。"
+            exit 0
+          fi
+          DUP=$(gh issue list --state all --search "日报 $TODAY in:title" --json number --jq 'length')
+          if [ "$DUP" != "0" ]; then
+            echo "今天的日报已经发过了，跳过。"
+            exit 0
+          fi
+          if [ "${{ steps.scrape.outputs.code }}" = "1" ]; then
+            NOTE="注意：今天最后一档抓取遇到网络类瞬时失败（退出码 1），下一档会自动重试。"
+          else
+            NOTE="今天各档都正常完成，只是国务院还没放出下一期。"
+          fi
+          BODY=$(printf '%s\n\n抓到的第一时间会单独开一条 issue（标题带 🎉），并且网页会自动更新，不用等这条日报。' "$NOTE")
+          gh issue create --title "日报 $TODAY：今天查了 $RUNS 次，暂无新公告" --assignee ywNYC --body "$BODY"
 
       - name: Summary
         if: always()
         run: |
           echo "### Visa bulletin scrape" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Outcome: ${{ steps.scrape.outcome }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Exit codes: 0 = ok (data written or already current), 1 = transient (network / all hosts failed, retries tomorrow), 2 = parser broke (needs a human)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Exit code: ${{ steps.scrape.outputs.code }} (0 = ok / not published yet, 1 = transient, 2 = parser broke)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Committed: ${{ steps.commit.outputs.committed || 'false' }}" >> "$GITHUB_STEP_SUMMARY"
+
+      # 通知发完之后再把 job 标红，这样 GitHub 自带的「scheduled workflow failed」邮件也会到。
+      - name: Fail the job if the scrape failed
+        if: steps.scrape.outputs.code != '0'
+        run: exit 1

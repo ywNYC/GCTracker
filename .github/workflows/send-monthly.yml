@@ -1,0 +1,81 @@
+name: Send monthly subscriber email
+
+# 订阅者邮件的人工批准闸（2026-08-26 加）。
+# 抓取 workflow 现在只更新网站、只做 dryRun，绝不自己发邮件——业主要求邮件必须他点头。
+# 这里就是那个「点头」：Actions → 本 workflow → Run workflow → 填月份。
+#
+# 填月份不是走过场：它会跟线上 bulletin.json 的 current.month 对一遍，对不上直接停，
+# 防止在 Pages 还没部署完、或者手滑选错 branch 的时候把上个月的内容群发出去。
+on:
+  workflow_dispatch:
+    inputs:
+      month:
+        description: '要发送的月份，必须和线上 bulletin.json 的 current.month 一致，例如 2026-10'
+        required: true
+        type: string
+      force:
+        description: '忽略 lastNotifiedMonth 强制重发（补发时才勾）'
+        type: boolean
+        default: false
+      dryRun:
+        description: '只演算不发送（先看会发给多少人）'
+        type: boolean
+        default: false
+
+permissions:
+  issues: write
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify the live site is already serving that month
+        run: |
+          LIVE=$(curl -fsS "https://gc.jmjvc.us/bulletin.json" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{process.stdout.write(JSON.parse(d).current.month||'')}catch{}})")
+          echo "线上 current.month = $LIVE，你填的是 ${{ inputs.month }}"
+          if [ "$LIVE" != "${{ inputs.month }}" ]; then
+            echo "::error::对不上，已中止。线上还是 $LIVE，等 Pages 部署完再跑，或者确认月份填错了。"
+            exit 1
+          fi
+
+      - name: Send
+        id: send
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          if [ -z "$ADMIN_TOKEN" ]; then
+            echo "::error::ADMIN_TOKEN secret 没配，发不了。"
+            exit 1
+          fi
+          # 注意别写成 `[ cond ] && VAR=...`：Actions 的 shell 带 -e，条件为假时
+          # 整条语句返回 1，会把这一步直接判成失败。
+          QS=""
+          if [ "${{ inputs.force }}" = "true" ]; then QS="$QS&force=1"; fi
+          if [ "${{ inputs.dryRun }}" = "true" ]; then QS="$QS&dryRun=1"; fi
+          curl -fsS -X POST "https://gc.jmjvc.us/api/admin/send-monthly?_=1$QS" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -o result.json -w "HTTP %{http_code}\n"
+          SENT=$(node -e "const r=JSON.parse(require('fs').readFileSync('result.json','utf8'));console.log(Array.isArray(r.sent)?r.sent.length:'?')")
+          ERRS=$(node -e "const r=JSON.parse(require('fs').readFileSync('result.json','utf8'));console.log(Array.isArray(r.errors)?r.errors.length:'?')")
+          echo "sent=$SENT" >> "$GITHUB_OUTPUT"
+          echo "errs=$ERRS" >> "$GITHUB_OUTPUT"
+          {
+            echo "### send-monthly 结果"
+            echo ""
+            echo '```json'
+            cat result.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report back as an issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ inputs.dryRun }}" = "true" ]; then
+            TITLE="演算：${{ inputs.month }} 订阅邮件会发给 ${{ steps.send.outputs.sent }} 人（没有真发）"
+          else
+            TITLE="📮 ${{ inputs.month }} 订阅邮件已发出：${{ steps.send.outputs.sent }} 封，失败 ${{ steps.send.outputs.errs }}"
+          fi
+          gh issue create --title "$TITLE" --assignee ywNYC \
+            --body "由你手动触发的 send-monthly 完成，明细见本次 workflow run 的 Summary。"
