@@ -6989,6 +6989,8 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
   // Which half of the category table shows — preset from the user's own case:
   // an F-case lands on 亲属类, everything else on 职业/人才类.
   const [catGroup, setCatGroup] = useState(!hasCase ? 'family' : (userCase.category?.startsWith('F') ? 'family' : 'emp'));
+  // 同日期合并行（EB-4/SR、EB-5 预留）点「展开」后按 cat 记录，本次会话内保持展开
+  const [expandedMerges, setExpandedMerges] = useState({});
   const chartKey = updChart === 'B' ? 'filing' : 'finalAction';
   const showsTwoColumns = userCase.country === 'China' || userCase.country === 'India'; // These have separate cutoffs from ROW
 
@@ -7115,7 +7117,7 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
         </div>
       )}
       {/* B5: this month's extremes — computed from the rows already on screen */}
-      {hasPreviousData && (() => {
+      {hasCase && hasPreviousData && (() => {
         const flat = [];
         changes.forEach((ch) => {
           if (ch.primary?.days) flat.push({ label: `${ch.cat}·${countryShortLabel(userCase.country, lang)}`, d: ch.primary.type === 'advanced' ? ch.primary.days : -ch.primary.days });
@@ -7183,7 +7185,7 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
           // The three EB-5 set-asides are Current in both columns almost every month —
           // three identical 无需排期 rows say nothing. Collapse them into one row and
           // only break them out again the month any of them picks up a cutoff date.
-          if (catGroup === 'emp') {
+          if (catGroup === 'emp' && !expandedMerges.EB5RES) {
             const res = ['EB5R', 'EB5H', 'EB5I'];
             const resRows = groupChanges.filter((r) => res.includes(r.cat));
             const allCurrent = resRows.length === 3 && resRows.every((r) =>
@@ -7199,6 +7201,27 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
                 secondaryDate: resRows[0].secondaryDate === null ? null : 'C',
                 primary: null, secondary: null,
                 mine: res.includes(userCase.category),
+                merged: true,
+              });
+            }
+          }
+          // EB-4 与宗教工作者（SR）两行长期同日期同变化——相同月份合并成一行省出
+          // 版面（整页一屏能放下），点「展开」拆回两行；哪个月日期分叉了会自动拆开。
+          if (catGroup === 'emp' && !expandedMerges.EB4GRP) {
+            const a = groupChanges.find((r) => r.cat === 'EB4');
+            const b = groupChanges.find((r) => r.cat === 'SR');
+            const sameMv = (x, y) => JSON.stringify(x || null) === JSON.stringify(y || null);
+            if (a && b && a.primaryDate === b.primaryDate && a.secondaryDate === b.secondaryDate
+                && sameMv(a.primary, b.primary) && sameMv(a.secondary, b.secondary)) {
+              const at = groupChanges.findIndex((r) => r.cat === 'EB4');
+              groupChanges = groupChanges.filter((r) => r.cat !== 'EB4' && r.cat !== 'SR');
+              groupChanges.splice(at, 0, {
+                ...a,
+                cat: 'EB4GRP',
+                label: lang === 'en' ? 'EB-4 special immigrants / religious workers'
+                  : lang === 'tw' ? 'EB-4 特殊移民 / 宗教工作者' : 'EB-4 特殊移民 / 宗教工作者',
+                mine: ['EB4', 'SR'].includes(userCase.category),
+                merged: true,
               });
             }
           }
@@ -7293,6 +7316,17 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
                       <span style={{ minWidth: 0 }}>
                         <span style={{ display: 'block', fontSize: '14px', fontWeight: 800, color: 'var(--gc-ink)', lineHeight: 1.15, whiteSpace: 'nowrap' }}>{code}</span>
                         {sub && <span style={{ display: 'block', fontSize: '8.5px', color: 'var(--gc-muted)', lineHeight: 1.25 }}>{sub}</span>}
+                        {ch.merged && (
+                          <button type="button"
+                            onClick={() => setExpandedMerges((m) => ({ ...m, [ch.cat]: true }))}
+                            style={{
+                              display: 'inline-block', marginTop: '2px', padding: 0,
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              fontSize: '9px', color: 'var(--gc-green)', textDecoration: 'underline',
+                            }}>
+                            {lang === 'en' ? 'expand ⌄' : '展开 ⌄'}
+                          </button>
+                        )}
                       </span>
                     </div>
                     <div style={{ textAlign: 'center' }}>{cell(ch.primaryDate, ch.primary)}</div>
@@ -17297,7 +17331,8 @@ export default function App() {
             // Tabs that skip the case input entirely (have their own selectors or are pure info)
             const tabsWithoutCase = ['compare', 'scenarios', 'index', 'help'];
             const showFullPanel = tabsWithFullPanel.includes(tab);
-            const showCompactBar = !tabsWithFullPanel.includes(tab) && !tabsWithoutCase.includes(tab);
+            // 访客没有案子：不渲染案件条（否则会把内置默认案子 全球·EB3 当成访客的展示出来）
+            const showCompactBar = hasOnboarded && !tabsWithFullPanel.includes(tab) && !tabsWithoutCase.includes(tab);
             return (
           <div className={showFullPanel ? "grid grid-cols-1 md:grid-cols-[260px_1fr] gap-3" : "grid grid-cols-1 gap-3"}
                style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
