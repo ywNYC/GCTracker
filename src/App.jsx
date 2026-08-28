@@ -6983,15 +6983,21 @@ const BulletinTab = ({ userCase = null }) => {
 // 真实存档里某类别·某国的截止日随月份的推进曲线，最新页表格下方展示。
 // ============================================================
 const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) => {
+  // 表B/A 与 人才/亲属 有自己的本地开关（初值跟随上方表格，表格切换时同步过来），
+  // 用户点名要在趋势图块里直接切，不用回表格切完再看。
+  const [ck, setCk] = useState(chartKey);
+  useEffect(() => { setCk(chartKey); }, [chartKey]);
+  const [grp, setGrp] = useState(catGroup);
+  useEffect(() => { setGrp(catGroup); }, [catGroup]);
   const famCats = ['F1', 'F2A', 'F2B', 'F3', 'F4'];
   const empCats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'EB5'];
-  const cats = catGroup === 'family' ? famCats : empCats;
-  const fallbackCat = catGroup === 'family' ? 'F4' : 'EB2';
+  const cats = grp === 'family' ? famCats : empCats;
+  const fallbackCat = grp === 'family' ? 'F4' : 'EB2';
   const [cat, setCat] = useState(initialCat && cats.includes(initialCat) ? initialCat : fallbackCat);
   useEffect(() => {
     if (!cats.includes(cat)) setCat(fallbackCat);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catGroup]);
+  }, [grp]);
   // 国别切换：默认自己的国别列，另给一个「全球/港澳台」（Other）——全球读者也要能看
   const countryOpts = userCountry === 'Other' ? ['Other'] : [userCountry, 'Other'];
   const [trendCountry, setTrendCountry] = useState(userCountry);
@@ -7006,9 +7012,14 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
   // 绿色系两档：排队中=浅绿，转无需排期=主题深绿（用户改口定的方案）
   const G_WAIT = '#5e9c77', G_SOFT = 'rgba(94, 156, 119, 0.16)';
   const pts = keys
-    .map((k) => ({ k, v: BULLETIN_ARCHIVE[k]?.data?.[chartKey]?.[cat]?.[trendCountry] }))
+    .map((k) => ({ k, v: BULLETIN_ARCHIVE[k]?.data?.[ck]?.[cat]?.[trendCountry] }))
     .filter((p) => p.v === 'C' || (p.v && /^20\d{2}-/.test(p.v)))
-    .map((p) => (p.v === 'C' ? { k: p.k, cur: true } : { k: p.k, t: Date.parse(p.v) }));
+    // 用本地时区拼日期：Date.parse('2021-09-01') 按 UTC 解析，美东显示会倒退成 8 月 31 日
+    .map((p) => {
+      if (p.v === 'C') return { k: p.k, cur: true };
+      const [yy, mm, dd] = p.v.split('-').map(Number);
+      return { k: p.k, t: new Date(yy, mm - 1, dd).getTime() };
+    });
   const dated = pts.filter((p) => !p.cur);
 
   const W = 600, H = 190, PAD_L = 8, PAD_R = 78, PAD_T = 18, PAD_B = 26;
@@ -7103,8 +7114,27 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
       <div className="flex items-center justify-between flex-wrap gap-1.5 mb-1.5">
         <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)' }}>
           {lang === 'en' ? 'Cutoff trend' : lang === 'tw' ? '排期趨勢' : '排期趋势'}
-          <span style={{ fontWeight: 500, color: 'var(--gc-muted)', fontSize: '10.5px', marginLeft: '6px' }}>
-            {chartKey === 'filing' ? (lang === 'en' ? 'Chart B' : '表B') : (lang === 'en' ? 'Chart A' : '表A')}
+          <span className="inline-flex" style={{ marginLeft: '7px', border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden', verticalAlign: 'middle' }}>
+            {[['filing', lang === 'en' ? 'Chart B' : '表B'], ['finalAction', lang === 'en' ? 'Chart A' : '表A']].map(([id, label], i) => (
+              <button key={id} type="button" onClick={() => setCk(id)}
+                style={{
+                  fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
+                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                  background: ck === id ? 'var(--gc-green)' : 'var(--gc-surface)',
+                  color: ck === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                }}>{label}</button>
+            ))}
+          </span>
+          <span className="inline-flex" style={{ marginLeft: '5px', border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden', verticalAlign: 'middle' }}>
+            {[['emp', lang === 'en' ? 'EB' : '人才类'], ['family', lang === 'en' ? 'Family' : '亲属类']].map(([id, label], i) => (
+              <button key={id} type="button" onClick={() => setGrp(id)}
+                style={{
+                  fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
+                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                  background: grp === id ? 'var(--gc-green)' : 'var(--gc-surface)',
+                  color: grp === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                }}>{label}</button>
+            ))}
           </span>
           {countryOpts.length > 1 && (
             <span className="inline-flex" style={{ marginLeft: '7px', border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden', verticalAlign: 'middle' }}>
