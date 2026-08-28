@@ -6992,13 +6992,20 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
     if (!cats.includes(cat)) setCat(fallbackCat);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catGroup]);
+  // 国别切换：默认自己的国别列，另给一个「全球/港澳台」（Other）——全球读者也要能看
+  const countryOpts = userCountry === 'Other' ? ['Other'] : [userCountry, 'Other'];
+  const [trendCountry, setTrendCountry] = useState(userCountry);
+  useEffect(() => { setTrendCountry(userCountry); }, [userCountry]);
+  const countryLabel = (c) => c === 'Other'
+    ? (lang === 'en' ? 'ROW' : '全球/港澳台')
+    : (c === 'China' ? (lang === 'en' ? 'China' : '中国大陆') : c === 'India' ? (lang === 'en' ? 'India' : '印度') : c);
 
   const keys = Object.keys(BULLETIN_ARCHIVE).sort().slice(-24);
   // 两种状态都进时间线：有截止日 = 排队中（琥珀色），C = 无需排期（绿色顶格）。
   // 之前把 C 的月份整个滤掉，一个类别转 Current 后曲线就凭空断了——用户点名要区分。
   const AMBER = '#b07d2a', AMBER_SOFT = 'rgba(176, 125, 42, 0.14)';
   const pts = keys
-    .map((k) => ({ k, v: BULLETIN_ARCHIVE[k]?.data?.[chartKey]?.[cat]?.[userCountry] }))
+    .map((k) => ({ k, v: BULLETIN_ARCHIVE[k]?.data?.[chartKey]?.[cat]?.[trendCountry] }))
     .filter((p) => p.v === 'C' || (p.v && /^20\d{2}-/.test(p.v)))
     .map((p) => (p.v === 'C' ? { k: p.k, cur: true } : { k: p.k, t: Date.parse(p.v) }));
   const dated = pts.filter((p) => !p.cur);
@@ -7093,9 +7100,21 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
         <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)' }}>
           {lang === 'en' ? 'Cutoff trend' : lang === 'tw' ? '排期趨勢' : '排期趋势'}
           <span style={{ fontWeight: 500, color: 'var(--gc-muted)', fontSize: '10.5px', marginLeft: '6px' }}>
-            {userCountry === 'China' ? (lang === 'en' ? 'China' : '中国大陆') : userCountry}
-            {' · '}{chartKey === 'filing' ? (lang === 'en' ? 'Chart B' : '表B') : (lang === 'en' ? 'Chart A' : '表A')}
+            {chartKey === 'filing' ? (lang === 'en' ? 'Chart B' : '表B') : (lang === 'en' ? 'Chart A' : '表A')}
           </span>
+          {countryOpts.length > 1 && (
+            <span className="inline-flex" style={{ marginLeft: '7px', border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden', verticalAlign: 'middle' }}>
+              {countryOpts.map((c, i) => (
+                <button key={c} type="button" onClick={() => setTrendCountry(c)}
+                  style={{
+                    fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
+                    borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                    background: trendCountry === c ? 'var(--gc-green)' : 'var(--gc-surface)',
+                    color: trendCountry === c ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                  }}>{countryLabel(c)}</button>
+              ))}
+            </span>
+          )}
         </span>
         <span className="inline-flex flex-wrap" style={{ gap: '3px' }}>
           {cats.map((c) => (
