@@ -7061,11 +7061,12 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
           </span>
           {/* 表B/表A toggle moved down into the category-table header, next to the
               人才/亲属 group toggle — the two selectors live together now. */}
-          <span className="text-[11px] text-slate-500">
+          <span className="text-[11px] text-slate-500" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
             {(() => {
               // 下期公告发布日预测：11 期实测发布日（Wayback 每期最早快照 + 本期）的经验
-              // 分布，分三档报日期区间+概率；进入发布月后按「到今天还没发」过滤剩余样本
-              // 重新归一化——纯 render 时按当天日期计算，自然每天更新。
+              // 分布，取概率最高的 5 个具体日期各给一个带色小胶囊，剩余合并为「其他」；
+              // 进入发布月后按「到今天还没发」过滤剩余样本重新归一化——render 时按当天
+              // 日期计算，自然每天更新。
               const SAMPLE = [12, 12, 13, 14, 15, 17, 18, 18, 19, 22, 24];
               // 下期公告在「当期公告月份」当月发布（10月号 9 月发）
               const [by, bm] = BULLETIN_CURRENT_KEY.value.split('-').map(Number);
@@ -7077,17 +7078,35 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
               const floor = inWindowMonth ? now.getDate() : 0;
               const rem = SAMPLE.filter((x) => x >= floor);
               if (!rem.length) return anyDay;
-              const buckets = [[1, 14], [15, 18], [19, 31]]
-                .map(([a, b]) => rem.filter((x) => x >= a && x <= b))
-                .filter((g) => g.length > 0);
-              const pct = buckets.map((g) => Math.round((g.length / rem.length) * 100));
-              pct[pct.length - 1] += 100 - pct.reduce((sum, x) => sum + x, 0);
-              const seg = buckets.map((g, i) => {
-                const lo = Math.min(...g), hi = Math.max(...g);
-                const range = lo === hi ? `${lo}` : `${lo}–${hi}`;
-                return lang === 'en' ? `${bm}/${range}: ${pct[i]}%` : `${bm}月${range}日 ${pct[i]}%`;
-              }).join(' · ');
-              return (lang === 'en' ? 'next bulletin ' : '下期公告 ') + seg;
+              const counts = {};
+              rem.forEach((x) => { counts[x] = (counts[x] || 0) + 1; });
+              const ranked = Object.entries(counts)
+                .map(([d, n]) => ({ d: +d, pct: Math.round((n / rem.length) * 100) }))
+                .sort((a, b) => b.pct - a.pct || a.d - b.d);
+              const top = ranked.slice(0, 5);
+              const otherPct = Math.max(0, 100 - top.reduce((sum, x) => sum + x.pct, 0));
+              const chip = (key, text, bg, fg, bd) => (
+                <span key={key} style={{
+                  display: 'inline-block', padding: '1.5px 7px', borderRadius: '999px',
+                  fontSize: '10px', fontWeight: 700, whiteSpace: 'nowrap',
+                  background: bg, color: fg, border: `1px solid ${bd}`,
+                }}>{text}</span>
+              );
+              const out = [
+                <span key="t" style={{ fontWeight: 600 }}>{lang === 'en' ? 'next bulletin' : '下期公告'}</span>,
+              ];
+              top.forEach((x, i) => {
+                const label = lang === 'en' ? `${bm}/${x.d} ${x.pct}%` : `${bm}月${x.d}日 ${x.pct}%`;
+                // 概率最高的两个用实心绿，其余用浅绿——一眼看出主峰
+                out.push(i < 2
+                  ? chip(x.d, label, 'var(--gc-green)', 'var(--gc-paper)', 'var(--gc-green)')
+                  : chip(x.d, label, 'var(--gc-green-soft)', 'var(--gc-green-ink)', 'var(--gc-green-soft)'));
+              });
+              if (otherPct > 0) {
+                out.push(chip('other', (lang === 'en' ? 'other ' : '其他 ') + otherPct + '%',
+                  'var(--gc-paper-soft)', 'var(--gc-muted)', 'var(--gc-rule)'));
+              }
+              return out;
             })()}
           </span>
         </div>
@@ -7334,9 +7353,10 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
                           <button type="button"
                             onClick={() => setExpandedMerges((m) => ({ ...m, [ch.cat]: true }))}
                             style={{
-                              display: 'inline-block', marginTop: '2px', padding: 0,
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              fontSize: '9px', color: 'var(--gc-green)', textDecoration: 'underline',
+                              display: 'inline-block', marginTop: '3px', padding: '2px 9px',
+                              background: 'var(--gc-green)', color: 'var(--gc-paper)',
+                              border: 'none', borderRadius: '999px', cursor: 'pointer',
+                              fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.02em',
                             }}>
                             {lang === 'en' ? 'expand ⌄' : '展开 ⌄'}
                           </button>
@@ -7345,9 +7365,10 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
                           <button type="button"
                             onClick={() => setExpandedMerges((m) => ({ ...m, [ch.expandedGroup]: false }))}
                             style={{
-                              display: 'inline-block', marginTop: '2px', padding: 0,
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              fontSize: '9px', color: 'var(--gc-muted)', textDecoration: 'underline',
+                              display: 'inline-block', marginTop: '3px', padding: '2px 9px',
+                              background: 'var(--gc-paper-soft)', color: 'var(--gc-muted)',
+                              border: '1px solid var(--gc-rule)', borderRadius: '999px', cursor: 'pointer',
+                              fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.02em',
                             }}>
                             {lang === 'en' ? 'collapse ⌃' : '收起 ⌃'}
                           </button>
@@ -14269,6 +14290,24 @@ const HelpCenter = ({ initialSection = 'faq' }) => {
 // and landing on OnboardingModal reads as one continuous surface rather than
 // a second, different-looking dialog.
 // ============================================================
+// 被污染存储的自愈：此前 userCase 持久化不看 hasOnboarded，把内置默认种子
+// （Taiwan EB3 2024-07-15，无生日无身份）写进了访客的 localStorage，刷新后访客
+// 被当成老用户直接放进个人页。真人走向导必填生日+身份，存的案子不可能长成这颗
+// 种子的样子——启动时发现是种子就整套清掉，当没填过。
+if (typeof window !== 'undefined') {
+  try {
+    const _raw = window.localStorage.getItem('gc_userCase');
+    if (_raw) {
+      const _c = JSON.parse(_raw);
+      if (_c && _c.country === 'Taiwan' && _c.category === 'EB3' && _c.priorityDate === '2024-07-15'
+          && !_c.birthYearMonth && !_c.role) {
+        window.localStorage.removeItem('gc_userCase');
+        window.localStorage.removeItem('gc_hasOnboarded');
+      }
+    }
+  } catch (e) { /* noop */ }
+}
+
 const LanguageGateModal = ({ theme = 'passport', onPick }) => {
   const opts = [
     { v: 'zh', label: '简体中文' },
@@ -16332,11 +16371,6 @@ export default function App() {
       birthYearMonth: '', // 'YYYY-MM', optional — powers the age line on the countdown card
     };
   });
-  // Persist userCase changes to localStorage
-  useEffect(() => {
-    try { window.localStorage.setItem('gc_userCase', JSON.stringify(userCase)); }
-    catch (e) { /* noop */ }
-  }, [userCase]);
 
   // Onboarding: show modal if the user came in fresh. "Fresh" = no URL case AND
   // no saved localStorage case AND no onboarding flag. Once they've onboarded once,
@@ -16358,6 +16392,16 @@ export default function App() {
       catch (e) { /* noop */ }
     }
   }, [hasOnboarded]);
+  // Persist userCase changes to localStorage — ONLY once the user has actually
+  // onboarded. Unconditional persistence was the "refresh lets visitors into 个人"
+  // hole: first render wrote the built-in default seed (Taiwan EB3) to storage,
+  // and the next load mistook that seed for a real saved case.
+  useEffect(() => {
+    if (!hasOnboarded) return;
+    try { window.localStorage.setItem('gc_userCase', JSON.stringify(userCase)); }
+    catch (e) { /* noop */ }
+  }, [userCase, hasOnboarded]);
+  // （这个 effect 原来在 hasOnboarded 声明之前，会因 TDZ 崩整页——必须放在声明之后）
   // Onboarding modal starting mode ('choose' default; 'form' when re-opened from Index "I know my category")
   const [onboardingInitialMode, setOnboardingInitialMode] = useState('choose');
   // 向导改为按需弹出：新访客不再自动被拦（他们落在「最新」页），只有点 CTA 横幅、
@@ -17367,7 +17411,26 @@ export default function App() {
             )}
             <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
               {showCompactBar && <CompactCaseBar userCase={userCase} setUserCase={setUserCase} />}
-              {tab === 'overview' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} greenCardInfo={greenCardInfo} setGreenCardInfo={setGreenCardInfo} travelRecords={travelRecords} setTravelRecords={setTravelRecords} i485ServiceCenter={i485ServiceCenter} setI485ServiceCenter={setI485ServiceCenter} stepActualDates={stepActualDates} setStepActualDates={setStepActualDates} />}
+              {/* 兜底：就算有人绕过 handleTabChange 的拦截（深链 ?tab=overview、
+                  残留脏存储）进到个人页，没案子也绝不渲染默认 EB3 数据，只给引导 */}
+              {tab === 'overview' && (hasOnboarded
+                ? <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} greenCardInfo={greenCardInfo} setGreenCardInfo={setGreenCardInfo} travelRecords={travelRecords} setTravelRecords={setTravelRecords} i485ServiceCenter={i485ServiceCenter} setI485ServiceCenter={setI485ServiceCenter} stepActualDates={stepActualDates} setStepActualDates={setStepActualDates} />
+                : (
+                  <div style={{ padding: '40px 16px', textAlign: 'center', background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius)' }}>
+                    <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '6px' }}>
+                      {lang === 'en' ? 'No case on this device yet' : lang === 'tw' ? '這台設備上還沒有你的案子' : '这台设备上还没有你的案子'}
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: 'var(--gc-muted)', marginBottom: '14px', lineHeight: 1.6 }}>
+                      {lang === 'en' ? 'Enter your category, country and priority date to see your personal timeline.'
+                        : lang === 'tw' ? '輸入類別、國家、優先日，個人頁才會有你的時間線'
+                        : '输入类别、国家、优先日，个人页才会有你的时间线'}
+                    </div>
+                    <button type="button" onClick={() => { setOnboardingInitialMode('choose'); setShowWizard(true); }}
+                      style={{ padding: '9px 16px', fontSize: '13px', fontWeight: 700, background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none', borderRadius: 'var(--gc-radius-sm)', cursor: 'pointer' }}>
+                      {lang === 'en' ? 'Set up my case →' : '输入我的案子 →'}
+                    </button>
+                  </div>
+                ))}
               {tab === 'dashboard' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {/* 预测 tab — id is 'trends' per navigation config (line 11527).
                   MUST pass i485ServiceCenter + completedI485Steps so TrendChart's
