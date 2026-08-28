@@ -7205,44 +7205,38 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
           // The three EB-5 set-asides are Current in both columns almost every month —
           // three identical 无需排期 rows say nothing. Collapse them into one row and
           // only break them out again the month any of them picks up a cutoff date.
-          if (catGroup === 'emp' && !expandedMerges.EB5RES) {
-            const res = ['EB5R', 'EB5H', 'EB5I'];
-            const resRows = groupChanges.filter((r) => res.includes(r.cat));
-            const allCurrent = resRows.length === 3 && resRows.every((r) =>
-              r.primaryDate === 'C' && (r.secondaryDate === null || r.secondaryDate === 'C'));
-            if (allCurrent) {
-              const at = groupChanges.findIndex((r) => r.cat === 'EB5R');
-              groupChanges = groupChanges.filter((r) => !res.includes(r.cat));
-              groupChanges.splice(at, 0, {
-                cat: 'EB5RES',
-                label: lang === 'en' ? 'EB-5 set-asides (rural/high-unemp/infra)'
-                  : lang === 'tw' ? 'EB-5 預留（鄉村/高失業/基建）' : 'EB-5 预留（乡村/高失业/基建）',
-                primaryDate: 'C',
-                secondaryDate: resRows[0].secondaryDate === null ? null : 'C',
-                primary: null, secondary: null,
-                mine: res.includes(userCase.category),
-                merged: true,
-              });
-            }
-          }
-          // EB-4 与宗教工作者（SR）两行长期同日期同变化——相同月份合并成一行省出
-          // 版面（整页一屏能放下），点「展开」拆回两行；哪个月日期分叉了会自动拆开。
-          if (catGroup === 'emp' && !expandedMerges.EB4GRP) {
-            const a = groupChanges.find((r) => r.cat === 'EB4');
-            const b = groupChanges.find((r) => r.cat === 'SR');
-            const sameMv = (x, y) => JSON.stringify(x || null) === JSON.stringify(y || null);
-            if (a && b && a.primaryDate === b.primaryDate && a.secondaryDate === b.secondaryDate
-                && sameMv(a.primary, b.primary) && sameMv(a.secondary, b.secondary)) {
-              const at = groupChanges.findIndex((r) => r.cat === 'EB4');
-              groupChanges = groupChanges.filter((r) => r.cat !== 'EB4' && r.cat !== 'SR');
-              groupChanges.splice(at, 0, {
-                ...a,
-                cat: 'EB4GRP',
-                label: lang === 'en' ? 'EB-4 special immigrants / religious workers'
-                  : lang === 'tw' ? 'EB-4 特殊移民 / 宗教工作者' : 'EB-4 特殊移民 / 宗教工作者',
-                mine: ['EB4', 'SR'].includes(userCase.category),
-                merged: true,
-              });
+          // EB-4 / EB-5 默认各收起成一行（显示主类的日期：EB-4=特殊移民，EB-5=未预留），
+          // 「展开 ⌄」拆出细分（SR / 预留三类），「收起 ⌃」再合回去。
+          if (catGroup === 'emp') {
+            const MERGE_GROUPS = [
+              {
+                key: 'EB4GRP', main: 'EB4', members: ['EB4', 'SR'],
+                label: lang === 'en' ? 'EB-4 special immigrants · religious workers'
+                  : lang === 'tw' ? 'EB-4 特殊移民 · 宗教工作者' : 'EB-4 特殊移民 · 宗教工作者',
+              },
+              {
+                key: 'EB5GRP', main: 'EB5', members: ['EB5', 'EB5R', 'EB5H', 'EB5I'],
+                label: lang === 'en' ? 'EB-5 investors (unreserved · set-asides)'
+                  : lang === 'tw' ? 'EB-5 投資移民 · 預留類' : 'EB-5 投资移民 · 预留类',
+              },
+            ];
+            for (const g of MERGE_GROUPS) {
+              if (!expandedMerges[g.key]) {
+                const a = groupChanges.find((r) => r.cat === g.main);
+                if (!a) continue;
+                const at = groupChanges.findIndex((r) => r.cat === g.main);
+                groupChanges = groupChanges.filter((r) => !g.members.includes(r.cat));
+                groupChanges.splice(at, 0, {
+                  ...a,
+                  cat: g.key,
+                  label: g.label,
+                  mine: g.members.includes(userCase.category),
+                  merged: true,
+                });
+              } else {
+                // 展开态：主行带「收起」控件
+                groupChanges = groupChanges.map((r) => (r.cat === g.main ? { ...r, expandedGroup: g.key } : r));
+              }
             }
           }
           const fmtFull = (ds) => {
@@ -7345,6 +7339,17 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
                               fontSize: '9px', color: 'var(--gc-green)', textDecoration: 'underline',
                             }}>
                             {lang === 'en' ? 'expand ⌄' : '展开 ⌄'}
+                          </button>
+                        )}
+                        {ch.expandedGroup && (
+                          <button type="button"
+                            onClick={() => setExpandedMerges((m) => ({ ...m, [ch.expandedGroup]: false }))}
+                            style={{
+                              display: 'inline-block', marginTop: '2px', padding: 0,
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              fontSize: '9px', color: 'var(--gc-muted)', textDecoration: 'underline',
+                            }}>
+                            {lang === 'en' ? 'collapse ⌃' : '收起 ⌃'}
                           </button>
                         )}
                       </span>
@@ -14365,7 +14370,6 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
   // Local state for the form (only used when user clicks "I have a case")
   const [mode, setMode] = useState(initialMode); // 'choose' | 'form'
   // 「找回我的案子」：输入订阅邮箱 → 后端发一封带案子深链的邮件（magic link，无账号）
-  const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreEmail, setRestoreEmail] = useState('');
   const [restoreState, setRestoreState] = useState('idle'); // idle | sending | sent | fail
   const [subtypeAttempted, setSubtypeAttempted] = useState(false);
@@ -14663,14 +14667,13 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               <span style={{ color: 'var(--gc-muted)', fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>›</span>
             </button>
 
-            {/* 之前订阅过 → 邮箱找回案子（magic link，无账号体系） */}
+            {/* 之前订阅过 → 邮箱找回案子（magic link，无账号体系）。
+                输入框直接摆出来，不藏在链接后面（用户点名要的）。 */}
             <div style={{ marginTop: '2px', textAlign: 'center' }}>
-              {!restoreOpen ? (
-                <button type="button" onClick={() => setRestoreOpen(true)}
-                  style={{ background: 'none', border: 'none', color: 'var(--gc-muted)', fontSize: '11.5px', textDecoration: 'underline', cursor: 'pointer', padding: '2px 4px' }}>
-                  {t.restoreLink}
-                </button>
-              ) : restoreState === 'sent' ? (
+              <div style={{ marginBottom: '5px', fontSize: '11.5px', color: 'var(--gc-muted)', textAlign: 'left' }}>
+                {t.restoreLink}
+              </div>
+              {restoreState === 'sent' ? (
                 <div style={{ fontSize: '11.5px', color: 'var(--gc-green)', lineHeight: 1.5, padding: '4px 0' }}>{t.restoreSent}</div>
               ) : (
                 <div>
