@@ -14308,7 +14308,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
     priorityDate: '', // must be explicitly chosen — no default, see onboarding required-field check on Start
     birthYearMonth: '', // 'YYYY-MM' — must be explicitly chosen, no default, see Start button check
     inUS: null, // must be explicitly chosen — no default, see onboarding required-field check on Start
-    role: null, // 'petitioner' | 'beneficiary' — must be explicitly chosen, same as inUS
+    role: null, // 'beneficiary' | 'petitioner' | 'helper' — must be explicitly chosen, same as inUS
     petitionerStatus: 'USC',
     subtype: null,
     name: '', // optional, never blocks Start — stripped out of the object handed to onComplete,
@@ -14342,9 +14342,10 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       inUS: 'Are you currently in the US?',
       inUSYes: 'In the US',
       inUSNo: 'Outside the US',
-      role: 'Are you the petitioner or the beneficiary?',
-      rolePetitioner: 'Petitioner',
-      roleBeneficiary: 'Beneficiary',
+      role: 'Whose green card is this?',
+      roleBeneficiary: "I'm waiting for my own green card",
+      rolePetitioner: "I'm petitioning for a family member",
+      roleHelper: "I'm tracking for a friend or client",
       petitioner: 'Petitioner',
       start: 'Start →',
       back: '← Back',
@@ -14368,9 +14369,10 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       inUS: '你目前在美国境内吗？',
       inUSYes: '在美国境内',
       inUSNo: '不在美国境内',
-      role: '你是申请人还是被申请人？',
-      rolePetitioner: '申请人',
-      roleBeneficiary: '被申请人',
+      role: '这张绿卡是给谁的？',
+      roleBeneficiary: '我自己在等这张绿卡',
+      rolePetitioner: '我在帮家人/亲属办',
+      roleHelper: '我帮朋友或客户跟进',
       petitioner: '担保人身份',
       start: '开始使用 →',
       back: '← 返回',
@@ -14394,9 +14396,10 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       inUS: '你目前在美國境內嗎？',
       inUSYes: '在美國境內',
       inUSNo: '不在美國境內',
-      role: '你是申請人還是被申請人？',
-      rolePetitioner: '申請人',
-      roleBeneficiary: '被申請人',
+      role: '這張綠卡是給誰的？',
+      roleBeneficiary: '我自己在等這張綠卡',
+      rolePetitioner: '我在幫家人/親屬辦',
+      roleHelper: '我幫朋友或客戶跟進',
       petitioner: '擔保人身份',
       start: '開始使用 →',
       back: '← 返回',
@@ -14712,8 +14715,8 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
             {/* Role — required, no default; both options start unselected */}
             <div>
               <div style={{ marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{t.role}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                {[{ v: 'petitioner', label: t.rolePetitioner }, { v: 'beneficiary', label: t.roleBeneficiary }].map((o) => {
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
+                {[{ v: 'beneficiary', label: t.roleBeneficiary }, { v: 'petitioner', label: t.rolePetitioner }, { v: 'helper', label: t.roleHelper }].map((o) => {
                   const active = form.role === o.v;
                   const showError = roleAttempted && form.role === null;
                   return (
