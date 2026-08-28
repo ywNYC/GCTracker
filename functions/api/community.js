@@ -41,6 +41,20 @@ const sanitizeWallMsg = (msg) => {
   return t;
 };
 
+// 排期讨论区的评论：同样的零审核前提下 fail closed（禁链接/联系方式），但允许更长。
+const sanitizeCommentMsg = (msg) => {
+  if (typeof msg !== 'string') return '';
+  const t = msg.trim().slice(0, 300);
+  if (/https?:|www\.|\.com|\.cn|\d{6,}|微信|weixin|wx|vx|qq/i.test(t)) return '';
+  return t;
+};
+const sanitizeName = (name) => {
+  if (typeof name !== 'string') return '';
+  const t = name.trim().slice(0, 16);
+  if (/https?:|www\.|\.com|\.cn|\d{6,}|微信|weixin|wx|vx|qq/i.test(t)) return '';
+  return t;
+};
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -110,6 +124,24 @@ export async function onRequestPost(context) {
   } else if (type === 'postgc') {
     if (!POSTGC_PLANS.includes(body.plan)) return json({ error: 'plan required' }, 400);
     rec = { cat, country, plan: body.plan };
+  } else if (type === 'comment') {
+    const text = sanitizeCommentMsg(body.message);
+    if (text.length < 2) return json({ error: 'message required' }, 400);
+    rec = { cat, country, name: sanitizeName(body.name), message: text, likes: 0 };
+  } else if (type === 'commentLike') {
+    // 点赞是对既有记录的原地 +1，不走下面的「新建记录」路径。KV 读改写有并发丢失
+    // 的可能，这个规模可接受；重新 put 会刷新 TTL——被点赞的评论活得更久，符合直觉。
+    const likeId = typeof body.id === 'string' && /^[a-zA-Z0-9-]{8,64}$/.test(body.id) ? body.id : null;
+    if (!likeId) return json({ error: 'id required' }, 400);
+    const likeKey = `cd:comment:${likeId}`;
+    try {
+      const raw = await env.SUBSCRIBERS.get(likeKey);
+      if (!raw) return json({ error: 'not found' }, 404);
+      const r = JSON.parse(raw);
+      r.likes = (r.likes || 0) + 1;
+      await env.SUBSCRIBERS.put(likeKey, JSON.stringify(r), { expirationTtl: TTL_S });
+      return json({ ok: true, likes: r.likes });
+    } catch { return json({ error: 'failed' }, 500); }
   } else {
     return json({ error: 'unknown type' }, 400);
   }
@@ -202,6 +234,30 @@ export async function onRequestGet(context) {
     const choices = {};
     for (const r of rows) choices[r.choice] = (choices[r.choice] || 0) + 1;
     return json({ total: rows.length, choices });
+  }
+
+  if (type === 'comment') {
+    // 评论需要带 id（点赞要用），listType 丢弃了 key，这里单独列
+    const out = [];
+    let cursor;
+    do {
+      const list = await env.SUBSCRIBERS.list({ prefix: 'cd:comment:', cursor });
+      for (const k of list.keys) {
+        try {
+          const rec = JSON.parse(await env.SUBSCRIBERS.get(k.name));
+          if (rec) out.push({ id: k.name.slice('cd:comment:'.length), ...rec });
+        } catch { /* skip */ }
+      }
+      cursor = list.list_complete ? null : list.cursor;
+    } while (cursor);
+    out.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+    return json({
+      total: out.length,
+      comments: out.slice(0, 50).map((r) => ({
+        id: r.id, name: r.name || '', message: r.message || '',
+        cat: r.cat || '', ts: r.ts, likes: r.likes || 0,
+      })),
+    });
   }
 
   if (type === 'wall') {

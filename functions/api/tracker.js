@@ -188,7 +188,12 @@ const WAIT_BUCKETS = [
   { key: '1to2', label: '1-2年', maxMonths: 24 },
   { key: '2to3', label: '2-3年', maxMonths: 36 },
   { key: '3to5', label: '3-5年', maxMonths: 60 },
-  { key: 'gt5', label: '5年以上', maxMonths: Infinity },
+  // 5年以上单桶曾装下全场大多数人（F4/F3 老案子全堆在这），信息量为零——
+  // 按用户要求拆成 4 档，长尾终于能看出形状。
+  { key: '5to7', label: '5-7年', maxMonths: 84 },
+  { key: '7to9', label: '7-9年', maxMonths: 108 },
+  { key: '9to12', label: '9-12年', maxMonths: 144 },
+  { key: 'gt12', label: '12年以上', maxMonths: Infinity },
 ];
 const bucketIdxOf = (months) => {
   const i = WAIT_BUCKETS.findIndex((b) => months < b.maxMonths);

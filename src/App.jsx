@@ -6978,6 +6978,273 @@ const BulletinTab = ({ userCase = null }) => {
   );
 };
 
+// ============================================================
+// BulletinTrend — 排期趋势折线图（仿 careerengine 的类别走势）：BULLETIN_ARCHIVE
+// 真实存档里某类别·某国的截止日随月份的推进曲线，最新页表格下方展示。
+// ============================================================
+const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) => {
+  const famCats = ['F1', 'F2A', 'F2B', 'F3', 'F4'];
+  const empCats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'EB5'];
+  const cats = catGroup === 'family' ? famCats : empCats;
+  const fallbackCat = catGroup === 'family' ? 'F4' : 'EB2';
+  const [cat, setCat] = useState(initialCat && cats.includes(initialCat) ? initialCat : fallbackCat);
+  useEffect(() => {
+    if (!cats.includes(cat)) setCat(fallbackCat);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catGroup]);
+
+  const keys = Object.keys(BULLETIN_ARCHIVE).sort().slice(-24);
+  const pts = keys
+    .map((k) => ({ k, v: BULLETIN_ARCHIVE[k]?.data?.[chartKey]?.[cat]?.[userCountry] }))
+    .filter((p) => p.v && p.v !== 'C' && /^20\d{2}-/.test(p.v))
+    .map((p) => ({ k: p.k, t: Date.parse(p.v) }));
+
+  const W = 600, H = 190, PAD_L = 8, PAD_R = 78, PAD_T = 16, PAD_B = 26;
+  let body = null;
+  if (pts.length >= 2) {
+    const minT = Math.min(...pts.map((p) => p.t));
+    const maxT = Math.max(...pts.map((p) => p.t));
+    const span = Math.max(maxT - minT, 1);
+    const x = (i) => PAD_L + (i / (pts.length - 1)) * (W - PAD_L - PAD_R);
+    const y = (t) => H - PAD_B - ((t - minT) / span) * (H - PAD_T - PAD_B);
+    const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.t).toFixed(1)}`).join(' ');
+    const area = `${PAD_L},${H - PAD_B} ${line} ${x(pts.length - 1).toFixed(1)},${H - PAD_B}`;
+    const last = pts[pts.length - 1];
+    const first = pts[0];
+    const gainDays = Math.round((last.t - first.t) / 86400000);
+    const fmt = (t) => {
+      const d = new Date(t);
+      return lang === 'en'
+        ? `${d.getFullYear()}/${d.getMonth() + 1}`
+        : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+    };
+    const mLabel = (k) => {
+      const [yy, mm] = k.split('-');
+      return lang === 'en' ? `${yy.slice(2)}/${+mm}` : `${yy.slice(2)}年${+mm}月`;
+    };
+    body = (
+      <>
+        <div style={{ overflowX: 'auto' }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: '320px', display: 'block' }}>
+            <polygon points={area} fill="var(--gc-green-soft)" opacity="0.6" />
+            <polyline points={line} fill="none" stroke="var(--gc-green)" strokeWidth="2" />
+            {pts.map((p, i) => (
+              <circle key={p.k} cx={x(i)} cy={y(p.t)} r={i === pts.length - 1 ? 3.5 : 1.8}
+                fill={i === pts.length - 1 ? 'var(--gc-green)' : 'var(--gc-green)'} opacity={i === pts.length - 1 ? 1 : 0.55} />
+            ))}
+            {/* 最新点标注：当前截止日 */}
+            <text x={x(pts.length - 1) + 7} y={y(last.t) + 4}
+              fontSize="11" fontWeight="700" fill="var(--gc-green-ink)">{fmt(last.t)}</text>
+            {/* x 轴首尾月份 */}
+            <text x={PAD_L} y={H - 8} fontSize="10" fill="var(--gc-muted)">{mLabel(pts[0].k)}</text>
+            <text x={x(pts.length - 1)} y={H - 8} fontSize="10" fill="var(--gc-muted)" textAnchor="end">{mLabel(last.k)}</text>
+          </svg>
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.6 }}>
+          {lang === 'en'
+            ? <>Cutoff moved from <b>{fmt(first.t)}</b> to <b>{fmt(last.t)}</b> over {pts.length} months — <b style={{ color: 'var(--gc-green-ink)' }}>+{gainDays} days</b> total.</>
+            : <>{pts.length} 个月里截止日从 <b>{fmt(first.t)}</b> 推进到 <b>{fmt(last.t)}</b>，累计 <b style={{ color: 'var(--gc-green-ink)' }}>前进 {gainDays} 天</b>。</>}
+        </div>
+      </>
+    );
+  } else {
+    body = (
+      <div style={{ fontSize: '11.5px', color: 'var(--gc-muted)', padding: '10px 0' }}>
+        {lang === 'en' ? 'This category has been current (no cutoff) — nothing to chart.' : '该类别近两年基本无需排期，没有可画的截止日曲线。'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2.5 p-2.5 rounded-xl" style={{ border: '1px solid var(--gc-rule-soft)', background: 'var(--gc-surface)' }}>
+      <div className="flex items-center justify-between flex-wrap gap-1.5 mb-1.5">
+        <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+          {lang === 'en' ? 'Cutoff trend' : lang === 'tw' ? '排期趨勢' : '排期趋势'}
+          <span style={{ fontWeight: 500, color: 'var(--gc-muted)', fontSize: '10.5px', marginLeft: '6px' }}>
+            {userCountry === 'China' ? (lang === 'en' ? 'China' : '中国大陆') : userCountry}
+            {' · '}{chartKey === 'filing' ? (lang === 'en' ? 'Chart B' : '表B') : (lang === 'en' ? 'Chart A' : '表A')}
+          </span>
+        </span>
+        <span className="inline-flex flex-wrap" style={{ gap: '3px' }}>
+          {cats.map((c) => (
+            <button key={c} type="button" onClick={() => setCat(c)}
+              style={{
+                fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px',
+                border: `1px solid ${cat === c ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
+                background: cat === c ? 'var(--gc-green)' : 'var(--gc-surface)',
+                color: cat === c ? 'var(--gc-paper)' : 'var(--gc-muted)', cursor: 'pointer',
+              }}>{c === 'EW' ? 'EB3非技' : c}</button>
+          ))}
+        </span>
+      </div>
+      {body}
+    </div>
+  );
+};
+
+// ============================================================
+// BulletinTalk — 排期讨论（仿 careerengine 讨论圈）：匿名发帖 + 点赞，
+// 最新/最热两个排序。走 /api/community 的 comment/commentLike 类型。
+// ============================================================
+const BulletinTalk = ({ lang }) => {
+  const [sortTab, setSortTab] = useState('new'); // 'new' | 'hot'
+  const [data, setData] = useState(null);
+  const [msg, setMsg] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [liked, setLiked] = useState(() => {
+    try { return new Set(JSON.parse(window.localStorage.getItem('gc_talk_liked') || '[]')); } catch { return new Set(); }
+  });
+  const guestName = useMemo(() => {
+    try {
+      const nick = window.localStorage.getItem('gc_nickname');
+      if (nick) return nick;
+      let g = window.localStorage.getItem('gc_talk_guest');
+      if (!g) { g = `${lang === 'en' ? 'Guest' : '游客'}${Math.floor(1000 + Math.random() * 9000)}`; window.localStorage.setItem('gc_talk_guest', g); }
+      return g;
+    } catch { return lang === 'en' ? 'Guest' : '游客'; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const load = () => {
+    fetch(`${API_BASE}/api/community?type=comment`).then((r) => r.json()).then(setData).catch(() => {});
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submit = async () => {
+    const text = msg.trim();
+    if (text.length < 2 || posting) return;
+    setPosting(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/community`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'comment', message: text, name: guestName }),
+      });
+      if (r.ok) { setMsg(''); load(); }
+    } catch { /* noop */ }
+    setPosting(false);
+  };
+  const like = async (id) => {
+    if (liked.has(id)) return;
+    const next = new Set(liked); next.add(id);
+    setLiked(next);
+    try { window.localStorage.setItem('gc_talk_liked', JSON.stringify([...next])); } catch { /* noop */ }
+    // 乐观 +1
+    setData((d) => d && { ...d, comments: d.comments.map((c) => (c.id === id ? { ...c, likes: (c.likes || 0) + 1 } : c)) });
+    try {
+      await fetch(`${API_BASE}/api/community`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'commentLike', id }),
+      });
+    } catch { /* noop */ }
+  };
+
+  const rel = (ts) => {
+    const s = Math.max(0, (Date.now() - Date.parse(ts)) / 1000);
+    if (s < 3600) return lang === 'en' ? `${Math.max(1, Math.floor(s / 60))}m ago` : `${Math.max(1, Math.floor(s / 60))} 分钟前`;
+    if (s < 86400) return lang === 'en' ? `${Math.floor(s / 3600)}h ago` : `${Math.floor(s / 3600)} 小时前`;
+    return lang === 'en' ? `${Math.floor(s / 86400)}d ago` : `${Math.floor(s / 86400)} 天前`;
+  };
+  const avatarColor = (name) => {
+    const palette = ['#0e4d2e', '#7a5c2e', '#274060', '#6b3030', '#3d5a4c', '#5c4a72'];
+    let h = 0;
+    for (const ch of String(name || '?')) h = (h * 31 + ch.charCodeAt(0)) % 997;
+    return palette[h % palette.length];
+  };
+
+  const items = (data?.comments || []).slice();
+  if (sortTab === 'hot') items.sort((a, b) => (b.likes || 0) - (a.likes || 0) || (b.ts || '').localeCompare(a.ts || ''));
+
+  return (
+    <div className="mt-2.5 p-2.5 rounded-xl" style={{ border: '1px solid var(--gc-rule-soft)', background: 'var(--gc-surface)' }}>
+      <div className="flex items-center justify-between flex-wrap gap-1.5 mb-2">
+        <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+          {lang === 'en' ? 'Bulletin talk' : lang === 'tw' ? '排期討論' : '排期讨论'}
+          {data && (
+            <span style={{ fontWeight: 500, color: 'var(--gc-muted)', fontSize: '10.5px', marginLeft: '6px' }}>
+              {lang === 'en' ? `${data.total} posts` : `${data.total} 条`}
+            </span>
+          )}
+        </span>
+        <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden' }}>
+          {[['new', lang === 'en' ? 'Latest' : '最新'], ['hot', lang === 'en' ? 'Top' : '最热']].map(([id, label], i) => (
+            <button key={id} type="button" onClick={() => setSortTab(id)}
+              style={{
+                fontSize: '10px', fontWeight: 700, padding: '3px 11px', border: 'none', cursor: 'pointer',
+                borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                background: sortTab === id ? 'var(--gc-green)' : 'var(--gc-surface)',
+                color: sortTab === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
+              }}>{label}</button>
+          ))}
+        </span>
+      </div>
+
+      {/* 发帖框 */}
+      <div style={{ border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)', background: 'var(--gc-paper-soft)', padding: '8px' }}>
+        <div className="flex items-center gap-2 mb-1.5">
+          <span style={{
+            width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
+            background: avatarColor(guestName), color: '#fff', fontSize: '11px', fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>{String(guestName).slice(0, 1).toUpperCase()}</span>
+          <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>{guestName}</span>
+        </div>
+        <textarea value={msg} maxLength={300} rows={2}
+          placeholder={lang === 'en' ? 'Say something about this bulletin… (no links)' : '聊聊这期排期…（不能带链接/联系方式）'}
+          onChange={(e) => setMsg(e.target.value)}
+          style={{
+            width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '48px',
+            padding: '7px 9px', fontSize: '12px', lineHeight: 1.5, color: 'var(--gc-ink)',
+            background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)',
+          }} />
+        <div className="flex items-center justify-between mt-1.5">
+          <span style={{ fontSize: '9.5px', color: 'var(--gc-muted)' }}>
+            {lang === 'en' ? 'Anonymous · be kind' : '匿名发布 · 文明发言，含链接/联系方式会被拒收'}
+          </span>
+          <button type="button" onClick={submit} disabled={posting || msg.trim().length < 2}
+            style={{
+              padding: '5px 16px', fontSize: '11.5px', fontWeight: 700, border: 'none',
+              borderRadius: '999px', cursor: 'pointer',
+              background: msg.trim().length < 2 ? 'var(--gc-rule)' : 'var(--gc-green)',
+              color: 'var(--gc-paper)', opacity: posting ? 0.6 : 1,
+            }}>{lang === 'en' ? 'Post' : '发布'}</button>
+        </div>
+      </div>
+
+      {/* 评论列表 */}
+      {items.length === 0 ? (
+        <div style={{ fontSize: '11.5px', color: 'var(--gc-muted)', textAlign: 'center', padding: '14px 0 6px' }}>
+          {data === null
+            ? (lang === 'en' ? 'Loading…' : '加载中…')
+            : (lang === 'en' ? 'No posts yet — be the first.' : '还没有评论——来抢个沙发')}
+        </div>
+      ) : items.map((c) => (
+        <div key={c.id} className="flex gap-2" style={{ padding: '10px 2px 8px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
+          <span style={{
+            width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, marginTop: '1px',
+            background: avatarColor(c.name), color: '#fff', fontSize: '12px', fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>{String(c.name || '?').slice(0, 1).toUpperCase()}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink)' }}>{c.name || (lang === 'en' ? 'Guest' : '游客')}</span>
+              {c.cat && <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--gc-green-ink)', background: 'var(--gc-green-soft)', borderRadius: '999px', padding: '1px 6px' }}>{c.cat}</span>}
+              <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{rel(c.ts)}</span>
+            </div>
+            <div style={{ fontSize: '12.5px', color: 'var(--gc-ink-soft)', lineHeight: 1.55, marginTop: '2px', wordBreak: 'break-word' }}>{c.message}</div>
+          </div>
+          <button type="button" onClick={() => like(c.id)}
+            style={{
+              alignSelf: 'flex-start', flexShrink: 0, padding: '3px 8px', fontSize: '10.5px', fontWeight: 700,
+              border: `1px solid ${liked.has(c.id) ? 'var(--gc-green)' : 'var(--gc-rule)'}`, borderRadius: '999px',
+              background: liked.has(c.id) ? 'var(--gc-green-soft)' : 'var(--gc-surface)',
+              color: liked.has(c.id) ? 'var(--gc-green-ink)' : 'var(--gc-muted)',
+              cursor: liked.has(c.id) ? 'default' : 'pointer',
+            }}>👍 {c.likes || 0}</button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const MonthlyUpdate = ({ userCase, hasCase = true }) => {
   // 访客（没填案子）看通用视角：默认中国大陆列 + 亲属组，不渲染「你的类别」个人行，
   // category=null 让所有「我的」高亮自然失效——不能拿默认的 Taiwan EB3 冒充访客的案子
@@ -7083,7 +7350,9 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
               const ranked = Object.entries(counts)
                 .map(([d, n]) => ({ d: +d, pct: Math.round((n / rem.length) * 100) }))
                 .sort((a, b) => b.pct - a.pct || a.d - b.d);
-              const top = ranked.slice(0, 5);
+              // 取概率前五，但展示按日期从早到晚排（用户点名），只有并列最高的实心亮起
+              const top = ranked.slice(0, 5).sort((a, b) => a.d - b.d);
+              const maxPct = Math.max(...top.map((x) => x.pct));
               const otherPct = Math.max(0, 100 - top.reduce((sum, x) => sum + x.pct, 0));
               const chip = (key, text, bg, fg, bd) => (
                 <span key={key} style={{
@@ -7095,10 +7364,9 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
               const out = [
                 <span key="t" style={{ fontWeight: 600 }}>{lang === 'en' ? 'next bulletin' : '下期公告'}</span>,
               ];
-              top.forEach((x, i) => {
+              top.forEach((x) => {
                 const label = lang === 'en' ? `${bm}/${x.d} ${x.pct}%` : `${bm}月${x.d}日 ${x.pct}%`;
-                // 概率最高的两个用实心绿，其余用浅绿——一眼看出主峰
-                out.push(i < 2
+                out.push(x.pct === maxPct
                   ? chip(x.d, label, 'var(--gc-green)', 'var(--gc-paper)', 'var(--gc-green)')
                   : chip(x.d, label, 'var(--gc-green-soft)', 'var(--gc-green-ink)', 'var(--gc-green-soft)'));
               });
@@ -7385,6 +7653,10 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
         })()}
       </div>
 
+      {/* 仿 careerengine：表格下面接排期趋势图 + 排期讨论区 */}
+      <BulletinTrend lang={lang} chartKey={chartKey} catGroup={catGroup} userCountry={userCountry}
+        initialCat={hasCase ? userCase.category : null} />
+      <BulletinTalk lang={lang} />
 
     </div>
 
