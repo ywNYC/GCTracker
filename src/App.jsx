@@ -7094,16 +7094,29 @@ const BulletinTalk = ({ lang }) => {
   const [liked, setLiked] = useState(() => {
     try { return new Set(JSON.parse(window.localStorage.getItem('gc_talk_liked') || '[]')); } catch { return new Set(); }
   });
-  const guestName = useMemo(() => {
+  // 昵称优先级：自己改过的 > 订阅时填的 > 自动生成的游客号。
+  // 自动游客号首位只取 1-7 —— 8/9 开头保留给站主的暖场/机器内容（内部约定，
+  // 让站主一眼分得清真人和撑场帖）。
+  const [guestName, setGuestName] = useState(() => {
     try {
+      const own = window.localStorage.getItem('gc_talk_name');
+      if (own) return own;
       const nick = window.localStorage.getItem('gc_nickname');
       if (nick) return nick;
       let g = window.localStorage.getItem('gc_talk_guest');
-      if (!g) { g = `${lang === 'en' ? 'Guest' : '游客'}${Math.floor(1000 + Math.random() * 9000)}`; window.localStorage.setItem('gc_talk_guest', g); }
+      if (!g) {
+        const num = (1 + Math.floor(Math.random() * 7)) * 1000 + Math.floor(Math.random() * 1000);
+        g = `${lang === 'en' ? 'Guest' : '游客'}${num}`;
+        window.localStorage.setItem('gc_talk_guest', g);
+      }
       return g;
     } catch { return lang === 'en' ? 'Guest' : '游客'; }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
+  const renameGuest = (v) => {
+    const clean = v.slice(0, 16);
+    setGuestName(clean);
+    try { window.localStorage.setItem('gc_talk_name', clean); } catch { /* noop */ }
+  };
   const load = () => {
     fetch(`${API_BASE}/api/community?type=comment`).then((r) => r.json()).then(setData).catch(() => {});
   };
@@ -7116,7 +7129,7 @@ const BulletinTalk = ({ lang }) => {
     try {
       const r = await fetch(`${API_BASE}/api/community`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'comment', message: text, name: guestName }),
+        body: JSON.stringify({ type: 'comment', message: text, name: guestName.trim() || (lang === 'en' ? 'Guest' : '游客') }),
       });
       if (r.ok) { setMsg(''); load(); }
     } catch { /* noop */ }
@@ -7184,8 +7197,18 @@ const BulletinTalk = ({ lang }) => {
             width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
             background: avatarColor(guestName), color: '#fff', fontSize: '11px', fontWeight: 700,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          }}>{String(guestName).slice(0, 1).toUpperCase()}</span>
-          <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>{guestName}</span>
+          }}>{String(guestName || '?').slice(0, 1).toUpperCase()}</span>
+          <input type="text" value={guestName} maxLength={16}
+            onChange={(e) => renameGuest(e.target.value)}
+            aria-label={lang === 'en' ? 'nickname' : '称呼'}
+            style={{
+              fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink-soft)',
+              background: 'transparent', border: 'none', borderBottom: '1px dashed var(--gc-rule)',
+              padding: '1px 2px', minWidth: 0, width: '120px', outline: 'none',
+            }} />
+          <span style={{ fontSize: '9px', color: 'var(--gc-muted)' }}>
+            {lang === 'en' ? '(tap to edit)' : '（可改）'}
+          </span>
         </div>
         <textarea value={msg} maxLength={300} rows={2}
           placeholder={lang === 'en' ? 'Say something about this bulletin… (no links)' : '聊聊这期排期…（不能带链接/联系方式）'}
