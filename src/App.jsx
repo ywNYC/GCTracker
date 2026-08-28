@@ -7022,13 +7022,15 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
     const y = (p) => p.cur ? PAD_T : H - PAD_B - ((p.t - minT) / span) * (H - PAD_T - PAD_B - 14) - 0;
     const segs = [];
     for (let i = 1; i < pts.length; i++) {
-      segs.push({
-        x1: x(i - 1), y1: y(pts[i - 1]), x2: x(i), y2: y(pts[i]),
-        // 段颜色跟终点状态走：走向/处于 C 的段是绿色，排队中的段是琥珀色
-        color: pts[i].cur ? 'var(--gc-green)' : G_WAIT,
-      });
+      segs.push({ x1: x(i - 1), y1: y(pts[i - 1]), x2: x(i), y2: y(pts[i]), color: G_WAIT });
     }
-    const area = `${PAD_L},${H - PAD_B} ${pts.map((p, i) => `${x(i).toFixed(1)},${y(p).toFixed(1)}`).join(' ')} ${x(pts.length - 1).toFixed(1)},${H - PAD_B}`;
+    // 面积分两块：转无需排期那个月做竖向横截面，左边浅绿（排队中）、右边深绿（C）。
+    // 加深的是面积不是线——线保持统一浅绿（用户点名的方案）。
+    const cutIdx = pts.findIndex((p) => p.cur);
+    const poly = (from, to) => `${x(from).toFixed(1)},${H - PAD_B} ${pts.slice(from, to + 1).map((p, j) => `${x(from + j).toFixed(1)},${y(p).toFixed(1)}`).join(' ')} ${x(to).toFixed(1)},${H - PAD_B}`;
+    const waitEnd = cutIdx === -1 ? pts.length - 1 : cutIdx;
+    const areaWait = waitEnd > 0 ? poly(0, waitEnd) : null;
+    const areaCur = cutIdx !== -1 && cutIdx < pts.length ? poly(Math.max(cutIdx - 0, 0) === 0 ? 0 : cutIdx, pts.length - 1) : null;
     const last = pts[pts.length - 1];
     const firstDated = dated[0];
     const lastDated = dated[dated.length - 1];
@@ -7049,7 +7051,8 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
       <>
         <div style={{ overflowX: 'auto' }}>
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: '320px', display: 'block' }}>
-            <polygon points={area} fill={G_SOFT} />
+            {areaWait && <polygon points={areaWait} fill={G_SOFT} />}
+            {areaCur && <polygon points={areaCur} fill="rgba(14, 77, 46, 0.30)" />}
             {segs.map((sg, i) => (
               <line key={i} x1={sg.x1} y1={sg.y1} x2={sg.x2} y2={sg.y2} stroke={sg.color} strokeWidth="2" />
             ))}
@@ -7057,9 +7060,10 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
               <circle key={p.k} cx={x(i)} cy={y(p)} r={i === pts.length - 1 ? 3.5 : 1.8}
                 fill={p.cur ? 'var(--gc-green)' : G_WAIT} opacity={i === pts.length - 1 ? 1 : 0.7} />
             ))}
-            {/* 首个转 C 的月份标一句「无需排期」 */}
+            {/* 「无需排期 ✓」放进深色面积内部居中——不压线不压点（重叠问题的修复） */}
             {firstCurIdx !== -1 && (
-              <text x={Math.min(x(firstCurIdx) + 6, W - PAD_R + 70)} y={PAD_T + 4}
+              <text x={Math.min(Math.max((x(firstCurIdx) + x(pts.length - 1)) / 2, x(firstCurIdx) + 30), W - 46)}
+                y={PAD_T + 30} textAnchor="middle"
                 fontSize="10.5" fontWeight="700" fill="var(--gc-green-ink)">{curLabel} ✓</text>
             )}
             {/* 最新点标注 */}
