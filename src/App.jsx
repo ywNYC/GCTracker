@@ -7011,6 +7011,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
   // 之前把 C 的月份整个滤掉，一个类别转 Current 后曲线就凭空断了——用户点名要区分。
   // 绿色系两档：排队中=浅绿，转无需排期=主题深绿（用户改口定的方案）
   const G_WAIT = '#5e9c77', G_SOFT = 'rgba(94, 156, 119, 0.16)';
+  const STALL = '#a09884'; // 停滞（截止日原地不动）用灰——和推进的绿有区分度
   const pts = keys
     .map((k) => ({ k, v: BULLETIN_ARCHIVE[k]?.data?.[ck]?.[cat]?.[trendCountry] }))
     .filter((p) => p.v === 'C' || (p.v && /^20\d{2}-/.test(p.v)))
@@ -7032,8 +7033,23 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
     // C（无需排期）画在最顶——语义上是「排到头了」
     const y = (p) => p.cur ? PAD_T : H - PAD_B - ((p.t - minT) / span) * (H - PAD_T - PAD_B - 14) - 0;
     const segs = [];
+    const stalled = (a, b) => !a.cur && !b.cur && a.t === b.t; // 两端都有截止日且没动
     for (let i = 1; i < pts.length; i++) {
-      segs.push({ x1: x(i - 1), y1: y(pts[i - 1]), x2: x(i), y2: y(pts[i]), color: G_WAIT });
+      segs.push({
+        x1: x(i - 1), y1: y(pts[i - 1]), x2: x(i), y2: y(pts[i]),
+        color: stalled(pts[i - 1], pts[i]) ? STALL : G_WAIT,
+      });
+    }
+    // 最长的停滞段（≥3 个月原地）标一句「排期未动」，只标最长的那段免得花
+    let stallRun = null;
+    {
+      let i = 0;
+      while (i < pts.length) {
+        let j = i;
+        while (j + 1 < pts.length && stalled(pts[j], pts[j + 1])) j++;
+        if (j - i >= 2 && (!stallRun || j - i > stallRun.j - stallRun.i)) stallRun = { i, j };
+        i = j > i ? j : i + 1;
+      }
     }
     // 面积分两块：转无需排期那个月做竖向横截面，左边浅绿（排队中）、右边深绿（C）。
     // 加深的是面积不是线——线保持统一浅绿（用户点名的方案）。
@@ -7069,8 +7085,21 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
             ))}
             {pts.map((p, i) => (
               <circle key={p.k} cx={x(i)} cy={y(p)} r={i === pts.length - 1 ? 3.5 : 1.8}
-                fill={p.cur ? 'var(--gc-green)' : G_WAIT} opacity={i === pts.length - 1 ? 1 : 0.7} />
+                fill={p.cur ? 'var(--gc-green)' : (i > 0 && stalled(pts[i - 1], p)) ? STALL : G_WAIT}
+                opacity={i === pts.length - 1 ? 1 : 0.7} />
             ))}
+            {/* 最长停滞段上方标「排期未动」 */}
+            {stallRun && (() => {
+              const midX = (x(stallRun.i) + x(stallRun.j)) / 2;
+              const lineY = y(pts[stallRun.i]);
+              const above = lineY > PAD_T + 20;
+              return (
+                <text x={midX} y={above ? lineY - 8 : lineY + 16} textAnchor="middle"
+                  fontSize="9.5" fontWeight="700" fill={STALL}>
+                  {lang === 'en' ? 'no movement' : '排期未动'}
+                </text>
+              );
+            })()}
             {/* 「无需排期 ✓」放进深色面积内部居中——不压线不压点（重叠问题的修复） */}
             {firstCurIdx !== -1 && (
               <text x={Math.min(Math.max((x(firstCurIdx) + x(pts.length - 1)) / 2, x(firstCurIdx) + 30), W - 46)}
@@ -7084,7 +7113,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
             )}
             {/* x 轴上方一行小字：两种绿各代表什么（代替独立图例） */}
             <text x={W / 2} y={H - 8} fontSize="9" fill="var(--gc-muted)" textAnchor="middle">
-              {lang === 'en' ? 'light green = waiting (has cutoff) · dark green = current' : '浅绿 = 排队中（有截止日） · 深绿 = 无需排期（C）'}
+              {lang === 'en' ? 'green = advancing · grey = no movement · dark area = current' : '绿 = 在推进 · 灰 = 排期未动 · 深绿面积 = 无需排期（C）'}
             </text>
             <text x={PAD_L} y={H - 8} fontSize="10" fill="var(--gc-muted)">{mLabel(pts[0].k)}</text>
             <text x={x(pts.length - 1)} y={H - 8} fontSize="10" fill="var(--gc-muted)" textAnchor="end">{mLabel(last.k)}</text>
@@ -7111,45 +7140,46 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
 
   return (
     <div className="mt-2.5 p-2.5 rounded-xl" style={{ border: '1px solid var(--gc-rule-soft)', background: 'var(--gc-surface)' }}>
-      <div className="flex items-center justify-between flex-wrap gap-1.5 mb-1.5">
-        <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+      {/* 标题 + 全部选择器统一靠左（用户点名对齐），一行放不下自动换行 */}
+      <div className="flex items-center flex-wrap mb-1.5" style={{ gap: '5px' }}>
+        <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)', marginRight: '3px' }}>
           {lang === 'en' ? 'Cutoff trend' : lang === 'tw' ? '排期趨勢' : '排期趋势'}
-          <span className="inline-flex" style={{ marginLeft: '7px', border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden', verticalAlign: 'middle' }}>
-            {[['filing', lang === 'en' ? 'Chart B' : '表B'], ['finalAction', lang === 'en' ? 'Chart A' : '表A']].map(([id, label], i) => (
-              <button key={id} type="button" onClick={() => setCk(id)}
-                style={{
-                  fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
-                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                  background: ck === id ? 'var(--gc-green)' : 'var(--gc-surface)',
-                  color: ck === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
-                }}>{label}</button>
-            ))}
-          </span>
-          <span className="inline-flex" style={{ marginLeft: '5px', border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden', verticalAlign: 'middle' }}>
-            {[['emp', lang === 'en' ? 'EB' : '人才类'], ['family', lang === 'en' ? 'Family' : '亲属类']].map(([id, label], i) => (
-              <button key={id} type="button" onClick={() => setGrp(id)}
-                style={{
-                  fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
-                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                  background: grp === id ? 'var(--gc-green)' : 'var(--gc-surface)',
-                  color: grp === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
-                }}>{label}</button>
-            ))}
-          </span>
-          {countryOpts.length > 1 && (
-            <span className="inline-flex" style={{ marginLeft: '7px', border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden', verticalAlign: 'middle' }}>
-              {countryOpts.map((c, i) => (
-                <button key={c} type="button" onClick={() => setTrendCountry(c)}
-                  style={{
-                    fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
-                    borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                    background: trendCountry === c ? 'var(--gc-green)' : 'var(--gc-surface)',
-                    color: trendCountry === c ? 'var(--gc-paper)' : 'var(--gc-muted)',
-                  }}>{countryLabel(c)}</button>
-              ))}
-            </span>
-          )}
         </span>
+        <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden' }}>
+          {[['filing', lang === 'en' ? 'Chart B' : '表B'], ['finalAction', lang === 'en' ? 'Chart A' : '表A']].map(([id, label], i) => (
+            <button key={id} type="button" onClick={() => setCk(id)}
+              style={{
+                fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
+                borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                background: ck === id ? 'var(--gc-green)' : 'var(--gc-surface)',
+                color: ck === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
+              }}>{label}</button>
+          ))}
+        </span>
+        <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden' }}>
+          {[['emp', lang === 'en' ? 'EB' : '人才类'], ['family', lang === 'en' ? 'Family' : '亲属类']].map(([id, label], i) => (
+            <button key={id} type="button" onClick={() => setGrp(id)}
+              style={{
+                fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
+                borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                background: grp === id ? 'var(--gc-green)' : 'var(--gc-surface)',
+                color: grp === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
+              }}>{label}</button>
+          ))}
+        </span>
+        {countryOpts.length > 1 && (
+          <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden' }}>
+            {countryOpts.map((c, i) => (
+              <button key={c} type="button" onClick={() => setTrendCountry(c)}
+                style={{
+                  fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
+                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
+                  background: trendCountry === c ? 'var(--gc-green)' : 'var(--gc-surface)',
+                  color: trendCountry === c ? 'var(--gc-paper)' : 'var(--gc-muted)',
+                }}>{countryLabel(c)}</button>
+            ))}
+          </span>
+        )}
         <span className="inline-flex flex-wrap" style={{ gap: '3px' }}>
           {cats.map((c) => (
             <button key={c} type="button" onClick={() => setCat(c)}
