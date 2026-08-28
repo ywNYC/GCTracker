@@ -7056,18 +7056,38 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
       <div className="mb-2.5">
         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
           <h2 className="text-base font-bold text-slate-900">{t.updateTitle}</h2>
-          <span className="px-2 py-0.5 bg-slate-900 text-white text-[10px] font-bold rounded-full">
+          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full" style={{ background: 'var(--gc-green)', color: 'var(--gc-paper)' }}>
             {BULLETIN_CURRENT_MONTH[lang]}
           </span>
           {/* 表B/表A toggle moved down into the category-table header, next to the
-              人才/亲属 group toggle — the two selectors live together now.
-              Next-release countdown rides the title line (replaced the subtitle). */}
+              人才/亲属 group toggle — the two selectors live together now. */}
           <span className="text-[11px] text-slate-500">
             {(() => {
+              // 下期公告发布日预测：11 期实测发布日（Wayback 每期最早快照 + 本期）的经验
+              // 分布，分三档报日期区间+概率；进入发布月后按「到今天还没发」过滤剩余样本
+              // 重新归一化——纯 render 时按当天日期计算，自然每天更新。
+              const SAMPLE = [12, 12, 13, 14, 15, 17, 18, 18, 19, 22, 24];
+              // 下期公告在「当期公告月份」当月发布（10月号 9 月发）
+              const [by, bm] = BULLETIN_CURRENT_KEY.value.split('-').map(Number);
               const now = new Date();
-              const target = new Date(now.getFullYear(), now.getMonth() + (now.getDate() > 22 ? 1 : 0), 15);
-              const daysTo = Math.max(Math.ceil((target - now) / 86400000), 0);
-              return lang === 'en' ? `next bulletin ~${daysTo}d` : lang === 'tw' ? `下期公告約 ${daysTo} 天後` : `下期公告约 ${daysTo} 天后`;
+              const anyDay = lang === 'en' ? 'next bulletin: any day now'
+                : lang === 'tw' ? '下期公告：隨時可能發布' : '下期公告：随时可能发布';
+              if (now > new Date(by, bm - 1, SAMPLE[SAMPLE.length - 1], 23, 59)) return anyDay;
+              const inWindowMonth = now.getFullYear() === by && now.getMonth() === bm - 1;
+              const floor = inWindowMonth ? now.getDate() : 0;
+              const rem = SAMPLE.filter((x) => x >= floor);
+              if (!rem.length) return anyDay;
+              const buckets = [[1, 14], [15, 18], [19, 31]]
+                .map(([a, b]) => rem.filter((x) => x >= a && x <= b))
+                .filter((g) => g.length > 0);
+              const pct = buckets.map((g) => Math.round((g.length / rem.length) * 100));
+              pct[pct.length - 1] += 100 - pct.reduce((sum, x) => sum + x, 0);
+              const seg = buckets.map((g, i) => {
+                const lo = Math.min(...g), hi = Math.max(...g);
+                const range = lo === hi ? `${lo}` : `${lo}–${hi}`;
+                return lang === 'en' ? `${bm}/${range}: ${pct[i]}%` : `${bm}月${range}日 ${pct[i]}%`;
+              }).join(' · ');
+              return (lang === 'en' ? 'next bulletin ' : '下期公告 ') + seg;
             })()}
           </span>
         </div>
