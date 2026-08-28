@@ -16017,8 +16017,8 @@ export default function App() {
 
   // Wrapped setTab that also scrolls to top - approximates sticky header behavior in WebViews
   const handleTabChange = (newTab) => {
-    // 个人页需要一个案子：访客点它先走向导，填完 onComplete 会自动落到个人页
-    if (newTab === 'overview' && !hasOnboarded) { setShowWizard(true); return; }
+    // 个人/社区都要案子：访客点它们先走向导，填完 onComplete 会自动落到个人页
+    if ((newTab === 'overview' || newTab === 'compare') && !hasOnboarded) { setShowWizard(true); return; }
     // Remember where user came from — helps The Index show a "back" button
     if (newTab === 'index' && tab !== 'index') {
       setPreviousTab(tab);
@@ -16399,12 +16399,12 @@ export default function App() {
   const t = translations[lang];
 
   const tabs = [
+    // 最新在个人前：访客第一眼就是公共排期页，个人页要有案子才进（见 handleTabChange）
+    { id: 'update', label: t.navUpdate, icon: TrendingUp },
     { id: 'overview', label: t.navOverview, icon: Eye },
     // 预测 tab 下架：总结页的估算+推导链已覆盖其价值（下月概率的增量不足以撑一个 tab）。
     // ForecastHub 代码保留，恢复时解开此行。
     // { id: 'trends', label: t.navTrends, icon: BarChart3 },
-    // 动态在公告前：读者先看"变了什么"，原始公告表退居查阅位。
-    { id: 'update', label: t.navUpdate, icon: TrendingUp },
     { id: 'compare', label: t.navCompare, icon: Users },
     { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
     { id: 'index', label: t.navIndex, icon: ClipboardList },
