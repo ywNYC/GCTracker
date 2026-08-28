@@ -7431,7 +7431,12 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
       <div className="mb-2.5">
         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
           <h2 className="text-base font-bold text-slate-900">{t.updateTitle}</h2>
-          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full" style={{ background: 'var(--gc-green)', color: 'var(--gc-paper)' }}>
+          {/* 月份徽章：方角大块（不是小胶囊），一眼看清在讲哪一期 */}
+          <span style={{
+            background: 'var(--gc-green)', color: 'var(--gc-paper)',
+            fontSize: '15px', fontWeight: 800, letterSpacing: '0.02em',
+            padding: '3px 10px', borderRadius: '4px', lineHeight: 1.3,
+          }}>
             {BULLETIN_CURRENT_MONTH[lang]}
           </span>
           {/* 表B/表A toggle moved down into the category-table header, next to the
