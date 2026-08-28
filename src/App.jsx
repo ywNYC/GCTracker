@@ -4948,7 +4948,9 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                               if (!hadBirthday) age -= 1;
                               return (
                                 <div style={{ marginTop: '2px' }}>
-                                  {lang === 'en' ? `You'll be about ${age} then` : lang === 'tw' ? `屆時你大約 ${age} 歲` : `届时你大约 ${age} 岁`}
+                                  {userCase.proxy
+                                    ? (lang === 'en' ? `They'll be about ${age} then` : lang === 'tw' ? `屆時 TA 大約 ${age} 歲` : `届时 TA 大约 ${age} 岁`)
+                                    : (lang === 'en' ? `You'll be about ${age} then` : lang === 'tw' ? `屆時你大約 ${age} 歲` : `届时你大约 ${age} 岁`)}
                                 </div>
                               );
                             })()}
@@ -14302,13 +14304,15 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
   const [inUSAttempted, setInUSAttempted] = useState(false);
   const [roleAttempted, setRoleAttempted] = useState(false);
   const [dobAttempted, setDobAttempted] = useState(false);
-  const [form, setForm] = useState(initialForm || {
+  // 旧数据没有 proxy 字段：已答过 role 的老案子视为「自己的案子」，别让编辑时问题一消失
+  const [form, setForm] = useState(initialForm ? { proxy: initialForm.role != null ? false : null, ...initialForm } : {
     country: 'Taiwan',
     category: null, // must be explicitly chosen — no default, see onboarding required-field check on Start
     priorityDate: '', // must be explicitly chosen — no default, see onboarding required-field check on Start
     birthYearMonth: '', // 'YYYY-MM' — must be explicitly chosen, no default, see Start button check
     inUS: null, // must be explicitly chosen — no default, see onboarding required-field check on Start
-    role: null, // 'beneficiary' | 'petitioner' | 'helper' — must be explicitly chosen, same as inUS
+    role: null, // 'beneficiary' | 'petitioner' — must be explicitly chosen, same as inUS
+    proxy: null, // null=未答 · false=自己的案子 · true=帮朋友/客户跟进；role 永远记录案子本人的身份
     petitionerStatus: 'USC',
     subtype: null,
     name: '', // optional, never blocks Start — stripped out of the object handed to onComplete,
@@ -14346,6 +14350,13 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       roleBeneficiary: "I'm waiting for my own green card",
       rolePetitioner: "I'm petitioning for a family member",
       roleHelper: "I'm tracking for a friend or client",
+      caseMine: "It's my own case",
+      roleSelfQ: 'Are you the petitioner or the beneficiary?',
+      roleHelperQ: 'Is that person the petitioner or the beneficiary?',
+      roleProxyBene: "They're waiting for their own green card",
+      roleProxyPet: "They're petitioning for a family member",
+      dobProxy: 'Their birth year & month',
+      inUSProxy: 'Are they currently in the US?',
       petitioner: 'Petitioner',
       start: 'Start →',
       back: '← Back',
@@ -14373,6 +14384,13 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       roleBeneficiary: '我自己在等这张绿卡',
       rolePetitioner: '我在帮家人/亲属办',
       roleHelper: '我帮朋友或客户跟进',
+      caseMine: '这是我自己的案子',
+      roleSelfQ: '你是申请人还是被申请人？',
+      roleHelperQ: '那位朋友/客户是申请人还是被申请人？',
+      roleProxyBene: 'TA 自己在等绿卡（被申请人）',
+      roleProxyPet: 'TA 在帮家人办（申请人）',
+      dobProxy: 'TA 的出生年月',
+      inUSProxy: 'TA 目前在美国境内吗？',
       petitioner: '担保人身份',
       start: '开始使用 →',
       back: '← 返回',
@@ -14400,6 +14418,13 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       roleBeneficiary: '我自己在等這張綠卡',
       rolePetitioner: '我在幫家人/親屬辦',
       roleHelper: '我幫朋友或客戶跟進',
+      caseMine: '這是我自己的案子',
+      roleSelfQ: '你是申請人還是被申請人？',
+      roleHelperQ: '那位朋友/客戶是申請人還是被申請人？',
+      roleProxyBene: 'TA 自己在等綠卡（被申請人）',
+      roleProxyPet: 'TA 在幫家人辦（申請人）',
+      dobProxy: 'TA 的出生年月',
+      inUSProxy: 'TA 目前在美國境內嗎？',
       petitioner: '擔保人身份',
       start: '開始使用 →',
       back: '← 返回',
@@ -14669,7 +14694,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                   }} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.dob}</div>
+                <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{form.proxy ? t.dobProxy : t.dob}</div>
                 <YearMonthDropdown value={form.birthYearMonth}
                   triggerStyle={{
                     padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)',
@@ -14716,12 +14741,19 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
             <div>
               <div style={{ marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{t.role}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
-                {[{ v: 'beneficiary', label: t.roleBeneficiary }, { v: 'petitioner', label: t.rolePetitioner }, { v: 'helper', label: t.roleHelper }].map((o) => {
-                  const active = form.role === o.v;
-                  const showError = roleAttempted && form.role === null;
+                {[
+                  { pv: false, label: t.caseMine },
+                  { pv: true, label: t.roleHelper },
+                ].map((o) => {
+                  const active = form.proxy === o.pv;
+                  const showError = roleAttempted && form.proxy === null;
                   return (
-                    <button key={o.v} type="button"
-                      onClick={() => { setForm({ ...form, role: o.v }); setRoleAttempted(false); }}
+                    <button key={String(o.pv)} type="button"
+                      onClick={() => {
+                        // 切换视角就清掉已选的 role，逼着第二问在正确的人称下重答
+                        setForm(form.proxy === o.pv ? form : { ...form, proxy: o.pv, role: null });
+                        setRoleAttempted(false);
+                      }}
                       style={{
                         padding: '9px 8px', fontSize: '12px', fontWeight: active ? 700 : 500,
                         background: active ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
@@ -14735,11 +14767,41 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                   );
                 })}
               </div>
+              {/* 第二问：答了第一问才出现，人称跟着视角走；role 存的都是案子本人的身份 */}
+              {form.proxy !== null && (
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{form.proxy ? t.roleHelperQ : t.roleSelfQ}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
+                    {(form.proxy
+                      ? [{ v: 'beneficiary', label: t.roleProxyBene }, { v: 'petitioner', label: t.roleProxyPet }]
+                      : [{ v: 'beneficiary', label: t.roleBeneficiary }, { v: 'petitioner', label: t.rolePetitioner }]
+                    ).map((o) => {
+                      const active = form.role === o.v;
+                      const showError = roleAttempted && form.role === null;
+                      return (
+                        <button key={o.v} type="button"
+                          onClick={() => { setForm({ ...form, role: o.v }); setRoleAttempted(false); }}
+                          style={{
+                            padding: '9px 8px', fontSize: '12px', fontWeight: active ? 700 : 500,
+                            background: active ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
+                            color: active ? 'var(--gc-paper)' : 'var(--gc-ink)',
+                            border: `1px solid ${active ? 'var(--gc-green)' : showError ? 'var(--gc-red)' : 'var(--gc-rule)'}`,
+                            borderRadius: 'var(--gc-radius-sm)',
+                            cursor: 'pointer', transition: 'all 120ms',
+                          }}>
+                          {o.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* In US — required, no default; both options start unselected */}
+            {/* In US — 第三问：答了身份才出现（层层递进），人称跟视角走 */}
+            {form.role !== null && (
             <div>
-              <div style={{ marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{t.inUS}</div>
+              <div style={{ marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{form.proxy ? t.inUSProxy : t.inUS}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {[{ v: true, label: t.inUSYes }, { v: false, label: t.inUSNo }].map((o) => {
                   const active = form.inUS === o.v;
@@ -14761,6 +14823,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                 })}
               </div>
             </div>
+            )}
 
             {/* Petitioner — only for F categories */}
             {isF && (
@@ -14814,7 +14877,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                     setPdAttempted(true);
                     return;
                   }
-                  if (form.role === null) {
+                  if (form.proxy === null || form.role === null) {
                     setRoleAttempted(true);
                     return;
                   }
