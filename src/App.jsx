@@ -294,6 +294,8 @@ const translations = {
     eligibleNow: 'You are already eligible to file',
     chartFooterNote: 'For May 2026, USCIS uses Final Action Dates for employment-based filings (Chart A) and Dates for Filing for family-based filings (Chart B). We automatically pick the right chart based on your category.',
     navOverview: 'Overview',
+    ctaBanner: "You're viewing the public bulletin — enter your case to see your own timeline.",
+    ctaBannerBtn: 'My timeline →',
     navAlerts: 'Subscribe',
     navTrends: 'Forecast',
   },
@@ -302,6 +304,8 @@ const translations = {
     appSubtitle: '看清进度,知道下一步该做什么',
     bulletinMonth: '公告月',
     navOverview: '个人',
+    ctaBanner: '你在看公共排期页——输入你的案子，算你自己的时间线',
+    ctaBannerBtn: '查我的排期 →',
     navAlerts: '订阅',
     navTrends: '预测',
     navUpdate: '最新',
@@ -571,6 +575,8 @@ const translations = {
     appSubtitle: '看清進度,知道下一步該做什麼',
     bulletinMonth: '公告月',
     navOverview: '個人',
+    ctaBanner: '你在看公共排期頁——輸入你的案子，算你自己的時間線',
+    ctaBannerBtn: '查我的排期 →',
     navAlerts: '訂閱',
     navTrends: '預測',
     navUpdate: '最新',
@@ -14298,6 +14304,10 @@ const LanguageGateModal = ({ theme = 'passport', onPick }) => {
 const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', initialForm = null, onComplete, onThemeChange, onClose }) => {
   // Local state for the form (only used when user clicks "I have a case")
   const [mode, setMode] = useState(initialMode); // 'choose' | 'form'
+  // 「找回我的案子」：输入订阅邮箱 → 后端发一封带案子深链的邮件（magic link，无账号）
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [restoreEmail, setRestoreEmail] = useState('');
+  const [restoreState, setRestoreState] = useState('idle'); // idle | sending | sent | fail
   const [subtypeAttempted, setSubtypeAttempted] = useState(false);
   const [categoryAttempted, setCategoryAttempted] = useState(false);
   const [pdAttempted, setPdAttempted] = useState(false);
@@ -14351,6 +14361,11 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       rolePetitioner: "I'm petitioning for a family member",
       roleHelper: "I'm tracking for a friend or client",
       caseMine: "It's my own case",
+      restoreLink: 'Subscribed before? Recover my case',
+      restorePlaceholder: 'Email you subscribed with',
+      restoreSend: 'Send link',
+      restoreSent: 'Sent! Open the link in your inbox and your case comes right back.',
+      restoreFail: 'Could not send — check the address or try again later.',
       roleSelfQ: 'Are you the petitioner or the beneficiary?',
       roleHelperQ: 'Is that person the petitioner or the beneficiary?',
       roleProxyBene: "They're waiting for their own green card",
@@ -14385,6 +14400,11 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       rolePetitioner: '我在帮家人/亲属办',
       roleHelper: '我帮朋友或客户跟进',
       caseMine: '这是我自己的案子',
+      restoreLink: '之前订阅过？找回我的案子',
+      restorePlaceholder: '订阅时用的邮箱',
+      restoreSend: '发恢复链接',
+      restoreSent: '已发送！去邮箱点开链接，案子就回来了。',
+      restoreFail: '发送失败——检查邮箱地址，或稍后再试。',
       roleSelfQ: '你是申请人还是被申请人？',
       roleHelperQ: '那位朋友/客户是申请人还是被申请人？',
       roleProxyBene: 'TA 自己在等绿卡（被申请人）',
@@ -14419,6 +14439,11 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       rolePetitioner: '我在幫家人/親屬辦',
       roleHelper: '我幫朋友或客戶跟進',
       caseMine: '這是我自己的案子',
+      restoreLink: '之前訂閱過？找回我的案子',
+      restorePlaceholder: '訂閱時用的郵箱',
+      restoreSend: '發恢復連結',
+      restoreSent: '已發送！去郵箱點開連結，案子就回來了。',
+      restoreFail: '發送失敗——檢查郵箱地址，或稍後再試。',
       roleSelfQ: '你是申請人還是被申請人？',
       roleHelperQ: '那位朋友/客戶是申請人還是被申請人？',
       roleProxyBene: 'TA 自己在等綠卡（被申請人）',
@@ -14562,6 +14587,46 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               </div>
               <span style={{ color: 'var(--gc-muted)', fontSize: '18px', lineHeight: 1, flexShrink: 0 }}>›</span>
             </button>
+
+            {/* 之前订阅过 → 邮箱找回案子（magic link，无账号体系） */}
+            <div style={{ marginTop: '2px', textAlign: 'center' }}>
+              {!restoreOpen ? (
+                <button type="button" onClick={() => setRestoreOpen(true)}
+                  style={{ background: 'none', border: 'none', color: 'var(--gc-muted)', fontSize: '11.5px', textDecoration: 'underline', cursor: 'pointer', padding: '2px 4px' }}>
+                  {t.restoreLink}
+                </button>
+              ) : restoreState === 'sent' ? (
+                <div style={{ fontSize: '11.5px', color: 'var(--gc-green)', lineHeight: 1.5, padding: '4px 0' }}>{t.restoreSent}</div>
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <input type="email" value={restoreEmail} placeholder={t.restorePlaceholder}
+                      onChange={(e) => { setRestoreEmail(e.target.value); if (restoreState === 'fail') setRestoreState('idle'); }}
+                      style={{ flex: 1, minWidth: 0, padding: '8px 10px', fontSize: '12px', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)', background: 'var(--gc-paper-soft)', color: 'var(--gc-ink)', boxSizing: 'border-box' }} />
+                    <button type="button" disabled={restoreState === 'sending'}
+                      onClick={async () => {
+                        const em = restoreEmail.trim();
+                        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { setRestoreState('fail'); return; }
+                        setRestoreState('sending');
+                        try {
+                          const r = await fetch(`${API_BASE}/api/restore-link`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: em }),
+                          });
+                          setRestoreState(r.ok ? 'sent' : 'fail');
+                        } catch { setRestoreState('fail'); }
+                      }}
+                      style={{ flexShrink: 0, padding: '8px 12px', fontSize: '12px', fontWeight: 700, background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none', borderRadius: 'var(--gc-radius-sm)', cursor: 'pointer', opacity: restoreState === 'sending' ? 0.6 : 1 }}>
+                      {t.restoreSend}
+                    </button>
+                  </div>
+                  {restoreState === 'fail' && (
+                    <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--gc-red)', textAlign: 'left' }}>{t.restoreFail}</div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Theme picker — tiny inline swatches, low-key so it doesn't compete with main CTAs.
                 Users will also find a full picker in the footer once they're inside the app. */}
@@ -15665,6 +15730,15 @@ export default function App() {
       const p = new URLSearchParams(window.location.search).get('tab');
       if (['overview', 'trends', 'update', 'bulletin', 'compare', 'index', 'alerts', 'about'].includes(p)) return p;
     } catch (e) { /* noop */ }
+    // 没有案子的新访客先落在「最新」页看公共排期——不再被向导拦在门外，
+    // 想看个性化数据时再通过 CTA / 个人页入口填案子（见 showWizard）。
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const hasUrlCase = q.get('c') && q.get('ct') && q.get('pd');
+      const hasLocal = window.localStorage.getItem('gc_hasOnboarded') === 'true'
+        || window.localStorage.getItem('gc_userCase');
+      if (!hasUrlCase && !hasLocal) return 'update';
+    } catch (e) { /* noop */ }
     return 'overview';
   });
   // Track the tab the user came from, for the "← back" button in The Index
@@ -15888,6 +15962,8 @@ export default function App() {
 
   // Wrapped setTab that also scrolls to top - approximates sticky header behavior in WebViews
   const handleTabChange = (newTab) => {
+    // 个人页需要一个案子：访客点它先走向导，填完 onComplete 会自动落到个人页
+    if (newTab === 'overview' && !hasOnboarded) { setShowWizard(true); return; }
     // Remember where user came from — helps The Index show a "back" button
     if (newTab === 'index' && tab !== 'index') {
       setPreviousTab(tab);
@@ -16206,6 +16282,9 @@ export default function App() {
   }, [hasOnboarded]);
   // Onboarding modal starting mode ('choose' default; 'form' when re-opened from Index "I know my category")
   const [onboardingInitialMode, setOnboardingInitialMode] = useState('choose');
+  // 向导改为按需弹出：新访客不再自动被拦（他们落在「最新」页），只有点 CTA 横幅、
+  // 个人页入口或 Index 的「我知道我的类别」时才打开。
+  const [showWizard, setShowWizard] = useState(false);
 
   // Keep URL in sync with userCase changes (after onboarding)
   useEffect(() => {
@@ -16294,14 +16373,14 @@ export default function App() {
           }}
         />
       )}
-      {hasPickedLanguage && !hasOnboarded && (
+      {hasPickedLanguage && showWizard && (
         <OnboardingModal
           lang={lang}
           theme={theme}
           initialMode={onboardingInitialMode}
           initialForm={onboardingInitialMode === 'form' ? userCase : null}
-          onComplete={(form) => { setUserCase(form); setTab('overview'); setHasOnboarded(true); setOnboardingInitialMode('choose'); }}
-          onClose={() => { setHasOnboarded(true); setOnboardingInitialMode('choose'); }}
+          onComplete={(form) => { setUserCase(form); setTab('overview'); setHasOnboarded(true); setShowWizard(false); setOnboardingInitialMode('choose'); }}
+          onClose={() => { setShowWizard(false); setOnboardingInitialMode('choose'); }}
           onThemeChange={setTheme}
         />
       )}
@@ -17165,6 +17244,19 @@ export default function App() {
               </div>
             </div>
           </nav>
+
+          {/* 访客 CTA：不拦路，但常驻一条入口把人引去填案子（有案子后自动消失） */}
+          {!hasOnboarded && (
+            <div style={{ width: '100%', background: 'var(--gc-green)', color: 'var(--gc-paper)' }}>
+              <div className="max-w-3xl mx-auto" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 14px', boxSizing: 'border-box' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, lineHeight: 1.35 }}>{t.ctaBanner}</div>
+                <button type="button" onClick={() => { setOnboardingInitialMode('choose'); setShowWizard(true); }}
+                  style={{ flexShrink: 0, padding: '6px 12px', fontSize: '12px', fontWeight: 700, background: 'var(--gc-paper)', color: 'var(--gc-green)', border: 'none', borderRadius: 'var(--gc-radius-sm)', cursor: 'pointer' }}>
+                  {t.ctaBannerBtn}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         {/* End fixed header wrapper */}
 
@@ -17212,7 +17304,7 @@ export default function App() {
               {/* 原「如果」（What-if）tab 让位给「社区」：案件进度墙 + 同路人互动挪进来，
                   CompareHub 没删，收进页面底部的 <details> 里，默认收起。 */}
               {tab === 'compare' && <CommunityPage userCase={userCase} />}
-              {tab === 'index' && <TheIndex userCase={userCase} setTab={handleTabChange} setUserCase={setUserCase} previousTab={previousTab} onSetupCase={() => { setOnboardingInitialMode('form'); setHasOnboarded(false); }} />}
+              {tab === 'index' && <TheIndex userCase={userCase} setTab={handleTabChange} setUserCase={setUserCase} previousTab={previousTab} onSetupCase={() => { setOnboardingInitialMode('form'); setShowWizard(true); }} />}
               {tab === 'help' && <HelpCenter />}
             </div>
           </div>
