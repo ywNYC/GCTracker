@@ -16253,16 +16253,9 @@ export default function App() {
       const p = new URLSearchParams(window.location.search).get('tab');
       if (['overview', 'trends', 'update', 'bulletin', 'compare', 'index', 'alerts', 'about'].includes(p)) return p;
     } catch (e) { /* noop */ }
-    // 没有案子的新访客先落在「最新」页看公共排期——不再被向导拦在门外，
-    // 想看个性化数据时再通过 CTA / 个人页入口填案子（见 showWizard）。
-    try {
-      const q = new URLSearchParams(window.location.search);
-      const hasUrlCase = q.get('c') && q.get('ct') && q.get('pd');
-      const hasLocal = window.localStorage.getItem('gc_hasOnboarded') === 'true'
-        || window.localStorage.getItem('gc_userCase');
-      if (!hasUrlCase && !hasLocal) return 'update';
-    } catch (e) { /* noop */ }
-    return 'overview';
+    // 刷新/直开一律默认落「最新」页（用户点名）——个人页只有主动点击或
+    // 向导填完（onComplete 里 setTab('overview')）才进；?tab= 深链仍优先。
+    return 'update';
   });
   // Track the tab the user came from, for the "← back" button in The Index
   const [previousTab, setPreviousTab] = useState('overview');
