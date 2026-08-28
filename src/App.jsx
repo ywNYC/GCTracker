@@ -6978,14 +6978,17 @@ const BulletinTab = ({ userCase = null }) => {
   );
 };
 
-const MonthlyUpdate = ({ userCase }) => {
+const MonthlyUpdate = ({ userCase, hasCase = true }) => {
+  // 访客（没填案子）看通用视角：默认中国大陆列 + 亲属组，不渲染「你的类别」个人行，
+  // category=null 让所有「我的」高亮自然失效——不能拿默认的 Taiwan EB3 冒充访客的案子
+  if (!hasCase) userCase = { country: 'China', category: null, priorityDate: null };
   const { t, lang } = useLang();
   const userCountry = resolveCountry(userCase.country);
   // Which chart the whole page reads: A (finalAction) or B (filing).
   const [updChart, setUpdChart] = useState('B');
   // Which half of the category table shows — preset from the user's own case:
   // an F-case lands on 亲属类, everything else on 职业/人才类.
-  const [catGroup, setCatGroup] = useState(userCase.category?.startsWith('F') ? 'family' : 'emp');
+  const [catGroup, setCatGroup] = useState(!hasCase ? 'family' : (userCase.category?.startsWith('F') ? 'family' : 'emp'));
   const chartKey = updChart === 'B' ? 'filing' : 'finalAction';
   const showsTwoColumns = userCase.country === 'China' || userCase.country === 'India'; // These have separate cutoffs from ROW
 
@@ -7103,11 +7106,14 @@ const MonthlyUpdate = ({ userCase }) => {
           </div>
         );
       })()}
-      {/* One line — the sentence already names the case, no eyebrow label needed. */}
-      <div className={`p-2.5 rounded-xl border mb-2.5 flex items-center gap-2 ${impactTone}`}>
-        <div className="text-[13px] font-semibold flex-1 min-w-0">{impactText}</div>
-        <MovementIndicator movement={userImpact} />
-      </div>
+      {/* One line — the sentence already names the case, no eyebrow label needed.
+          访客没有案子，这行个人影响不渲染。 */}
+      {hasCase && (
+        <div className={`p-2.5 rounded-xl border mb-2.5 flex items-center gap-2 ${impactTone}`}>
+          <div className="text-[13px] font-semibold flex-1 min-w-0">{impactText}</div>
+          <MovementIndicator movement={userImpact} />
+        </div>
+      )}
       {/* B5: this month's extremes — computed from the rows already on screen */}
       {hasPreviousData && (() => {
         const flat = [];
@@ -14512,6 +14518,21 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
           <LangSwitcher />
         </div>
 
+        {/* 关闭/返回 — 访客随时能退回去看公共排期页，不再被弹窗锁死 */}
+        {onClose && (
+          <button type="button" aria-label="close" onClick={onClose}
+            style={{
+              position: 'absolute', top: '10px', left: '10px', zIndex: 2,
+              width: '28px', height: '28px', lineHeight: '26px',
+              fontSize: '16px', textAlign: 'center',
+              background: 'var(--gc-paper-soft)', color: 'var(--gc-muted)',
+              border: '1px solid var(--gc-rule)', borderRadius: '50%',
+              cursor: 'pointer', padding: 0,
+            }}>
+            ✕
+          </button>
+        )}
+
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
           <div className="gc-eyebrow" style={{ color: 'var(--gc-green)', marginBottom: '4px' }}>
@@ -17295,7 +17316,7 @@ export default function App() {
                   approval forecast syncs with Overview. The 'forecast' branch
                   below is dead code kept for backward compat. */}
               {tab === 'trends' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
-              {tab === 'update' && <MonthlyUpdate userCase={userCase} />}
+              {tab === 'update' && <MonthlyUpdate userCase={userCase} hasCase={hasOnboarded} />}
               {tab === 'forecast' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
               {tab === 'i485' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
