@@ -7328,7 +7328,12 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
           </span>
           {/* 表B/表A toggle moved down into the category-table header, next to the
               人才/亲属 group toggle — the two selectors live together now. */}
-          <span className="text-[11px] text-slate-500" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+          <span className="text-[11px] text-slate-500" style={{
+            // 独占一行 + 行内横滑：手机上胶囊再多也不折行（用户点名一行）
+            display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap',
+            flexBasis: '100%', minWidth: 0, overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+          }}>
             {(() => {
               // 下期公告发布日预测：11 期实测发布日（Wayback 每期最早快照 + 本期）的经验
               // 分布，取概率最高的 5 个具体日期各给一个带色小胶囊，剩余合并为「其他」；
@@ -7356,13 +7361,13 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
               const otherPct = Math.max(0, 100 - top.reduce((sum, x) => sum + x.pct, 0));
               const chip = (key, text, bg, fg, bd) => (
                 <span key={key} style={{
-                  display: 'inline-block', padding: '1.5px 7px', borderRadius: '999px',
-                  fontSize: '10px', fontWeight: 700, whiteSpace: 'nowrap',
+                  display: 'inline-block', padding: '1px 6px', borderRadius: '999px',
+                  fontSize: '9.5px', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
                   background: bg, color: fg, border: `1px solid ${bd}`,
                 }}>{text}</span>
               );
               const out = [
-                <span key="t" style={{ fontWeight: 600 }}>{lang === 'en' ? 'next bulletin' : '下期公告'}</span>,
+                <span key="t" style={{ fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>{lang === 'en' ? 'next bulletin' : '下期公告'}</span>,
               ];
               top.forEach((x) => {
                 const label = `${bm}/${x.d} ${x.pct}%`; // 9/18 比 9月18日 省地方，大家都懂
