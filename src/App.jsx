@@ -7003,7 +7003,8 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
   const keys = Object.keys(BULLETIN_ARCHIVE).sort().slice(-24);
   // 两种状态都进时间线：有截止日 = 排队中（琥珀色），C = 无需排期（绿色顶格）。
   // 之前把 C 的月份整个滤掉，一个类别转 Current 后曲线就凭空断了——用户点名要区分。
-  const AMBER = '#b07d2a', AMBER_SOFT = 'rgba(176, 125, 42, 0.14)';
+  // 绿色系两档：排队中=浅绿，转无需排期=主题深绿（用户改口定的方案）
+  const G_WAIT = '#5e9c77', G_SOFT = 'rgba(94, 156, 119, 0.16)';
   const pts = keys
     .map((k) => ({ k, v: BULLETIN_ARCHIVE[k]?.data?.[chartKey]?.[cat]?.[trendCountry] }))
     .filter((p) => p.v === 'C' || (p.v && /^20\d{2}-/.test(p.v)))
@@ -7024,7 +7025,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
       segs.push({
         x1: x(i - 1), y1: y(pts[i - 1]), x2: x(i), y2: y(pts[i]),
         // 段颜色跟终点状态走：走向/处于 C 的段是绿色，排队中的段是琥珀色
-        color: pts[i].cur ? 'var(--gc-green)' : AMBER,
+        color: pts[i].cur ? 'var(--gc-green)' : G_WAIT,
       });
     }
     const area = `${PAD_L},${H - PAD_B} ${pts.map((p, i) => `${x(i).toFixed(1)},${y(p).toFixed(1)}`).join(' ')} ${x(pts.length - 1).toFixed(1)},${H - PAD_B}`;
@@ -7048,13 +7049,13 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
       <>
         <div style={{ overflowX: 'auto' }}>
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: '320px', display: 'block' }}>
-            <polygon points={area} fill={AMBER_SOFT} />
+            <polygon points={area} fill={G_SOFT} />
             {segs.map((sg, i) => (
               <line key={i} x1={sg.x1} y1={sg.y1} x2={sg.x2} y2={sg.y2} stroke={sg.color} strokeWidth="2" />
             ))}
             {pts.map((p, i) => (
               <circle key={p.k} cx={x(i)} cy={y(p)} r={i === pts.length - 1 ? 3.5 : 1.8}
-                fill={p.cur ? 'var(--gc-green)' : AMBER} opacity={i === pts.length - 1 ? 1 : 0.6} />
+                fill={p.cur ? 'var(--gc-green)' : G_WAIT} opacity={i === pts.length - 1 ? 1 : 0.7} />
             ))}
             {/* 首个转 C 的月份标一句「无需排期」 */}
             {firstCurIdx !== -1 && (
@@ -7064,22 +7065,21 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
             {/* 最新点标注 */}
             {!last.cur && (
               <text x={x(pts.length - 1) + 7} y={y(last) + 4}
-                fontSize="11" fontWeight="700" fill={AMBER}>{fmt(last.t)}</text>
+                fontSize="11" fontWeight="700" fill="var(--gc-green-ink)">{fmt(last.t)}</text>
             )}
+            {/* x 轴上方一行小字：两种绿各代表什么（代替独立图例） */}
+            <text x={W / 2} y={H - 8} fontSize="9" fill="var(--gc-muted)" textAnchor="middle">
+              {lang === 'en' ? 'light green = waiting (has cutoff) · dark green = current' : '浅绿 = 排队中（有截止日） · 深绿 = 无需排期（C）'}
+            </text>
             <text x={PAD_L} y={H - 8} fontSize="10" fill="var(--gc-muted)">{mLabel(pts[0].k)}</text>
             <text x={x(pts.length - 1)} y={H - 8} fontSize="10" fill="var(--gc-muted)" textAnchor="end">{mLabel(last.k)}</text>
           </svg>
         </div>
-        {/* 图例 + 一句小结 */}
-        <div className="flex items-center flex-wrap" style={{ gap: '10px', fontSize: '10px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
-          <span><span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '2px', background: AMBER, verticalAlign: '-1px', marginRight: '4px' }} />{lang === 'en' ? 'has cutoff (waiting)' : '排队中（有截止日）'}</span>
-          <span><span style={{ display: 'inline-block', width: '9px', height: '9px', borderRadius: '2px', background: 'var(--gc-green)', verticalAlign: '-1px', marginRight: '4px' }} />{lang === 'en' ? 'current (no cutoff)' : '无需排期（C）'}</span>
-        </div>
         <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.6 }}>
           {last.cur
             ? (lang === 'en'
-              ? <>Cutoff advanced <b style={{ color: AMBER }}>+{gainDays} days</b> while waiting, and the category is now <b style={{ color: 'var(--gc-green-ink)' }}>current — no cutoff</b>.</>
-              : <>排队阶段截止日累计前进 <b style={{ color: AMBER }}>{gainDays} 天</b>，目前已转为<b style={{ color: 'var(--gc-green-ink)' }}>无需排期</b>。</>)
+              ? <>Cutoff advanced <b style={{ color: 'var(--gc-green-ink)' }}>+{gainDays} days</b> while waiting, and the category is now <b style={{ color: 'var(--gc-green-ink)' }}>current — no cutoff</b>.</>
+              : <>排队阶段截止日累计前进 <b style={{ color: 'var(--gc-green-ink)' }}>{gainDays} 天</b>，目前已转为<b style={{ color: 'var(--gc-green-ink)' }}>无需排期</b>。</>)
             : (lang === 'en'
               ? <>Cutoff moved from <b>{fmt(firstDated.t)}</b> to <b>{fmt(lastDated.t)}</b> over {pts.length} months — <b style={{ color: 'var(--gc-green-ink)' }}>+{gainDays} days</b> total.</>
               : <>{pts.length} 个月里截止日从 <b>{fmt(firstDated.t)}</b> 推进到 <b>{fmt(lastDated.t)}</b>，累计 <b style={{ color: 'var(--gc-green-ink)' }}>前进 {gainDays} 天</b>。</>)}
