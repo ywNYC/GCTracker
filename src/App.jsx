@@ -7365,7 +7365,7 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
                 <span key="t" style={{ fontWeight: 600 }}>{lang === 'en' ? 'next bulletin' : '下期公告'}</span>,
               ];
               top.forEach((x) => {
-                const label = lang === 'en' ? `${bm}/${x.d} ${x.pct}%` : `${bm}月${x.d}日 ${x.pct}%`;
+                const label = `${bm}/${x.d} ${x.pct}%`; // 9/18 比 9月18日 省地方，大家都懂
                 out.push(x.pct === maxPct
                   ? chip(x.d, label, 'var(--gc-green)', 'var(--gc-paper)', 'var(--gc-green)')
                   : chip(x.d, label, 'var(--gc-green-soft)', 'var(--gc-green-ink)', 'var(--gc-green-soft)'));
