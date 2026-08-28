@@ -7658,6 +7658,22 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
         initialCat={hasCase ? userCase.category : null} />
       <BulletinTalk lang={lang} />
 
+      {/* 社区小组件（每月一题/打卡墙/调查·提问 + 换类别对比）镜像到最新页底部——
+          这些都要案子才有意义，访客不渲染（他们有上面的讨论区可玩） */}
+      {hasCase && (
+        <>
+          <div className="mt-2.5"><CommunityHub userCase={userCase} /></div>
+          <details className="mt-2.5" style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '8px 10px' }}>
+            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
+              {lang === 'en' ? 'What if I switch category or status?' : '如果换类别、换身份会更快吗'}
+              <span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · tap for the auto-computed comparison' : ' · 展开看自动算好的对比'}</span>
+            </summary>
+            <div style={{ height: '8px' }} />
+            <CompareHub userCase={userCase} />
+          </details>
+        </>
+      )}
+
     </div>
 
   );
