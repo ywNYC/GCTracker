@@ -7032,32 +7032,31 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
     const x = (i) => PAD_L + (i / (pts.length - 1)) * (W - PAD_L - PAD_R);
     // C（无需排期）画在最顶——语义上是「排到头了」
     const y = (p) => p.cur ? PAD_T : H - PAD_B - ((p.t - minT) / span) * (H - PAD_T - PAD_B - 14) - 0;
-    const segs = [];
+    // 状态一律画在面积上（用户两次点名的原则），线保持统一浅绿：
+    // 按月分段做竖向横截面——推进段浅绿填充、停滞段灰填充、无需排期段深绿填充。
     const stalled = (a, b) => !a.cur && !b.cur && a.t === b.t; // 两端都有截止日且没动
+    const segs = [];
     for (let i = 1; i < pts.length; i++) {
-      segs.push({
-        x1: x(i - 1), y1: y(pts[i - 1]), x2: x(i), y2: y(pts[i]),
-        color: stalled(pts[i - 1], pts[i]) ? STALL : G_WAIT,
-      });
+      segs.push({ x1: x(i - 1), y1: y(pts[i - 1]), x2: x(i), y2: y(pts[i]), color: G_WAIT });
     }
-    // 最长的停滞段（≥3 个月原地）标一句「排期未动」，只标最长的那段免得花
-    let stallRun = null;
-    {
-      let i = 0;
-      while (i < pts.length) {
-        let j = i;
-        while (j + 1 < pts.length && stalled(pts[j], pts[j + 1])) j++;
-        if (j - i >= 2 && (!stallRun || j - i > stallRun.j - stallRun.i)) stallRun = { i, j };
-        i = j > i ? j : i + 1;
+    const segCls = (i) => pts[i].cur ? 'cur' : stalled(pts[i - 1], pts[i]) ? 'stall' : 'adv';
+    const poly = (from, to) => `${x(from).toFixed(1)},${H - PAD_B} ${pts.slice(from, to + 1).map((p, j) => `${x(from + j).toFixed(1)},${y(p).toFixed(1)}`).join(' ')} ${x(to).toFixed(1)},${H - PAD_B}`;
+    const FILLS = { adv: G_SOFT, stall: 'rgba(160, 152, 132, 0.32)', cur: 'rgba(14, 77, 46, 0.30)' };
+    const regions = [];
+    if (pts.length > 1) {
+      let rs = 1;
+      for (let i = 2; i <= pts.length; i++) {
+        if (i === pts.length || segCls(i) !== segCls(rs)) {
+          regions.push({ from: rs - 1, to: i - 1, cls: segCls(rs) });
+          rs = i;
+        }
       }
     }
-    // 面积分两块：转无需排期那个月做竖向横截面，左边浅绿（排队中）、右边深绿（C）。
-    // 加深的是面积不是线——线保持统一浅绿（用户点名的方案）。
-    const cutIdx = pts.findIndex((p) => p.cur);
-    const poly = (from, to) => `${x(from).toFixed(1)},${H - PAD_B} ${pts.slice(from, to + 1).map((p, j) => `${x(from + j).toFixed(1)},${y(p).toFixed(1)}`).join(' ')} ${x(to).toFixed(1)},${H - PAD_B}`;
-    const waitEnd = cutIdx === -1 ? pts.length - 1 : cutIdx;
-    const areaWait = waitEnd > 0 ? poly(0, waitEnd) : null;
-    const areaCur = cutIdx !== -1 && cutIdx < pts.length ? poly(Math.max(cutIdx - 0, 0) === 0 ? 0 : cutIdx, pts.length - 1) : null;
+    // 最长的停滞区（≥3 个月原地）标「排期未动」
+    const stallRegions = regions.filter((r) => r.cls === 'stall' && r.to - r.from >= 2);
+    const stallRun = stallRegions.length
+      ? stallRegions.reduce((a, b) => (b.to - b.from > a.to - a.from ? b : a))
+      : null;
     const last = pts[pts.length - 1];
     const firstDated = dated[0];
     const lastDated = dated[dated.length - 1];
@@ -7078,24 +7077,24 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
       <>
         <div style={{ overflowX: 'auto' }}>
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: '320px', display: 'block' }}>
-            {areaWait && <polygon points={areaWait} fill={G_SOFT} />}
-            {areaCur && <polygon points={areaCur} fill="rgba(14, 77, 46, 0.30)" />}
+            {regions.map((r, i) => (
+              <polygon key={i} points={poly(r.from, r.to)} fill={FILLS[r.cls]} />
+            ))}
             {segs.map((sg, i) => (
               <line key={i} x1={sg.x1} y1={sg.y1} x2={sg.x2} y2={sg.y2} stroke={sg.color} strokeWidth="2" />
             ))}
             {pts.map((p, i) => (
               <circle key={p.k} cx={x(i)} cy={y(p)} r={i === pts.length - 1 ? 3.5 : 1.8}
-                fill={p.cur ? 'var(--gc-green)' : (i > 0 && stalled(pts[i - 1], p)) ? STALL : G_WAIT}
-                opacity={i === pts.length - 1 ? 1 : 0.7} />
+                fill={p.cur ? 'var(--gc-green)' : G_WAIT} opacity={i === pts.length - 1 ? 1 : 0.7} />
             ))}
-            {/* 最长停滞段上方标「排期未动」 */}
+            {/* 「排期未动」写进最长停滞区的灰色面积里；线贴着轴没空间时才挪到线上方 */}
             {stallRun && (() => {
-              const midX = (x(stallRun.i) + x(stallRun.j)) / 2;
-              const lineY = y(pts[stallRun.i]);
-              const above = lineY > PAD_T + 20;
+              const midX = (x(stallRun.from) + x(stallRun.to)) / 2;
+              const lineY = y(pts[stallRun.to]);
+              const roomBelow = (H - PAD_B) - lineY > 32;
               return (
-                <text x={midX} y={above ? lineY - 8 : lineY + 16} textAnchor="middle"
-                  fontSize="9.5" fontWeight="700" fill={STALL}>
+                <text x={midX} y={roomBelow ? lineY + 18 : lineY - 8} textAnchor="middle"
+                  fontSize="9.5" fontWeight="700" fill="#7d7666">
                   {lang === 'en' ? 'no movement' : '排期未动'}
                 </text>
               );
