@@ -7382,6 +7382,9 @@ const BulletinTalk = ({ lang }) => {
   );
 };
 
+// 访客在个人页看到的示例案件（只读展示，不写进 localStorage）
+const SAMPLE_CASE = { country: 'Taiwan', category: 'EB3', priorityDate: '2024-07-15', inUS: true, petitionerStatus: 'USC', birthYearMonth: '' };
+
 const MonthlyUpdate = ({ userCase, hasCase = true }) => {
   // 访客（没填案子）看通用视角：默认中国大陆列 + 亲属组，不渲染「你的类别」个人行，
   // category=null 让所有「我的」高亮自然失效——不能拿默认的 Taiwan EB3 冒充访客的案子
@@ -16507,8 +16510,9 @@ export default function App() {
 
   // Wrapped setTab that also scrolls to top - approximates sticky header behavior in WebViews
   const handleTabChange = (newTab) => {
-    // 个人/社区都要案子：访客点它们先走向导，填完 onComplete 会自动落到个人页
-    if ((newTab === 'overview' || newTab === 'compare') && !hasOnboarded) { setShowWizard(true); return; }
+    // 社区要案子：访客点它先走向导。个人页不拦——访客先看示例案件，
+    // 停留几秒后再弹向导（见下方 samplePrompted 计时），看完再决定填不填
+    if (newTab === 'compare' && !hasOnboarded) { setShowWizard(true); return; }
     // Remember where user came from — helps The Index show a "back" button
     if (newTab === 'index' && tab !== 'index') {
       setPreviousTab(tab);
@@ -16835,6 +16839,13 @@ export default function App() {
   // 向导改为按需弹出：新访客不再自动被拦（他们落在「最新」页），只有点 CTA 横幅、
   // 个人页入口或 Index 的「我知道我的类别」时才打开。
   const [showWizard, setShowWizard] = useState(false);
+  // 访客在个人页看示例：停 8 秒自动弹一次向导，每次打开网页只弹一次，关掉就不再追
+  const [samplePrompted, setSamplePrompted] = useState(false);
+  useEffect(() => {
+    if (hasOnboarded || samplePrompted || tab !== 'overview') return undefined;
+    const id = setTimeout(() => { setOnboardingInitialMode('choose'); setShowWizard(true); setSamplePrompted(true); }, 8000);
+    return () => clearTimeout(id);
+  }, [hasOnboarded, samplePrompted, tab]);
 
   // Keep URL in sync with userCase changes (after onboarding)
   useEffect(() => {
@@ -17839,25 +17850,25 @@ export default function App() {
             )}
             <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box', overflow: 'hidden' }}>
               {showCompactBar && <CompactCaseBar userCase={userCase} setUserCase={setUserCase} />}
-              {/* 兜底：就算有人绕过 handleTabChange 的拦截（深链 ?tab=overview、
-                  残留脏存储）进到个人页，没案子也绝不渲染默认 EB3 数据，只给引导 */}
+              {/* 访客进个人页：渲染固定的示例案件（SAMPLE_CASE，不是 userCase——
+                  默认种子不能冒充访客自己的案子），顶上一条横条标明「示例」 */}
               {tab === 'overview' && (hasOnboarded
                 ? <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} greenCardInfo={greenCardInfo} setGreenCardInfo={setGreenCardInfo} travelRecords={travelRecords} setTravelRecords={setTravelRecords} i485ServiceCenter={i485ServiceCenter} setI485ServiceCenter={setI485ServiceCenter} stepActualDates={stepActualDates} setStepActualDates={setStepActualDates} />
                 : (
-                  <div style={{ padding: '40px 16px', textAlign: 'center', background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius)' }}>
-                    <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '6px' }}>
-                      {lang === 'en' ? 'No case on this device yet' : lang === 'tw' ? '這台設備上還沒有你的案子' : '这台设备上还没有你的案子'}
-                    </div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--gc-muted)', marginBottom: '14px', lineHeight: 1.6 }}>
-                      {lang === 'en' ? 'Enter your category, country and priority date to see your personal timeline.'
-                        : lang === 'tw' ? '輸入類別、國家、優先日，個人頁才會有你的時間線'
-                        : '输入类别、国家、优先日，个人页才会有你的时间线'}
-                    </div>
-                    <button type="button" onClick={() => { setOnboardingInitialMode('choose'); setShowWizard(true); }}
-                      style={{ padding: '9px 16px', fontSize: '13px', fontWeight: 700, background: 'var(--gc-green)', color: 'var(--gc-paper)', border: 'none', borderRadius: 'var(--gc-radius-sm)', cursor: 'pointer' }}>
-                      {lang === 'en' ? 'Set up my case →' : '输入我的案子 →'}
+                  <>
+                    <button type="button" onClick={() => { setOnboardingInitialMode('choose'); setShowWizard(true); setSamplePrompted(true); }}
+                      style={{ width: '100%', boxSizing: 'border-box', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 14px', textAlign: 'left', cursor: 'pointer', background: 'var(--gc-amber-soft)', border: '1px solid var(--gc-amber-border)', borderRadius: 'var(--gc-radius)', color: 'var(--gc-amber-ink)', fontSize: '13px', lineHeight: 1.45 }}>
+                      <span>
+                        {lang === 'en' ? 'Sample case (EB-3 · ROW · PD 2024-07-15) — this is what your page will look like.'
+                          : lang === 'tw' ? '示例案件（EB-3 · 全球 · 優先日 2024-07-15），你的個人頁會長這樣'
+                          : '示例案件（EB-3 · 全球 · 优先日 2024-07-15），你的个人页会长这样'}
+                      </span>
+                      <span style={{ flexShrink: 0, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {lang === 'en' ? 'Use my case →' : lang === 'tw' ? '換成我的 →' : '换成我的 →'}
+                      </span>
                     </button>
-                  </div>
+                    <Overview userCase={SAMPLE_CASE} setTab={handleTabChange} />
+                  </>
                 ))}
               {tab === 'dashboard' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {/* 预测 tab — id is 'trends' per navigation config (line 11527).
