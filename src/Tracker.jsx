@@ -385,6 +385,7 @@ const StackedBarHistogram = ({ hist, stackBy }) => {
 const CardView = ({ me, b, autoJoined, onBack, onBatch }) => {
   const svgRef = useRef(null);
   const [pngUrl, setPngUrl] = useState(null);
+  const [showShare, setShowShare] = useState(false);
   const stage = myStageIdx(me.dates);
 
   const makePng = (thenDownload) => {
@@ -415,7 +416,7 @@ const CardView = ({ me, b, autoJoined, onBack, onBatch }) => {
   return (
     <div>
       <button onClick={onBack} className="flex items-center gap-1" style={{ fontSize: '13px', color: 'var(--gc-muted)', marginBottom: '10px' }}>
-        <ChevronLeft size={14} /> 改一下我填的
+        <ChevronLeft size={14} /> 改一下我填的 / 补充进度
       </button>
 
       {autoJoined && (
@@ -424,58 +425,51 @@ const CardView = ({ me, b, autoJoined, onBack, onBatch }) => {
         </p>
       )}
 
-      {/* ⑤ 即时共鸣：填完那一秒就告诉你有多少人跟你一样 */}
-      <div style={{ background: 'var(--gc-amber-soft)', border: '1px solid var(--gc-amber-border)', borderRadius: '4px', padding: '14px', marginBottom: '10px' }}>
-        <p style={{ fontSize: '14.5px', color: 'var(--gc-amber-ink)', lineHeight: 1.7, fontWeight: 600 }}>
+      {/* ⑤ 即时共鸣：一句话 + 三个数，第一屏就看到「跟我一样的人」，不先看表格和分享卡 */}
+      <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '14px 16px', marginBottom: '10px' }}>
+        <p style={{ fontSize: '14.5px', color: 'var(--gc-ink)', lineHeight: 1.65, fontWeight: 600, marginBottom: '12px' }}>
           {b.sameStep > 0
-            ? <>你不是一个人——<b>{b.short}</b> 这一批还有 <b>{b.sameStep}</b> 个人，也卡在「{STEPS[stage]?.label || '还没递交'}」这一步。</>
-            : <>你是 <b>{b.short}</b> 这一批里第一个走到「{STEPS[stage]?.label || '登记'}」的人。</>}
+            ? <>跟你同类别同国家、同样停在「{STEPS[stage]?.label || '还没递交'}」的，还有 <b style={{ color: 'var(--gc-green-ink)' }}>{b.sameStep}</b> 个人。</>
+            : <>你是同类别同国家里第一个登记到「{STEPS[stage]?.label || '登记'}」这一步的人。</>}
         </p>
-      </div>
-
-      {/* "你在哪个位置"：分段条形图（前面/你/后面）+ 阶段直方图（大家走到哪一步了）
-          总人数/排名现在是「D1 已登记 + 已确认邮件订阅」合并算的，样本比刚上线时
-          大得多；不到 K_MIN 的冷门类别才退回"还差 N 人"提示，不再整块隐藏。 */}
-      <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '16px 18px', marginBottom: '10px' }}>
         {b.enough ? (
-          <>
-            <p className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>你在这一批里的位置</p>
-            <RankBar rank={b.rank} total={b.total} />
-            <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '8px' }}>
-              位置按优先日先后排，不是案子的等待进度。同批 <b>{b.total}</b> 人里，中位等 <b>{b.medianWait}</b> 个月，平均等 <b>{b.meanWait}</b> 个月。
-            </p>
-
-            <p className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', margin: '14px 0 8px' }}>大家等了多久</p>
-            <BarHistogram dist={b.waitHist} />
-            <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px' }}>
-              等待时长 = 优先日到现在（已批准的算到批准那天），按人数分桶，不看具体某一天。
-            </p>
-
-            {b.stageN > 0 && (
-              <>
-                <p className="gc-serif" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', margin: '14px 0 8px' }}>大家走到哪一步了</p>
-                <BarHistogram dist={b.stageDist} />
-                <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px' }}>
-                  只算 {b.stageN} 个填过完整进度的人，不是全部 {b.total} 人——多数订阅者只留了类别和优先日，没有逐步日期。
-                </p>
-              </>
-            )}
-          </>
+          <div className="grid grid-cols-3" style={{ gap: '8px' }}>
+            {[
+              [b.total, '人', '同类别同国家'],
+              [b.medianWait, '个月', '中位已等'],
+              [b.rank, '位', '你按优先日排第'],
+            ].map(([n, unit, cap]) => (
+              <div key={cap} style={{ background: 'var(--gc-paper-soft)', borderRadius: '3px', padding: '9px 6px', textAlign: 'center' }}>
+                <div style={{ fontSize: '11.5px', color: 'var(--gc-muted)', marginBottom: '2px' }}>{cap}</div>
+                <div><b className="gc-mono" style={{ fontSize: '20px', color: 'var(--gc-ink)' }}>{n}</b><span style={{ fontSize: '12px', color: 'var(--gc-muted)', marginLeft: '2px' }}>{unit}</span></div>
+              </div>
+            ))}
+          </div>
         ) : (
-          <p style={{ fontSize: '13px', color: 'var(--gc-amber-ink)', lineHeight: 1.75 }}>
-            这一批目前只有 <b>{b.total}</b> 人，还差 <b>{b.needMore}</b> 人才够 {K_MIN} 人的最低展示门槛——人太少的话，光看类别加优先日就能猜到是谁，所以先不出细分图。把卡发给同批的人，凑够了就自动解锁。
+          <p style={{ fontSize: '13px', color: 'var(--gc-amber-ink)', lineHeight: 1.7 }}>
+            这个类别 + 国家目前只有 <b>{b.total}</b> 人，还差 <b>{b.needMore}</b> 人才出细分数字——人太少的话，光看类别加优先日就能猜到是谁。
+          </p>
+        )}
+        {b.approvedN > 0 && (
+          <p style={{ fontSize: '12.5px', color: 'var(--gc-green-ink)', marginTop: '10px', fontWeight: 600 }}>
+            其中已经批准 {b.approvedN} 个。
           </p>
         )}
       </div>
 
-      {b.approvedN > 0 && (
-        <p style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', marginBottom: '10px' }}>
-          这批已经批准 <b>{b.approvedN}</b> 个（来自 {b.stageN} 个登记过完整进度的人）。
-        </p>
-      )}
+      <div className="flex gap-2" style={{ marginBottom: '10px' }}>
+        <button onClick={onBatch} className="flex items-center justify-center gap-1.5"
+          style={{ flex: 1, padding: '11px', background: 'var(--gc-green)', color: 'var(--gc-paper)', fontSize: '14px', fontWeight: 700, borderRadius: '4px' }}>
+          <Users size={15} /> 看大家走到哪了
+        </button>
+        <button onClick={() => setShowShare((v) => !v)} className="flex items-center justify-center gap-1.5"
+          style={{ flex: 1, padding: '11px', background: 'var(--gc-surface)', color: 'var(--gc-green)', border: '1px solid var(--gc-green-border)', fontSize: '14px', fontWeight: 700, borderRadius: '4px' }}>
+          <Download size={15} /> {showShare ? '收起进度卡' : '生成进度卡'}
+        </button>
+      </div>
 
+      {showShare && (
       <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '18px' }}>
-        <p className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '4px' }}>你的进度卡</p>
         <p style={{ fontSize: '12px', color: 'var(--gc-muted)', marginBottom: '12px', lineHeight: 1.6 }}>
           卡上主角是批次不是你个人——发出去只暴露「这一批多少人、走到哪」，不暴露别人的案子。
         </p>
@@ -506,11 +500,7 @@ const CardView = ({ me, b, autoJoined, onBack, onBatch }) => {
           </div>
         )}
       </div>
-
-      <button onClick={onBatch} className="flex items-center justify-center gap-1.5"
-        style={{ width: '100%', marginTop: '10px', padding: '11px', background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', fontSize: '14px', fontWeight: 600, color: 'var(--gc-ink)', borderRadius: '4px' }}>
-        <Users size={15} /> 看看 {b.short} 这一批走到哪了
-      </button>
+      )}
     </div>
   );
 };
@@ -547,7 +537,7 @@ const FormView = ({ initial, onSubmit, submitting, submitError }) => {
   return (
     <div>
       <div style={card}>
-        <p className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)' }}>第 1 步 · 你的案子</p>
+        <p className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)' }}>登记你的案子</p>
         <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 12px', lineHeight: 1.6 }}>
           不收姓名、不收 A 号、不收护照号。填完立刻出卡。
         </p>
@@ -597,10 +587,14 @@ const FormView = ({ initial, onSubmit, submitting, submitError }) => {
         )}
       </div>
 
-      <div style={card}>
-        <p className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)' }}>第 2 步 · 走到哪一步了</p>
-        <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 12px', lineHeight: 1.6 }}>
-          只填已经发生的，没到的留空。别人只看得到月份，看不到具体哪一天。
+      {/* 第 2 步默认收起：6 个日期框摆在第一屏，是这页读起来像「填调查表」的主因；
+          多数人只有优先日，逐步日期留给愿意多填的人 */}
+      <details open={Object.values(f.dates || {}).some(Boolean)} style={card}>
+        <summary className="gc-serif" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gc-ink)', cursor: 'pointer', listStyle: 'revert' }}>
+          补充走到哪一步（可选）
+        </summary>
+        <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '6px 0 12px', lineHeight: 1.6 }}>
+          只填已经发生的，没到的留空。填了才能看到跟你停在同一步的人；别人只看得到月份，看不到具体哪一天。
         </p>
         {STEPS.map((s) => (
           <div key={s.key} className="flex items-center gap-2" style={{ marginBottom: '7px' }}>
@@ -609,7 +603,7 @@ const FormView = ({ initial, onSubmit, submitting, submitError }) => {
             {f.dates[s.key] && <CheckCircle2 size={15} style={{ color: 'var(--gc-green)', flexShrink: 0 }} />}
           </div>
         ))}
-      </div>
+      </details>
 
       {err && <p style={{ fontSize: '12px', color: 'var(--gc-red)', marginBottom: '8px', fontWeight: 600 }}>{err}</p>}
       {submitError && <p style={{ fontSize: '12px', color: 'var(--gc-red)', marginBottom: '8px', fontWeight: 600 }}>{submitError}</p>}
@@ -634,18 +628,18 @@ const LockedTeaser = ({ summary, onFill }) => {
   return (
     <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '18px' }}>
       <p className="flex items-center gap-1.5 gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>
-        <Lock size={14} /> 你那一批的数据还锁着
+        <Lock size={14} /> 填上你的案子，看跟你同路的人
       </p>
       <p style={{ fontSize: '13px', color: 'var(--gc-ink-soft)', lineHeight: 1.75, marginBottom: '12px' }}>
-        全站现在有 <b>{summary?.totalCases ?? 0}</b> 个案子，分成 <b>{summary?.totalBatches ?? 0}</b> 批，其中 <b>{summary?.approvedCount ?? 0}</b> 个已经批准。
-        填完你自己那一条，就能看到你这一批的等待中位数、阶段分布和季度走势。
+        这里已经有 <b>{summary?.totalCases ?? 0}</b> 个人登记了案子{summary?.approvedCount ? <>，<b>{summary.approvedCount}</b> 个已经批准</> : null}。
+        填上你的类别和优先日，就能看到同类别同国家有多少人、大家中位等了几个月、你排第几。
       </p>
       <button onClick={onFill}
         style={{ width: '100%', padding: '11px', background: 'var(--gc-green)', color: 'var(--gc-paper)', fontSize: '14px', fontWeight: 700, borderRadius: '3px' }}>
-        填一条解锁
+        填我的案子 →
       </button>
       <p style={{ fontSize: '11.5px', color: 'var(--gc-muted)', marginTop: '9px', lineHeight: 1.6 }}>
-        大家都填才有数——只看不填的话，这堵墙迟早会空。
+        不收姓名、A 号、护照号，只出统计不出个人。
       </p>
     </div>
   );
@@ -861,21 +855,8 @@ const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
             </div>
           )}
 
-          <BatchPoll b={b} />
-
-          {/* ⑩ 月度邮件从排期播报变成社区播报 */}
-          <div style={{ ...cardBox, background: 'var(--gc-paper-soft)' }}>
-            <p className="flex items-center gap-1.5 gc-serif" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '6px' }}>
-              <Mail size={14} /> 下个月的邮件里会多这么一行
-            </p>
-            <p style={{ fontSize: '13px', color: 'var(--gc-ink-soft)', lineHeight: 1.75, padding: '10px 12px', background: 'var(--gc-surface)', border: '1px dashed var(--gc-rule)', borderRadius: '3px' }}>
-              「你这批（{b.short}）本月有 {Math.max(1, Math.round(b.total / 4))} 个人往前走了一步，
-              {b.approvedN} 个已经批准。」
-            </p>
-            <p style={{ fontSize: '11.5px', color: 'var(--gc-muted)', marginTop: '8px', lineHeight: 1.6 }}>
-              不带任何个人字段。把一次性填表的人拉回来第二次、第三次靠的就是这行。
-            </p>
-          </div>
+          {/* 原来这里有「批次一题」投票和「下个月邮件会多这么一行」两张卡：前者百分比是写死的
+              占位数（没接后端），后者「本月有几个人往前走」是 total/4 凑的，都是给用户看编出来的数，拿掉 */}
         </>
       )}
 
@@ -889,7 +870,7 @@ const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
 // ============================================================
 // 页面壳 —— 管 ownerId、拉后端数据、切视图
 // ============================================================
-const TrackerPage = ({ userCase, sample = false, onNeedCase }) => {
+const TrackerPage = ({ userCase, sample = false, onNeedCase, onSummary }) => {
   const ownerId = useMemo(getOrCreateOwnerId, []);
   const [view, setView] = useState('form');
   const [hydrated, setHydrated] = useState(null);   // {record, batch, cat, ticker} | null
@@ -926,7 +907,7 @@ const TrackerPage = ({ userCase, sample = false, onNeedCase }) => {
           fetch(`${API_BASE}/api/tracker?owner=${encodeURIComponent(ownerId)}`).then((r) => r.ok ? r.json() : null).catch(() => null),
         ]);
         if (cancelled) return;
-        if (summaryRes) setSummary(summaryRes);
+        if (summaryRes) { setSummary(summaryRes); onSummary?.(summaryRes); }
         if (ownerRes?.record) { setHydrated(ownerRes); setView('card'); return; }
 
         // 没有记录：如果本站已经知道你的类别+优先日（在别处设置案子时填过），
@@ -982,13 +963,13 @@ const TrackerPage = ({ userCase, sample = false, onNeedCase }) => {
   const ticker = hydrated?.ticker || summary?.ticker || [];
 
   return (
-    <div style={{ padding: '4px 2px 20px' }}>
+    <div style={{ padding: '4px 2px 4px' }}>
       <div style={{ marginBottom: '12px' }}>
-        <h2 className="gc-serif" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '-0.01em' }}>
-          案件进度墙
-        </h2>
-        <p style={{ fontSize: '13px', color: 'var(--gc-muted)', marginTop: '3px', lineHeight: 1.6 }}>
-          按「批次」看——跟你同一个季度优先日、同类别同出生地的人，走到哪一步了。页面上只出现批次，不出现个人。
+        <h3 className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+          跟你同路的人
+        </h3>
+        <p style={{ fontSize: '12.5px', color: 'var(--gc-muted)', marginTop: '2px', lineHeight: 1.6 }}>
+          同类别、同出生地的人走到哪一步了。只出统计，不出现任何个人。
         </p>
       </div>
 
@@ -998,9 +979,12 @@ const TrackerPage = ({ userCase, sample = false, onNeedCase }) => {
         <p style={{ fontSize: '13px', color: 'var(--gc-muted)', padding: '18px 0', textAlign: 'center' }}>读取中…</p>
       ) : (
         <>
-          {view === 'form' && <FormView initial={initial} onSubmit={submit} submitting={submitting} submitError={submitError} />}
-          {view === 'card' && hydrated?.record && <CardView me={hydrated.record} b={hydrated.batch} autoJoined={autoJoined} onBack={() => setView('form')} onBatch={() => setView('batch')} />}
-          {view === 'batch' && <BatchView me={hydrated?.record} b={hydrated?.batch} catData={hydrated?.cat} scopes={hydrated?.scopes} summary={summary} onBack={() => setView(hydrated?.record ? 'card' : 'form')} onFill={() => setView('form')} />}
+          {/* 示例模式（访客还没填案子）：不摆表单——表单里预填的是示例，
+              访客看到的应该是「这里有多少人」，再引去填自己的 */}
+          {sample && <LockedTeaser summary={summary} onFill={() => onNeedCase?.()} />}
+          {!sample && view === 'form' && <FormView initial={initial} onSubmit={submit} submitting={submitting} submitError={submitError} />}
+          {!sample && view === 'card' && hydrated?.record && <CardView me={hydrated.record} b={hydrated.batch} autoJoined={autoJoined} onBack={() => setView('form')} onBatch={() => setView('batch')} />}
+          {!sample && view === 'batch' && <BatchView me={hydrated?.record} b={hydrated?.batch} catData={hydrated?.cat} scopes={hydrated?.scopes} summary={summary} onBack={() => setView(hydrated?.record ? 'card' : 'form')} onFill={() => setView('form')} />}
         </>
       )}
     </div>

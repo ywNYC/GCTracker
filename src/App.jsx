@@ -3796,21 +3796,30 @@ const ActionCenter = ({ userCase }) => {
 // milestone wall, and the surveys/question box. Every submission is anonymous
 // (see /api/community); localStorage only guards against double-submits.
 // ============================================================
-const CURRENT_POLL = {
-  id: 'poll-2026-09-bulletin',
-  q: { zh: '9 月排期，你觉得你的类别会怎么走？', tw: '9 月排期，你覺得你的類別會怎麼走？', en: 'Your call for the September bulletin:' },
-  options: [
-    { id: 'advance', zh: '会前进', tw: '會前進', en: 'Advances' },
-    { id: 'flat', zh: '原地不动', tw: '原地不動', en: 'Flat' },
-    { id: 'retro', zh: '会回调', tw: '會回調', en: 'Retrogresses' },
-  ],
-};
+// 每月一题按「下个月的公告」自动滚动：原来写死「9 月排期」，9 月公告出来之后还挂着，
+// 问的是已经知道答案的事。id 带月份，每个月的票数自然分开。
+const CURRENT_POLL = (() => {
+  const d = new Date();
+  const nx = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  const ym = `${nx.getFullYear()}-${String(nx.getMonth() + 1).padStart(2, '0')}`;
+  const m = nx.getMonth() + 1;
+  const enMonth = nx.toLocaleString('en-US', { month: 'long' });
+  return {
+    id: `poll-${ym}-bulletin`,
+    q: { zh: `${m} 月排期，你觉得你的类别会怎么走？`, tw: `${m} 月排期，你覺得你的類別會怎麼走？`, en: `Your call for the ${enMonth} bulletin:` },
+    options: [
+      { id: 'advance', zh: '会前进', tw: '會前進', en: 'Advances' },
+      { id: 'flat', zh: '原地不动', tw: '原地不動', en: 'Flat' },
+      { id: 'retro', zh: '会回调', tw: '會回調', en: 'Retrogresses' },
+    ],
+  };
+})();
 
 const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
   const { lang } = useLang();
   const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
   const isEB = !userCase.category?.startsWith('F');
-  const [tab, setTab] = useState(null); // null = collapsed | poll | wall | survey
+  const [tab, setTab] = useState('poll'); // null = collapsed | poll | wall | survey —— 默认展开投票，别让整块只剩一行小按钮
   const [busy, setBusy] = useState('');
 
   const post = async (payload, doneKey) => {
@@ -3904,26 +3913,26 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
   }[userCase.category] || { id: 'switched', label: L('换过类别', '換過類別', 'Switched category') };
 
   const chip = (active) => ({
-    fontSize: '10.5px', fontWeight: 700, padding: '6px 10px', border: `1px solid ${active ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
+    fontSize: '12px', fontWeight: 700, padding: '8px 12px', border: `1px solid ${active ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
     borderRadius: '3px', cursor: 'pointer', background: active ? 'var(--gc-green)' : 'var(--gc-surface)',
     color: active ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
   });
-  const submitBtn = { fontSize: '11px', fontWeight: 700, padding: '6px 14px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-green)', color: 'var(--gc-paper)' };
+  const submitBtn = { fontSize: '12.5px', fontWeight: 700, padding: '6px 14px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-green)', color: 'var(--gc-paper)' };
   const doneNote = (txt) => (
-    <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 600 }}>{txt}</div>
+    <div style={{ fontSize: '12.5px', color: 'var(--gc-green-ink)', fontWeight: 600 }}>{txt}</div>
   );
 
   return (
     <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' }}>
       <div className="flex items-center justify-between" style={{ padding: '11px 14px 0' }}>
-        <span className="gc-eyebrow" style={{ fontSize: '9px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-muted)' }}>
-          {L('同路人', '同路人', 'COMMUNITY')}
+        <span className="gc-eyebrow" style={{ fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-muted)' }}>
+          {L('投票 · 打卡 · 调查', '投票 · 打卡 · 調查', 'POLL · CHECK-IN · SURVEY')}
         </span>
         <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
           {[['poll', L('每月一题', '每月一題', 'Poll')], ['wall', L('打卡墙', '打卡牆', 'Wall')], ['survey', L('调查·提问', '調查·提問', 'Surveys')]].map(([id, label], i) => (
             <button key={id} type="button" onClick={() => setTab(tab === id ? null : id)}
               style={{
-                fontSize: '10px', fontWeight: 700, padding: '3px 9px', border: 'none', cursor: 'pointer',
+                fontSize: '12px', fontWeight: 700, padding: '6px 12px', border: 'none', cursor: 'pointer',
                 borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                 background: tab === id ? 'var(--gc-green)' : 'var(--gc-surface)',
                 color: tab === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
@@ -3937,7 +3946,7 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
       <div style={{ padding: '10px 14px 13px' }}>
         {tab === 'poll' && (
           <div>
-            <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>
               {CURRENT_POLL.q[lang] || CURRENT_POLL.q.zh}
             </div>
             {!voted ? (
@@ -3955,15 +3964,15 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
                   const pct = pollAgg.total ? Math.round((n / pollAgg.total) * 100) : 0;
                   return (
                     <div key={o.id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', width: '72px', flexShrink: 0 }}>{o[lang] || o.zh}</span>
+                      <span style={{ fontSize: '12.5px', color: 'var(--gc-ink-soft)', width: '72px', flexShrink: 0 }}>{o[lang] || o.zh}</span>
                       <span style={{ flex: 1, height: '8px', background: 'var(--gc-rule-soft)', borderRadius: '4px', overflow: 'hidden' }}>
                         <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
                       </span>
-                      <span className="gc-mono" style={{ fontSize: '10.5px', color: 'var(--gc-muted)', width: '42px', textAlign: 'right' }}>{pct}%</span>
+                      <span className="gc-mono" style={{ fontSize: '12px', color: 'var(--gc-muted)', width: '42px', textAlign: 'right' }}>{pct}%</span>
                     </div>
                   );
                 })}
-                <div style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '5px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--gc-muted)', marginTop: '5px' }}>
                   {L(`已投 ${pollAgg.total} 票 · 匿名`, `已投 ${pollAgg.total} 票 · 匿名`, `${pollAgg.total} votes · anonymous`)}
                 </div>
               </div>
@@ -3974,7 +3983,7 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
         {tab === 'wall' && (
           <div>
             {myDays !== null && (
-              <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', marginBottom: '7px' }}>
+              <div style={{ fontSize: '13px', color: 'var(--gc-ink-soft)', marginBottom: '7px' }}>
                 {L(`你已等待 `, `你已等待 `, `You've waited `)}
                 <b className="gc-mono" style={{ color: 'var(--gc-green-ink)' }}>{myDays.toLocaleString('en-US')}</b>
                 {L(' 天', ' 天', ' days')}
@@ -3984,7 +3993,7 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
               <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
                 <input value={wallMsg} onChange={(e) => setWallMsg(e.target.value.slice(0, 40))}
                   placeholder={L('说一句（可留空，40 字内）', '說一句（可留空）', 'One line (optional)')}
-                  style={{ flex: '1 1 180px', minWidth: 0, fontSize: '11.5px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
+                  style={{ flex: '1 1 180px', minWidth: 0, fontSize: '13px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
                 <button type="button" onClick={checkIn} disabled={busy === 'wall' || myDays === null} style={submitBtn}>
                   {L('打卡', '打卡', 'Check in')}
                 </button>
@@ -3992,27 +4001,27 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
             ) : doneNote(L('已打卡 ✓', '已打卡 ✓', 'Checked in ✓'))}
             <div style={{ marginTop: '9px', paddingTop: '8px', borderTop: '1px solid var(--gc-rule-soft)' }}>
               {wall === null ? (
-                <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>…</div>
+                <div style={{ fontSize: '12px', color: 'var(--gc-muted)' }}>…</div>
               ) : wall.entries?.length ? (
                 <>
                   {(wallExpanded ? wall.entries : wall.entries.slice(0, 5)).map((e, i, arr) => (
                     <div key={i} className="flex items-baseline" style={{ gap: '8px', padding: '3px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none' }}>
-                      <span className="gc-mono" style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-green-ink)', flexShrink: 0 }}>
+                      <span className="gc-mono" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-green-ink)', flexShrink: 0 }}>
                         {Number(e.days).toLocaleString('en-US')}{L('天', '天', 'd')}
                       </span>
-                      {e.cat && <span className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', flexShrink: 0 }}>{e.cat}</span>}
-                      <span style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', minWidth: 0 }}>{e.message || L('……', '……', '…')}</span>
+                      {e.cat && <span className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', flexShrink: 0 }}>{e.cat}</span>}
+                      <span style={{ fontSize: '12.5px', color: 'var(--gc-ink-soft)', minWidth: 0 }}>{e.message || <span style={{ color: 'var(--gc-muted)' }}>{L('打了卡', '打了卡', 'checked in')}</span>}</span>
                     </div>
                   ))}
                   {wall.entries.length > 5 && (
                     <button type="button" onClick={() => setWallExpanded((v) => !v)}
-                      style={{ border: 'none', background: 'transparent', padding: '6px 0 0', cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', fontWeight: 700 }}>
+                      style={{ border: 'none', background: 'transparent', padding: '6px 0 0', cursor: 'pointer', fontSize: '12px', color: 'var(--gc-green)', fontWeight: 700 }}>
                       {wallExpanded ? L('收起', '收起', 'Collapse') : L(`展开全部 ${wall.entries.length} 条`, `展開全部 ${wall.entries.length} 條`, `Show all ${wall.entries.length}`)}
                     </button>
                   )}
                 </>
               ) : (
-                <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--gc-muted)' }}>
                   {L('还没有人打卡——做第一个。', '還沒有人打卡——做第一個。', 'No check-ins yet — be the first.')}
                 </div>
               )}
@@ -4024,7 +4033,7 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
           <div>
             {isEB && (
               <div style={{ marginBottom: '11px' }}>
-                <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
                   {L('你为缩短等待做过什么？', '你為縮短等待做過什麼？', 'Have you tried to shorten the wait?')}
                 </div>
                 {!swDone ? (
@@ -4069,15 +4078,15 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
                           const pct = swAgg.total ? Math.round((n / swAgg.total) * 100) : 0;
                           return (
                             <div key={id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
-                              <span style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
+                              <span style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
                               <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
                                 <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
                               </span>
-                              <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
+                              <span className="gc-mono" style={{ fontSize: '12px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
                             </div>
                           );
                         })}
-                        <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '3px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '3px' }}>
                           {L(`${swAgg.total} 份 · 匿名`, `${swAgg.total} 份 · 匿名`, `${swAgg.total} responses`)}
                         </div>
                       </div>
@@ -4088,7 +4097,7 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
             )}
 
             <div style={{ marginBottom: '11px' }}>
-              <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
                 {L('整个流程的律师费＋官费，大概花了多少？', '整個流程的律師費＋官費，大概花了多少？', 'Total attorney + filing fees so far?')}
               </div>
               {!costDone ? (
@@ -4119,15 +4128,15 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
                         const pct = costAgg.total ? Math.round((n / costAgg.total) * 100) : 0;
                         return (
                           <div key={id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
-                            <span style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
+                            <span style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
                             <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
                               <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
                             </span>
-                            <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
+                            <span className="gc-mono" style={{ fontSize: '12px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
                           </div>
                         );
                       })}
-                      <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '3px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '3px' }}>
                         {L(`${costAgg.total} 份 · 匿名`, `${costAgg.total} 份 · 匿名`, `${costAgg.total} responses`)}
                       </div>
                     </div>
@@ -4137,14 +4146,14 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
             </div>
 
             <div>
-              <div style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
                 {L('关于排期，你最想搞懂什么？', '關於排期，你最想搞懂什麼？', 'What do you most want explained?')}
               </div>
               {!qDone ? (
                 <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
                   <input value={qText} onChange={(e) => setQText(e.target.value.slice(0, 200))}
                     placeholder={L('写一句，会变成后续内容选题', '寫一句，會變成後續內容選題', 'One line — it shapes what we write next')}
-                    style={{ flex: '1 1 200px', minWidth: 0, fontSize: '11.5px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
+                    style={{ flex: '1 1 200px', minWidth: 0, fontSize: '13px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
                   <button type="button" style={submitBtn} disabled={busy === 'question' || qText.trim().length < 4}
                     onClick={async () => { if (await post({ type: 'question', text: qText }, 'question')) setQDone(true); }}>
                     {L('提交', '提交', 'Send')}
@@ -9373,28 +9382,39 @@ const CompareHub = ({ userCase }) => {
 // 同路人互动（原挂在「总结」页底部，poll/打卡墙/调查全部原样保留）+
 // CompareHub（原「如果」的全部内容，没删，收进默认收起的 <details> 里）。
 // ============================================================
+// 社区页排序（2026-09-23 重排）：先人后表。
+//   ① 一行实时人数 → ② 跟你同路的人（三个数，没登记的一键登记）→ ③ 讨论区（跟「最新」页同一串）
+//   → ④ 投票/打卡/调查 → ⑤ 换类别对比（工具，不是社区内容，收在最底）
+// 原来第一屏是 6 个日期框的两步表单，读起来像填调查表；真有人说话的讨论区反而只挂在「最新」页。
 const CommunityPage = ({ userCase, sample = false, onNeedCase }) => {
   const { lang } = useLang();
+  const [summary, setSummary] = useState(null);
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div style={{ padding: '4px 0 0' }}>
-        <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>{lang === 'en' ? 'COMMUNITY' : '社区'}</div>
-        <h2 className="gc-serif" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 2px' }}>
-          {lang === 'en' ? "You're not doing this alone" : '你不是一个人在等'}
+        <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>{lang === 'en' ? 'COMMUNITY' : lang === 'tw' ? '社區' : '社区'}</div>
+        <h2 className="gc-serif" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 4px' }}>
+          {lang === 'en' ? "You're not doing this alone" : lang === 'tw' ? '你不是一個人在等' : '你不是一个人在等'}
         </h2>
-        <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: 0 }}>
-          {lang === 'en' ? 'Everything below is anonymous, crowd-sourced — no email, no case number.' : '下面全部匿名众包——不收邮箱，不收案号。'}
+        <p style={{ fontSize: '13px', color: 'var(--gc-muted)', margin: 0 }}>
+          {summary?.totalCases
+            ? (lang === 'en' ? `${summary.totalCases} people have logged their case here · anonymous, no email or case number`
+              : lang === 'tw' ? `${summary.totalCases} 個人在這裡登記了案子 · 全部匿名，不收郵箱和案號`
+              : `${summary.totalCases} 个人在这里登记了案子 · 全部匿名，不收邮箱和案号`)
+            : (lang === 'en' ? 'Anonymous and crowd-sourced — no email, no case number.' : lang === 'tw' ? '全部匿名眾包——不收郵箱，不收案號。' : '全部匿名众包——不收邮箱，不收案号。')}
         </p>
       </div>
 
-      <TrackerPage userCase={userCase} sample={sample} onNeedCase={onNeedCase} />
+      <TrackerPage userCase={userCase} sample={sample} onNeedCase={onNeedCase} onSummary={setSummary} />
+
+      <BulletinTalk lang={lang} />
 
       <CommunityHub userCase={userCase} sample={sample} onNeedCase={onNeedCase} />
 
-      <details style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '8px 10px' }}>
-        <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
-          {lang === 'en' ? 'What if I switch category or status?' : '如果换类别、换身份会更快吗'}
-          <span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · tap for the auto-computed comparison' : ' · 展开看自动算好的对比'}</span>
+      <details style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '10px 12px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
+          {lang === 'en' ? 'What if I switch category or status?' : lang === 'tw' ? '如果換類別、換身份會更快嗎' : '如果换类别、换身份会更快吗'}
+          <span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · auto-computed comparison' : lang === 'tw' ? ' · 展開看自動算好的對比' : ' · 展开看自动算好的对比'}</span>
         </summary>
         <div style={{ height: '8px' }} />
         <CompareHub userCase={userCase} />
