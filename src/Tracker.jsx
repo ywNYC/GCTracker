@@ -889,7 +889,7 @@ const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
 // ============================================================
 // 页面壳 —— 管 ownerId、拉后端数据、切视图
 // ============================================================
-const TrackerPage = ({ userCase }) => {
+const TrackerPage = ({ userCase, sample = false, onNeedCase }) => {
   const ownerId = useMemo(getOrCreateOwnerId, []);
   const [view, setView] = useState('form');
   const [hydrated, setHydrated] = useState(null);   // {record, batch, cat, ticker} | null
@@ -936,7 +936,8 @@ const TrackerPage = ({ userCase }) => {
         const autoCountry = COUNTRIES.includes(userCase?.country) ? userCase.country : null;
         const autoPd = userCase?.priorityDate;
         const pdValid = typeof autoPd === 'string' && autoPd >= MIN_PD && autoPd <= TODAY;
-        if (autoCat && autoCountry && pdValid) {
+        // 访客看的是示例案件：绝不能拿示例自动写进众包库
+        if (!sample && autoCat && autoCountry && pdValid) {
           try {
             const data = await postCase({ cat: autoCat, country: autoCountry, priorityDate: autoPd, path: 'aos', center: 'unknown', dates: {} });
             if (cancelled) return;
@@ -962,6 +963,8 @@ const TrackerPage = ({ userCase }) => {
   }), [hydrated, userCase]);
 
   const submit = async (f) => {
+    // 示例模式：表单预填的是示例案件，直接提交会把示例写进众包库，先引导去填自己的案子
+    if (sample) { onNeedCase?.(); return; }
     setSubmitting(true);
     setSubmitError(null);
     try {

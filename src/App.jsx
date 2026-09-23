@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, memo, createContext, useContext, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, Calendar, MapPin, Briefcase, Home, TrendingUp, TrendingDown, Minus, AlertCircle, AlertTriangle, CheckCircle2, Clock, Info, FileText, Zap, Shield, Users, Target, Database, RefreshCw, ExternalLink, Sparkles, Eye, Bell, BarChart3, Mail, Download, History, HelpCircle, DollarSign, Scale, Plane, Activity, Ruler, Dot, ClipboardList, Share2, Lock } from 'lucide-react';
+import { Globe, Calendar, MapPin, Briefcase, Home, TrendingUp, TrendingDown, Minus, AlertCircle, AlertTriangle, CheckCircle2, Clock, Info, FileText, Zap, Shield, Users, Target, Database, RefreshCw, ExternalLink, Sparkles, Eye, Bell, BarChart3, Mail, Download, History, HelpCircle, DollarSign, Scale, Plane, Activity, Ruler, Dot, ClipboardList, Share2, Lock, MoreHorizontal } from 'lucide-react';
 // Shared with the Cloudflare Pages Functions email pipeline (functions/api/admin/send-monthly.js)
 // so the site and the monthly emails can't silently diverge — see _gcMath.js's own header
 // comment for what still can't be shared (parseDate's 'U' handling differs on purpose;
@@ -3806,7 +3806,7 @@ const CURRENT_POLL = {
   ],
 };
 
-const CommunityHub = ({ userCase }) => {
+const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
   const { lang } = useLang();
   const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
   const isEB = !userCase.category?.startsWith('F');
@@ -3814,6 +3814,8 @@ const CommunityHub = ({ userCase }) => {
   const [busy, setBusy] = useState('');
 
   const post = async (payload, doneKey) => {
+    // 示例模式下不投票不发帖（否则会带着示例的类别写进真实数据），改成引导去填案子
+    if (sample) { onNeedCase?.(); return false; }
     setBusy(doneKey);
     try {
       const r = await fetch(`${API_BASE}/api/community`, {
@@ -9371,7 +9373,7 @@ const CompareHub = ({ userCase }) => {
 // 同路人互动（原挂在「总结」页底部，poll/打卡墙/调查全部原样保留）+
 // CompareHub（原「如果」的全部内容，没删，收进默认收起的 <details> 里）。
 // ============================================================
-const CommunityPage = ({ userCase }) => {
+const CommunityPage = ({ userCase, sample = false, onNeedCase }) => {
   const { lang } = useLang();
   return (
     <div className="space-y-2">
@@ -9385,9 +9387,9 @@ const CommunityPage = ({ userCase }) => {
         </p>
       </div>
 
-      <TrackerPage userCase={userCase} />
+      <TrackerPage userCase={userCase} sample={sample} onNeedCase={onNeedCase} />
 
-      <CommunityHub userCase={userCase} />
+      <CommunityHub userCase={userCase} sample={sample} onNeedCase={onNeedCase} />
 
       <details style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '8px 10px' }}>
         <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
@@ -16510,9 +16512,8 @@ export default function App() {
 
   // Wrapped setTab that also scrolls to top - approximates sticky header behavior in WebViews
   const handleTabChange = (newTab) => {
-    // 社区要案子：访客点它先走向导。个人页不拦——访客先看示例案件，
-    // 停留几秒后再弹向导（见下方 samplePrompted 计时），看完再决定填不填
-    if (newTab === 'compare' && !hasOnboarded) { setShowWizard(true); return; }
+    // 个人/社区不拦：访客先看示例案件，停留几秒后再弹向导
+    // （见下方 samplePrompted 计时），看完再决定填不填
     // Remember where user came from — helps The Index show a "back" button
     if (newTab === 'index' && tab !== 'index') {
       setPreviousTab(tab);
@@ -16839,10 +16840,11 @@ export default function App() {
   // 向导改为按需弹出：新访客不再自动被拦（他们落在「最新」页），只有点 CTA 横幅、
   // 个人页入口或 Index 的「我知道我的类别」时才打开。
   const [showWizard, setShowWizard] = useState(false);
-  // 访客在个人页看示例：停 8 秒自动弹一次向导，每次打开网页只弹一次，关掉就不再追
+  const openWizardFromSample = () => { setOnboardingInitialMode('choose'); setShowWizard(true); setSamplePrompted(true); };
+  // 访客在个人/社区页看示例：停 8 秒自动弹一次向导，每次打开网页只弹一次，关掉就不再追
   const [samplePrompted, setSamplePrompted] = useState(false);
   useEffect(() => {
-    if (hasOnboarded || samplePrompted || tab !== 'overview') return undefined;
+    if (hasOnboarded || samplePrompted || (tab !== 'overview' && tab !== 'compare')) return undefined;
     const id = setTimeout(() => { setOnboardingInitialMode('choose'); setShowWizard(true); setSamplePrompted(true); }, 8000);
     return () => clearTimeout(id);
   }, [hasOnboarded, samplePrompted, tab]);
@@ -16914,9 +16916,23 @@ export default function App() {
     { id: 'compare', label: t.navCompare, icon: Users },
     { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
     { id: 'index', label: t.navIndex, icon: ClipboardList },
-    { id: 'about', label: lang === 'en' ? 'About' : lang === 'tw' ? '關於' : '关于', icon: Info },
+    { id: 'about', label: lang === 'en' ? 'More' : '更多', icon: MoreHorizontal },
   ];
 
+  // 访客在个人/社区页顶上看到的「示例」横条，点它直接打开向导
+  const sampleBanner = (
+    <button type="button" onClick={openWizardFromSample}
+      style={{ width: '100%', boxSizing: 'border-box', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 14px', textAlign: 'left', cursor: 'pointer', background: 'var(--gc-amber-soft)', border: '1px solid var(--gc-amber-border)', borderRadius: 'var(--gc-radius)', color: 'var(--gc-amber-ink)', fontSize: '13px', lineHeight: 1.45 }}>
+      <span>
+        {lang === 'en' ? 'Sample case (EB-3 · ROW · PD 2024-07-15) — fill in yours to see your own.'
+          : lang === 'tw' ? '示例案件（EB-3 · 全球 · 優先日 2024-07-15），填了你的案子就會換成你的'
+          : '示例案件（EB-3 · 全球 · 优先日 2024-07-15），填了你的案子就会换成你的'}
+      </span>
+      <span style={{ flexShrink: 0, fontWeight: 700, whiteSpace: 'nowrap' }}>
+        {lang === 'en' ? 'Use my case →' : lang === 'tw' ? '換成我的 →' : '换成我的 →'}
+      </span>
+    </button>
+  );
   // Split tabs into two rows for better mobile layout
   const fontStack = lang === 'zh' ? '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif'
     : lang === 'tw' ? '"PingFang TC", "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif'
@@ -17856,17 +17872,7 @@ export default function App() {
                 ? <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} greenCardInfo={greenCardInfo} setGreenCardInfo={setGreenCardInfo} travelRecords={travelRecords} setTravelRecords={setTravelRecords} i485ServiceCenter={i485ServiceCenter} setI485ServiceCenter={setI485ServiceCenter} stepActualDates={stepActualDates} setStepActualDates={setStepActualDates} />
                 : (
                   <>
-                    <button type="button" onClick={() => { setOnboardingInitialMode('choose'); setShowWizard(true); setSamplePrompted(true); }}
-                      style={{ width: '100%', boxSizing: 'border-box', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 14px', textAlign: 'left', cursor: 'pointer', background: 'var(--gc-amber-soft)', border: '1px solid var(--gc-amber-border)', borderRadius: 'var(--gc-radius)', color: 'var(--gc-amber-ink)', fontSize: '13px', lineHeight: 1.45 }}>
-                      <span>
-                        {lang === 'en' ? 'Sample case (EB-3 · ROW · PD 2024-07-15) — this is what your page will look like.'
-                          : lang === 'tw' ? '示例案件（EB-3 · 全球 · 優先日 2024-07-15），你的個人頁會長這樣'
-                          : '示例案件（EB-3 · 全球 · 优先日 2024-07-15），你的个人页会长这样'}
-                      </span>
-                      <span style={{ flexShrink: 0, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                        {lang === 'en' ? 'Use my case →' : lang === 'tw' ? '換成我的 →' : '换成我的 →'}
-                      </span>
-                    </button>
+                    {sampleBanner}
                     <Overview userCase={SAMPLE_CASE} setTab={handleTabChange} />
                   </>
                 ))}
@@ -17884,7 +17890,14 @@ export default function App() {
               {tab === 'about' && <AboutTab />}
               {/* 原「如果」（What-if）tab 让位给「社区」：案件进度墙 + 同路人互动挪进来，
                   CompareHub 没删，收进页面底部的 <details> 里，默认收起。 */}
-              {tab === 'compare' && <CommunityPage userCase={userCase} />}
+              {tab === 'compare' && (hasOnboarded
+                ? <CommunityPage userCase={userCase} />
+                : (
+                  <>
+                    {sampleBanner}
+                    <CommunityPage userCase={SAMPLE_CASE} sample onNeedCase={openWizardFromSample} />
+                  </>
+                ))}
               {tab === 'index' && <TheIndex userCase={userCase} setTab={handleTabChange} setUserCase={setUserCase} previousTab={previousTab} onSetupCase={() => { setOnboardingInitialMode('form'); setShowWizard(true); }} />}
               {tab === 'help' && <HelpCenter />}
             </div>
