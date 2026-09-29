@@ -6993,7 +6993,7 @@ const BulletinTab = ({ userCase = null }) => {
 // BulletinTrend — 排期趋势折线图（仿 careerengine 的类别走势）：BULLETIN_ARCHIVE
 // 真实存档里某类别·某国的截止日随月份的推进曲线，最新页表格下方展示。
 // ============================================================
-const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) => {
+const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat, onChartKey, onCatGroup }) => {
   // 表B/A 与 人才/亲属 有自己的本地开关（初值跟随上方表格，表格切换时同步过来），
   // 用户点名要在趋势图块里直接切，不用回表格切完再看。
   const [ck, setCk] = useState(chartKey);
@@ -7157,7 +7157,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
         </span>
         <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden' }}>
           {[['filing', lang === 'en' ? 'Chart B' : '表B'], ['finalAction', lang === 'en' ? 'Chart A' : '表A']].map(([id, label], i) => (
-            <button key={id} type="button" onClick={() => setCk(id)}
+            <button key={id} type="button" onClick={() => { setCk(id); onChartKey?.(id); }}
               style={{
                 fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
                 borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
@@ -7168,7 +7168,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat }) =>
         </span>
         <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden' }}>
           {[['emp', lang === 'en' ? 'EB' : '人才类'], ['family', lang === 'en' ? 'Family' : '亲属类']].map(([id, label], i) => (
-            <button key={id} type="button" onClick={() => setGrp(id)}
+            <button key={id} type="button" onClick={() => { setGrp(id); onCatGroup?.(id); }}
               style={{
                 fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
                 borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
@@ -7894,6 +7894,7 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
 
       {/* 仿 careerengine：表格下面接排期趋势图 + 排期讨论区 */}
       <BulletinTrend lang={lang} chartKey={chartKey} catGroup={catGroup} userCountry={userCountry}
+        onChartKey={(k) => setUpdChart(k === 'filing' ? 'B' : 'A')} onCatGroup={setCatGroup}
         initialCat={hasCase ? userCase.category : null} />
       <BulletinTalk lang={lang} />
 
