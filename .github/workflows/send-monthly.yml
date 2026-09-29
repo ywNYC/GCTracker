@@ -31,7 +31,7 @@ jobs:
     steps:
       - name: Verify the live site is already serving that month
         run: |
-          LIVE=$(curl -fsS "https://gc.jmjvc.us/bulletin.json" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{process.stdout.write(JSON.parse(d).current.month||'')}catch{}})")
+          LIVE=$(curl -fsS -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36" "https://gc.jmjvc.us/bulletin.json" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{process.stdout.write(JSON.parse(d).current.month||'')}catch{}})")
           echo "线上 current.month = $LIVE，你填的是 ${{ inputs.month }}"
           if [ "$LIVE" != "${{ inputs.month }}" ]; then
             echo "::error::对不上，已中止。线上还是 $LIVE，等 Pages 部署完再跑，或者确认月份填错了。"
@@ -52,7 +52,7 @@ jobs:
           QS=""
           if [ "${{ inputs.force }}" = "true" ]; then QS="$QS&force=1"; fi
           if [ "${{ inputs.dryRun }}" = "true" ]; then QS="$QS&dryRun=1"; fi
-          curl -fsS -X POST "https://gc.jmjvc.us/api/admin/send-monthly?_=1$QS" \
+          curl -fsS -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36" -X POST "https://gc.jmjvc.us/api/admin/send-monthly?_=1$QS" \
             -H "Authorization: Bearer $ADMIN_TOKEN" \
             -o result.json -w "HTTP %{http_code}\n"
           SENT=$(node -e "const r=JSON.parse(require('fs').readFileSync('result.json','utf8'));console.log(Array.isArray(r.sent)?r.sent.length:'?')")
@@ -68,7 +68,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report back as an issue
-        if: always()
+        if: steps.send.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -77,5 +77,5 @@ jobs:
           else
             TITLE="📮 ${{ inputs.month }} 订阅邮件已发出：${{ steps.send.outputs.sent }} 封，失败 ${{ steps.send.outputs.errs }}"
           fi
-          gh issue create --title "$TITLE" --assignee ywNYC \
+          gh issue create -R "${{ github.repository }}" --title "$TITLE" --assignee ywNYC \
             --body "由你手动触发的 send-monthly 完成，明细见本次 workflow run 的 Summary。"
