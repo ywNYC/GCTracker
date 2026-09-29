@@ -751,27 +751,30 @@ export const renderMonthlyUpdateEmail = ({ email, userCase, update, uscisChart, 
   // Headline split into pre/accent/post so the HTML version can color just the verdict
   // phrase ("advanced 243 days") while subject and plain-text reuse the same words.
   const GOOD_COLOR = '#0e6b3e';
-  const hp = isNowCurrent
+  // Which chart drives the headline: not yet reached -> Filing (Chart B); already reached -> Final Action (Chart A).
+  const drv = isNowCurrent ? fa : (fil?.movement ? fil : fa);
+  const chartTag = drv === fil ? (lang === 'en' ? ' (Chart B, filing)' : '（表B·递件）') : (lang === 'en' ? ' (Chart A, approval)' : '（表A·出卡）');
+  const hp = isNowCurrent && fa.movement.type !== 'retrogressed'
     ? (lang === 'en'
         ? { pre: 'Your priority date ', accent: 'is current', post: '', color: GOOD_COLOR }
         : { pre: '你的优先日', accent: '已经排到了', post: '', color: GOOD_COLOR })
-    : fa.movement.type === 'advanced'
+    : drv.movement.type === 'advanced'
       ? (lang === 'en'
-          ? { pre: 'Your category ', accent: `advanced ${fa.movement.days} days`, post: ' this month', color: ADVANCE_COLOR }
-          : { pre: '本月你的类别', accent: `前进了 ${fa.movement.days} 天`, post: '', color: ADVANCE_COLOR })
-      : fa.movement.type === 'retrogressed'
+          ? { pre: 'Your category ', accent: `advanced ${drv.movement.days} days`, post: `${chartTag} this month`, color: ADVANCE_COLOR }
+          : { pre: '本月你的类别', accent: `前进了 ${drv.movement.days} 天`, post: chartTag, color: ADVANCE_COLOR })
+      : drv.movement.type === 'retrogressed'
         ? (lang === 'en'
-            ? { pre: 'Your category ', accent: 'retrogressed', post: ' this month', color: RETROGRESS_COLOR }
-            : { pre: '本月你的类别', accent: '出现倒退', post: '', color: RETROGRESS_COLOR })
-        : fa.movement.type === 'unavailable'
-          ? (fa.movement.still
+            ? { pre: 'Your category ', accent: 'retrogressed', post: `${chartTag} this month`, color: RETROGRESS_COLOR }
+            : { pre: '本月你的类别', accent: '出现倒退', post: chartTag, color: RETROGRESS_COLOR })
+        : drv.movement.type === 'unavailable'
+          ? (drv.movement.still
               ? (lang === 'en'
                   ? { pre: 'Your category ', accent: 'is still unavailable (U)', post: '', color: RETROGRESS_COLOR }
                   : { pre: '本月你的类别', accent: '持续无名额（U）', post: '', color: RETROGRESS_COLOR })
               : (lang === 'en'
                   ? { pre: 'Your category ', accent: 'went unavailable (U)', post: '', color: RETROGRESS_COLOR }
                   : { pre: '本月你的类别', accent: '转为无名额（U）', post: '', color: RETROGRESS_COLOR }))
-          : fa.movement.type === 'resumed'
+          : drv.movement.type === 'resumed'
             ? (lang === 'en'
                 ? { pre: 'Your category ', accent: 'resumed', post: ' — numbers are back', color: GOOD_COLOR }
                 : { pre: '你的类别', accent: '恢复名额了', post: '', color: GOOD_COLOR })
