@@ -59,6 +59,14 @@ export async function onRequestPost(context) {
   const url = new URL(request.url);
   const dryRun = url.searchParams.get('dryRun') === '1';
   const force = url.searchParams.get('force') === '1';
+  // Correction mode: only the emails listed in the POST body, subject prefixed, banner on top.
+  const correction = url.searchParams.get('correction') === '1';
+  let corrEmails = null;
+  if (correction) {
+    const b = await request.json().catch(() => ({}));
+    corrEmails = new Set((Array.isArray(b.emails) ? b.emails : []).map((e) => String(e).trim().toLowerCase()).filter(Boolean));
+    if (!corrEmails.size) return json({ error: 'correction mode needs a non-empty emails list' }, 400);
+  }
   // Safety valve for template testing: process ONLY this subscriber, skip the rest.
   // Without it, a force-resend now reaches real strangers.
   const only = (url.searchParams.get('only') || '').trim().toLowerCase();
@@ -141,10 +149,13 @@ export async function onRequestPost(context) {
       let record;
       try { record = JSON.parse(raw); } catch { continue; }
 
+      if (correction && !corrEmails.has(String(record.email || '').toLowerCase())) continue;
       if (record.confirmed !== true) { report.skipped.unconfirmed++; continue; }
       const uc = record.userCase;
       if (!uc?.category || !uc?.country || !uc?.priorityDate) { report.skipped.noCase++; continue; }
-      if (!force && record.lastNotifiedMonth === current.month) { report.skipped.alreadyNotified++; continue; }
+      if (correction) {
+        if (record.correctedMonth === current.month) { report.skipped.alreadyNotified++; continue; }
+      } else if (!force && record.lastNotifiedMonth === current.month) { report.skipped.alreadyNotified++; continue; }
 
       const update = computeCaseUpdate({
         cat: uc.category,
@@ -155,7 +166,7 @@ export async function onRequestPost(context) {
         historyMonths: history.months,
       });
 
-      const reason = shouldNotify(update, record.alerts);
+      const reason = correction ? 'correction' : shouldNotify(update, record.alerts);
       if (!reason) {
         const moved = update.finalAction.movement.type !== 'none' || update.filing.movement.type !== 'none';
         if (moved) report.skipped.optedOut++; else report.skipped.noChange++;
@@ -170,7 +181,7 @@ export async function onRequestPost(context) {
       try {
         const unsubscribeUrl = await buildUnsubscribeUrl(record.email, env);
         const subtypeToken = await buildSubtypeToken(record.email, env);
-        const { subject, html, text } = renderMonthlyUpdateEmail({
+        let { subject, html, text } = renderMonthlyUpdateEmail({
           email: record.email,
           userCase: uc,
           update,
@@ -184,6 +195,19 @@ export async function onRequestPost(context) {
           subtypeToken,
           name: record.name,
         });
+
+        if (correction) {
+          const en = record.language === 'en';
+          const tw = record.language === 'tw';
+          const note = en
+            ? 'Correction: the headline of our earlier email for this bulletin used only the Final Action chart (Chart A). If your priority date has not reached Chart A yet, follow the Dates for Filing chart (Chart B); if it already has, follow Chart A. The headline of this email uses the right chart for you.'
+            : tw
+              ? '更正：上一封郵件的標題只按出卡線（表A）來寫。如果你的優先日還沒排到出卡線，請以遞件表（表B）的變化為準；已經排到的，以表A為準。本封標題已按你的情況改正。'
+              : '更正：上一封邮件的标题只按出卡线（表A）来写。如果你的优先日还没排到出卡线，请以递件表（表B）的变化为准；已经排到的，以表A为准。本封标题已按你的情况改正。';
+          subject = (en ? '[Correction] ' : tw ? '【更正】' : '【更正】') + subject;
+          html = html.replace(/<body[^>]*>/i, (m) => `${m}<div style="max-width:600px;margin:0 auto;padding:12px 16px;background:#fff4e5;border-left:3px solid #c1571f;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#3a3a3a;">${note}</div>`);
+          text = `${note}\n\n${text}`;
+        }
 
         const resp = await fetch('https://api.resend.com/emails', {
           method: 'POST',
@@ -209,7 +233,7 @@ export async function onRequestPost(context) {
 
         // Stamp AFTER the send succeeds; a stamp with no mail behind it would
         // permanently silence this subscriber for the month.
-        record.lastNotifiedMonth = current.month;
+        if (correction) record.correctedMonth = current.month; else record.lastNotifiedMonth = current.month;
         await env.SUBSCRIBERS.put(keyInfo.name, JSON.stringify(record));
         report.sent.push({ email: record.email, reason });
       } catch (e) {
