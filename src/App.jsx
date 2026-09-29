@@ -7260,6 +7260,21 @@ const BulletinTalk = ({ lang }) => {
     } catch { /* noop */ }
     setPosting(false);
   };
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyMsg, setReplyMsg] = useState('');
+  const submitReply = async (parentId) => {
+    const text = replyMsg.trim();
+    if (text.length < 2 || posting) return;
+    setPosting(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/community`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'comment', message: text, parentId, name: guestName.trim() || (lang === 'en' ? 'Guest' : '游客') }),
+      });
+      if (r.ok) { setReplyMsg(''); setReplyingTo(null); load(); }
+    } catch { /* noop */ }
+    setPosting(false);
+  };
   const like = async (id) => {
     if (liked.has(id)) return;
     const next = new Set(liked); next.add(id);
@@ -7288,8 +7303,36 @@ const BulletinTalk = ({ lang }) => {
     return palette[h % palette.length];
   };
 
-  const items = (data?.comments || []).slice();
+  const allComments = data?.comments || [];
+  const repliesOf = {};
+  allComments.filter((c) => c.parentId).forEach((c) => { (repliesOf[c.parentId] = repliesOf[c.parentId] || []).push(c); });
+  Object.values(repliesOf).forEach((a) => a.sort((x, y) => (x.ts || '').localeCompare(y.ts || '')));
+  const items = allComments.filter((c) => !c.parentId);
   if (sortTab === 'hot') items.sort((a, b) => (b.likes || 0) - (a.likes || 0) || (b.ts || '').localeCompare(a.ts || ''));
+
+  const replyBox = (targetId, targetName) => (
+    <div style={{ marginTop: '5px' }}>
+      <textarea value={replyMsg} maxLength={300} rows={2} autoFocus
+        placeholder={(lang === 'en' ? 'Reply to ' : '回复 ') + (targetName || (lang === 'en' ? 'Guest' : '游客')) + '…'}
+        onChange={(e) => setReplyMsg(e.target.value)}
+        style={{
+          width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '40px',
+          padding: '6px 8px', fontSize: '12px', lineHeight: 1.5, color: 'var(--gc-ink)',
+          background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)',
+        }} />
+      <div className="flex items-center justify-end gap-2 mt-1">
+        <button type="button" onClick={() => { setReplyingTo(null); setReplyMsg(''); }}
+          style={{ padding: '4px 10px', fontSize: '11px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--gc-muted)' }}>
+          {lang === 'en' ? 'Cancel' : '取消'}
+        </button>
+        <button type="button" onClick={() => submitReply(targetId)} disabled={posting || replyMsg.trim().length < 2}
+          style={{
+            padding: '4px 14px', fontSize: '11px', fontWeight: 700, border: 'none', borderRadius: '999px', cursor: 'pointer',
+            background: replyMsg.trim().length < 2 ? 'var(--gc-rule)' : 'var(--gc-green)', color: 'var(--gc-paper)', opacity: posting ? 0.6 : 1,
+          }}>{lang === 'en' ? 'Reply' : '回复'}</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="mt-2.5 p-2.5 rounded-xl" style={{ border: '1px solid var(--gc-rule-soft)', background: 'var(--gc-surface)' }}>
@@ -7378,6 +7421,41 @@ const BulletinTalk = ({ lang }) => {
               <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{rel(c.ts)}</span>
             </div>
             <div style={{ fontSize: '12.5px', color: 'var(--gc-ink-soft)', lineHeight: 1.55, marginTop: '2px', wordBreak: 'break-word' }}>{c.message}</div>
+            <button type="button" onClick={() => { setReplyingTo(replyingTo === c.id ? null : c.id); setReplyMsg(''); }}
+              style={{ marginTop: '3px', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-muted)' }}>
+              {lang === 'en' ? 'Reply' : lang === 'tw' ? '回覆' : '回复'}{(repliesOf[c.id] || []).length > 0 ? ` · ${(repliesOf[c.id] || []).length}` : ''}
+            </button>
+            {(repliesOf[c.id] || []).length > 0 && (
+              <div style={{ marginTop: '6px', padding: '2px 0 0 9px', borderLeft: '2px solid var(--gc-rule-soft)' }}>
+                {(repliesOf[c.id] || []).map((r) => (
+                  <div key={r.id} className="flex gap-2" style={{ padding: '5px 0' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)' }}>{r.name || (lang === 'en' ? 'Guest' : '游客')}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{rel(r.ts)}</span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', lineHeight: 1.5, marginTop: '1px', wordBreak: 'break-word' }}>
+                        {r.replyTo && r.replyTo !== c.name && <span style={{ color: 'var(--gc-green-ink)', fontWeight: 700 }}>@{r.replyTo} </span>}{r.message}
+                      </div>
+                      <button type="button" onClick={() => { setReplyingTo(r.id); setReplyMsg(''); }}
+                        style={{ marginTop: '2px', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 700, color: 'var(--gc-muted)' }}>
+                        {lang === 'en' ? 'Reply' : lang === 'tw' ? '回覆' : '回复'}
+                      </button>
+                      {replyingTo === r.id && replyBox(r.id, r.name)}
+                    </div>
+                    <button type="button" onClick={() => like(r.id)}
+                      style={{
+                        alignSelf: 'flex-start', flexShrink: 0, padding: '2px 7px', fontSize: '10px', fontWeight: 700,
+                        border: `1px solid ${liked.has(r.id) ? 'var(--gc-green)' : 'var(--gc-rule)'}`, borderRadius: '999px',
+                        background: liked.has(r.id) ? 'var(--gc-green-soft)' : 'var(--gc-surface)',
+                        color: liked.has(r.id) ? 'var(--gc-green-ink)' : 'var(--gc-muted)',
+                        cursor: liked.has(r.id) ? 'default' : 'pointer',
+                      }}>👍 {r.likes || 0}</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {replyingTo === c.id && replyBox(c.id, c.name)}
           </div>
           <button type="button" onClick={() => like(c.id)}
             style={{

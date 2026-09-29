@@ -128,6 +128,18 @@ export async function onRequestPost(context) {
     const text = sanitizeCommentMsg(body.message);
     if (text.length < 2) return json({ error: 'message required' }, 400);
     rec = { cat, country, name: sanitizeName(body.name), message: text, likes: 0 };
+    // 回复只做一层：回复的是回复时，挂到最顶层那条上，replyTo 记被回复人的昵称。
+    if (body.parentId !== undefined && body.parentId !== null) {
+      const pid = typeof body.parentId === 'string' && /^[a-zA-Z0-9-]{8,64}$/.test(body.parentId) ? body.parentId : null;
+      if (!pid) return json({ error: 'bad parentId' }, 400);
+      try {
+        const praw = await env.SUBSCRIBERS.get(`cd:comment:${pid}`);
+        if (!praw) return json({ error: 'parent not found' }, 404);
+        const par = JSON.parse(praw);
+        rec.parentId = par.parentId || pid;
+        rec.replyTo = sanitizeName(par.name);
+      } catch { return json({ error: 'failed' }, 500); }
+    }
   } else if (type === 'commentLike') {
     // 点赞是对既有记录的原地 +1，不走下面的「新建记录」路径。KV 读改写有并发丢失
     // 的可能，这个规模可接受；重新 put 会刷新 TTL——被点赞的评论活得更久，符合直觉。
@@ -253,9 +265,10 @@ export async function onRequestGet(context) {
     out.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
     return json({
       total: out.length,
-      comments: out.slice(0, 50).map((r) => ({
+      comments: out.slice(0, 300).map((r) => ({
         id: r.id, name: r.name || '', message: r.message || '',
         cat: r.cat || '', ts: r.ts, likes: r.likes || 0,
+        parentId: r.parentId || null, replyTo: r.replyTo || '',
       })),
     });
   }
