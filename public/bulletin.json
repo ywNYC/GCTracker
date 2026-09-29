@@ -221,7 +221,23 @@
     },
     "dv": null,
     "dvNext": null,
-    "notices": [],
+    "notices": [
+      {
+        "letter": "B",
+        "title": "AVAILABILITY OF FAMILY-SPONSORED AND EMPLOYMENT-BASED VISAS FOR FY 2027",
+        "text": "With the availability of FY 2027 immigrant visa numbers, dates for filing and final action dates have advanced across various immigrant visa categories. However, some employment-based visa categories for “Rest of World” countries have retrogressed, and these retrogressions are necessary to keep visa issuances within FY 2027 quarterly and annual limits. This situation is being continually monitored, and any necessary adjustments will be made accordingly."
+      },
+      {
+        "letter": "C",
+        "title": "EXTENSION OF THE EMPLOYMENT FOURTH RELIGIOUS WORKERS (SR) CATEGORY",
+        "text": "H.R. 6500, signed on September 2, 2026, extends the Employment Fourth Preference Certain Religious Workers (SR) category through December 11, 2026. The SR category is subject to the same dates for filing and final action dates as the other Employment Fourth Preference categories per applicable foreign state of chargeability."
+      },
+      {
+        "letter": "D",
+        "title": "U.S. GOVERNMENT EMPLOYEE SPECIAL IMMIGRANT VISAS (SIVs)",
+        "text": "The National Defense Authorization Act (NDAA) for Fiscal Year 2024, signed into law on December 22, 2023, may affect certain current and former employees of the U.S. Government abroad, as well as certain surviving spouses and children of deceased employees of the U.S. government abroad, applying for SIVs or adjustment of status, as described in section 101(a)(27)(D) of the INA. This does not affect certain Iraqis and Afghans applying for SQ and SI SIVs. Applicants should contact the consular section at which they filed their Form DS-1884 for further information on the impact of that law on their case."
+      }
+    ],
     "f2aExempt": "2026-03-22",
     "meta": {
       "volume": "XI",
