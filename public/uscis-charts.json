@@ -1,10 +1,14 @@
 {
-  "scrapedAt": "2026-10-13T07:18:12.967Z",
+  "scrapedAt": "2026-10-22T19:42:04.365Z",
   "sourceUrl": "https://www.uscis.gov/visabulletininfo",
   "current": {
     "month": "2026-10",
     "family": "filing",
     "employment": "filing"
   },
-  "next": null
+  "next": {
+    "month": "2026-11",
+    "family": "filing",
+    "employment": "filing"
+  }
 }
