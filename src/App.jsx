@@ -7246,7 +7246,7 @@ const CommunityTeaser = ({ lang, onGo }) => {
 // 访客在个人页看到的示例案件（只读展示，不写进 localStorage）
 const SAMPLE_CASE = { country: 'Taiwan', category: 'EB3', priorityDate: '2024-07-15', inUS: true, petitionerStatus: 'USC', birthYearMonth: '' };
 
-const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = () => {}, onNeedCase = () => {} }) => {
+const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = () => {}, onNeedCase = () => {}, dataPending = false }) => {
   // 访客（没填案子）看通用视角：默认中国大陆列 + 亲属组，不渲染「你的类别」个人行，
   // category=null 让所有「我的」高亮自然失效——不能拿默认的 Taiwan EB3 冒充访客的案子
   if (!hasCase) userCase = { country: 'China', category: null, priorityDate: null };
@@ -7424,6 +7424,30 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
           </span>
         </div>
       </div>
+      {/* UI-30: seed-flash gate. bulletinCurrent / BULLETIN_CURRENT_MONTH are
+          module-level May-2026 seed on first paint; every number below is
+          computed from them until history.json (archive swap) or
+          bulletin.json (in-place mutation) lands. A deep-link landing shows
+          that first paint as the whole first screen — May cutoffs under a
+          current-month picker. UI-00's banner only covers failed/mismatch,
+          never 'pending', so until EITHER source resolves we show a loading
+          placeholder instead of seed numbers. Once either lands the gate
+          lifts for good — Time Machine month switches afterwards are
+          synchronous archive swaps and behave exactly as before. */}
+      {dataPending ? (
+        <div role="status" aria-busy="true" style={{ padding: '14px 2px 6px' }}>
+          <div style={{ fontSize: '12.5px', color: 'var(--gc-muted)', marginBottom: '12px' }}>
+            {lang === 'en' ? 'Loading the latest bulletin data…' : lang === 'tw' ? '正在載入最新一期公告數據…' : '正在加载最新一期公告数据…'}
+          </div>
+          {[92, 78, 85, 64].map((w, i) => (
+            <div key={i} style={{
+              height: '14px', width: `${w}%`, borderRadius: '3px', marginBottom: '10px',
+              background: 'var(--gc-rule-soft)',
+            }} />
+          ))}
+        </div>
+      ) : (
+        <>
       {/* UI-19: visitor first screen — one plain-language summary of this
           month plus the case-setup CTA, ahead of every table. All numbers are
           computed at render from the same `changes` rows and the same
@@ -7798,6 +7822,8 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
         onChartKey={(k) => setUpdChart(k === 'filing' ? 'B' : 'A')} onCatGroup={setCatGroup}
         initialCat={hasCase ? userCase.category : null} />
       </>)}
+        </>
+      )}
 
       {/* UI-04：讨论区/社区小组件/换类别对比此前在最新页与社区页各挂一份，
           现已撤下镜像——社区页是唯一挂载点，最新页只留一行摘要入口。 */}
@@ -11106,7 +11132,7 @@ export default function App() {
                   no setTab/deep-link path ever sets tab to 'forecast' — and
                   has been removed.) */}
               {tab === 'trends' && <Suspense fallback={<TabFallback />}><ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} /></Suspense>}
-              {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} setTab={handleTabChange} onNeedCase={openWizardFromSample} />}
+              {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} setTab={handleTabChange} onNeedCase={openWizardFromSample} dataPending={dataLoad.history === 'pending' && dataLoad.bulletin === 'pending'} />}
               {tab === 'i485' && <Overview userCase={userCase} onRefineCase={() => { setOnboardingInitialMode('form'); setShowWizard(true); }} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <Suspense fallback={<TabFallback />}><SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} /></Suspense>}
               {tab === 'bulletin' && <BulletinTab userCase={userCase} />}
