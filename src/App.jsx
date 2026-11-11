@@ -46,7 +46,7 @@ const translations = {
     navFAQ: 'FAQ',
     navData: 'Data Source',
     navGlossary: 'Glossary',
-    navIndex: 'Index',
+    navIndex: 'Path',
     inputTitle: 'Your Case',
     inputSubtitle: 'Enter your details to see personalized analysis',
     countryLabel: 'Country or Region of Birth',
@@ -319,7 +319,7 @@ const translations = {
     navFAQ: '常见问题',
     navData: '数据来源',
     navGlossary: '名词解释',
-    navIndex: '索引',
+    navIndex: '路径',
     inputTitle: '你的案子',
     inputSubtitle: '填写信息获取专属分析',
     countryLabel: '出生国或地区',
@@ -588,7 +588,7 @@ const translations = {
     navFAQ: '常見問題',
     navData: '資料來源',
     navGlossary: '名詞解釋',
-    navIndex: '索引',
+    navIndex: '路徑',
     inputTitle: '你的案子',
     inputSubtitle: '填寫資訊取得專屬分析',
     countryLabel: '出生國或地區',
@@ -14667,7 +14667,7 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
 
       <div style={{ padding: '14px 0 10px', borderBottom: '1px solid var(--gc-rule)' }}>
         <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>
-          {lang === 'en' ? 'THE INDEX' : '身份索引'}
+          {lang === 'en' ? 'THE PATH' : lang === 'tw' ? '身份路徑' : '身份路径'}
         </div>
         <h2 className="gc-serif" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 4px', letterSpacing: '-0.01em' }}>
           {lang === 'en' ? 'Find Your Pathway' : lang === 'tw' ? '找到你的路徑' : '找到你的路径'}
