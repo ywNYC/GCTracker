@@ -46,13 +46,24 @@ export async function onRequestGet(context) {
   // per day, same as how beacon.js overwrites dwell time.
   const caseByVidDay = new Map();
   for (const r of bySid) {
-    const d = (days[r.day] ||= { sessions: 0, vids: new Set(), dwells: [], langs: {}, withCase: 0, subscribed: 0 });
+    const d = (days[r.day] ||= { sessions: 0, vids: new Set(), dwells: [], langs: {}, withCase: 0, subscribed: 0, tabs: {}, events: {} });
     d.sessions += 1;
     d.vids.add(r.vid);
     d.dwells.push(r.dwellMs || 0);
     if (r.lang) d.langs[r.lang] = (d.langs[r.lang] || 0) + 1;
     if (r.hasCase) d.withCase += 1;
     if (r.subscribed) d.subscribed += 1;
+    // UI-14: tab = the page this session was on at its last flush (records written
+    // before UI-14 have no tab and simply don't appear in the split). events =
+    // cumulative per-session funnel counters, summed across the day's sessions —
+    // one session contributes its totals exactly once because beacon.js overwrites
+    // a single record per session.
+    if (r.tab) d.tabs[r.tab] = (d.tabs[r.tab] || 0) + 1;
+    if (r.events && typeof r.events === 'object') {
+      for (const [k, v] of Object.entries(r.events)) {
+        if (typeof v === 'number' && v > 0) d.events[k] = (d.events[k] || 0) + v;
+      }
+    }
     if (r.category && r.country) {
       caseByVidDay.set(`${r.day}:${r.vid}`, { day: r.day, category: r.category, country: r.country });
     }
@@ -86,15 +97,27 @@ export async function onRequestGet(context) {
       withCase: d.withCase,
       subscribed: d.subscribed,
       langs: d.langs,
+      tabs: d.tabs,
+      events: d.events,
     };
   });
 
   const allDwells = bySid.map((r) => r.dwellMs || 0);
+  // UI-14: window-wide funnel totals (same per-session summing as the per-day rows).
+  const totalEvents = {};
+  for (const r of bySid) {
+    if (r.events && typeof r.events === 'object') {
+      for (const [k, v] of Object.entries(r.events)) {
+        if (typeof v === 'number' && v > 0) totalEvents[k] = (totalEvents[k] || 0) + v;
+      }
+    }
+  }
   const totals = {
     sessions: bySid.length,
     uniqueVisitors: new Set(bySid.map((r) => r.vid)).size,
     avgDwellSec: allDwells.length ? Math.round(allDwells.reduce((s, x) => s + x, 0) / allDwells.length / 1000) : 0,
     medianDwellSec: Math.round(median(allDwells) / 1000),
+    events: totalEvents,
   };
 
   return new Response(JSON.stringify({ totals, caseBreakdown, days: out }, null, 2), {
