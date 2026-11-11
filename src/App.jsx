@@ -8029,7 +8029,21 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
   const { t, lang } = useLang();
   const userCountry = resolveCountry(userCase.country);
   // Which chart the whole page reads: A (finalAction) or B (filing).
+  // UI-21: the DEFAULT follows USCIS's adopted chart for the current month
+  // (chartsSel — the UI-00 selection over uscis-charts.json), taken from the
+  // group the user's own case belongs to: family cases read chartsSel.family,
+  // employment cases and case-less visitors (category null) read
+  // chartsSel.employment. Before the selection is confirmed the historical
+  // 'B' default stands; once the user flips the toggle by hand
+  // (updChartTouched) the default never overrides them again.
   const [updChart, setUpdChart] = useState('B');
+  const [updChartTouched, setUpdChartTouched] = useState(false);
+  useEffect(() => {
+    if (updChartTouched) return;
+    if (!chartsSel || !chartsSel.confirmed) return;
+    const adopted = userCase.category?.startsWith('F') ? chartsSel.family : chartsSel.employment;
+    if (adopted) setUpdChart(adopted === 'filing' ? 'B' : 'A');
+  }, [chartsSel, updChartTouched, userCase.category]);
   // Which half of the category table shows — preset from the user's own case:
   // an F-case lands on 亲属类, everything else on 职业/人才类.
   const [catGroup, setCatGroup] = useState(!hasCase ? 'family' : (userCase.category?.startsWith('F') ? 'family' : 'emp'));
@@ -8253,7 +8267,7 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
           <span className="inline-flex" style={{ marginLeft: 'auto', border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
             {/* B leads — same order as the summary card's stations: filing before approval. */}
             {['B', 'A'].map((c, i) => (
-              <button key={c} type="button" onClick={() => setUpdChart(c)}
+              <button key={c} type="button" onClick={() => { setUpdChart(c); setUpdChartTouched(true); }}
                 className="gc-mono"
                 style={{
                   fontSize: '10px', fontWeight: 700, padding: '3px 9px', lineHeight: 1.4,
