@@ -3740,7 +3740,7 @@ const AC_MILESTONES = [
   { id: 'approved', zh: '已批准', tw: '已批准', en: 'Approved' },
 ];
 
-const ActionCenter = ({ userCase }) => {
+const ActionCenter = ({ userCase, setTab = () => {} }) => {
   const { lang } = useLang();
   // inUS 三态（UI-28）：null = 未填。未填时先按境内（I-485）显示并在顶部挂
   // 明示条——此前 !!null 折叠成 false，整块按领事馆口径呈现，等于替用户
@@ -3760,52 +3760,9 @@ const ActionCenter = ({ userCase }) => {
   };
 
   // ---- crowd timeline + RFE ----
-  const [crowdOpen, setCrowdOpen] = useState(false);
-  const [tlAgg, setTlAgg] = useState(null);
-  const [rfeAgg, setRfeAgg] = useState(null);
-  const [tlDates, setTlDates] = useState({ filed: '', receipt: '', biometrics: '', ead: '', interview: '', approved: '' });
-  const [tlCenter, setTlCenter] = useState('unknown');
-  const [tlState, setTlState] = useState(''); // '' | 'loading' | 'done' | 'error'
-  const [rfeGot, setRfeGot] = useState(null); // null | false | true
-  const [rfeType, setRfeType] = useState(null);
-  const [rfeDone, setRfeDone] = useState(() => {
-    try { return !!window.localStorage.getItem('gc_cd_rfe'); } catch { return false; }
-  });
-  useEffect(() => {
-    if (!crowdOpen || tlAgg) return;
-    fetch(`${API_BASE}/api/community?type=timeline&cat=${userCase.category}`)
-      .then((r) => r.json()).then(setTlAgg).catch(() => setTlAgg({ total: 0 }));
-    fetch(`${API_BASE}/api/community?type=rfe&cat=${userCase.category}`)
-      .then((r) => r.json()).then(setRfeAgg).catch(() => {});
-  }, [crowdOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-  const submitTimeline = async () => {
-    if (!tlDates.filed) return;
-    setTlState('loading');
-    try {
-      const dates = {};
-      Object.entries(tlDates).forEach(([k, v]) => { if (v) dates[k] = v; });
-      const r = await fetch(`${API_BASE}/api/community`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'timeline', cat: userCase.category, country: userCase.country, path: inUS ? 'aos' : 'cp', center: tlCenter, dates }),
-      });
-      if (!r.ok) throw new Error();
-      setTlState('done');
-      try { window.localStorage.setItem('gc_cd_timeline', '1'); } catch { /* noop */ }
-      setTlAgg(null); // refetch
-    } catch { setTlState('error'); setTimeout(() => setTlState(''), 2500); }
-  };
-  const submitRfe = async (got, type2) => {
-    try {
-      const r = await fetch(`${API_BASE}/api/community`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'rfe', cat: userCase.category, country: userCase.country, got, rfeType: type2 }),
-      });
-      if (r.ok) {
-        setRfeDone(true);
-        try { window.localStorage.setItem('gc_cd_rfe', '1'); } catch { /* noop */ }
-      }
-    } catch { /* noop */ }
-  };
+  // UI-16: the reporting FORMS moved to the community page's 段1 card group
+  // (CrowdReportForms, below). This page keeps only the aggregate read-only
+  // echo (CrowdEcho) in the ④ slot — same numbers, same thresholds.
 
   const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' };
   const eyebrow = { fontSize: '9px', letterSpacing: '0.12em', fontWeight: 700 };
@@ -4010,24 +3967,194 @@ const ActionCenter = ({ userCase }) => {
         )}
       </div>
 
-      {/* ④ Crowd timeline + RFE — the dataset nobody else has in Chinese */}
+      {/* ④ Crowd timeline + RFE — UI-16: forms moved to 社区段1
+          (CrowdReportForms); this slot is now the read-only echo. */}
+      <CrowdEcho userCase={userCase} setTab={setTab} />
+    </>
+  );
+};
+
+// ============================================================
+// CommunityHub — the always-on interaction card: monthly one-tap poll, the
+// milestone wall, and the surveys/question box. Every submission is anonymous
+// ============================================================
+// CrowdEcho — UI-16: 个人页的众包聚合只读回显。时间线/RFE 的上报表单已迁到
+// 社区段1（CrowdReportForms），这里只剩数字：与迁移前 ActionCenter ④ 卡
+// 完全同一套口径（total>=3 才出聚合盒、中位每步另需 counts>=3、RFE 同为
+// total>=3 才显示），加一行去向按钮。展开才拉数据，与迁移前一致。
+// ============================================================
+const CrowdEcho = ({ userCase, setTab = () => {} }) => {
+  const { lang } = useLang();
+  const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
+  const [crowdOpen, setCrowdOpen] = useState(false);
+  const [tlAgg, setTlAgg] = useState(null);
+  const [rfeAgg, setRfeAgg] = useState(null);
+  useEffect(() => {
+    if (!crowdOpen || tlAgg) return;
+    fetch(`${API_BASE}/api/community?type=timeline&cat=${userCase.category}`)
+      .then((r) => r.json()).then(setTlAgg).catch(() => setTlAgg({ total: 0 }));
+    fetch(`${API_BASE}/api/community?type=rfe&cat=${userCase.category}`)
+      .then((r) => r.json()).then(setRfeAgg).catch(() => {});
+  }, [crowdOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' };
+  const eyebrow = { fontSize: '9px', letterSpacing: '0.12em', fontWeight: 700 };
+  return (
+    <div style={card}>
+      <button type="button" onClick={() => setCrowdOpen((v) => !v)}
+        className="flex items-center justify-between"
+        style={{ width: '100%', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+        <span className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
+          {L('真实时间线互助（匿名）', '真實時間線互助（匿名）', 'REAL TIMELINES (ANONYMOUS)')}
+          {tlAgg && tlAgg.total > 0 && (
+            <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--gc-green)', letterSpacing: 0, textTransform: 'none' }}>
+              {tlAgg.total}
+            </span>
+          )}
+        </span>
+        <span style={{ fontSize: '9px', color: 'var(--gc-muted)', transform: crowdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+      </button>
+      {crowdOpen && (
+        <div style={{ padding: '0 14px 12px' }}>
+          {/* aggregates — verbatim caliber from the pre-migration ④ card */}
+          {tlAgg && tlAgg.total >= 3 ? (
+            <div style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--gc-green-soft)', borderRadius: '3px' }}>
+              <div style={{ fontSize: '10.5px', color: 'var(--gc-green-ink)', fontWeight: 700, marginBottom: '3px' }}>
+                {L(`${userCase.category} · ${tlAgg.total} 份真实时间线`, `${userCase.category} · ${tlAgg.total} 份真實時間線`, `${userCase.category} · ${tlAgg.total} real timelines`)}
+              </div>
+              <div className="gc-mono" style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', lineHeight: 1.7 }}>
+                {tlAgg.medians?.receipt !== null && tlAgg.counts?.receipt >= 3 && <div>{L('递件→收据 中位 ', '遞件→收據 中位 ', 'filed→receipt median ')}{tlAgg.medians.receipt}{L(' 天', ' 天', 'd')}</div>}
+                {tlAgg.medians?.ead !== null && tlAgg.counts?.ead >= 3 && <div>{L('递件→EAD 中位 ', '遞件→EAD 中位 ', 'filed→EAD median ')}{tlAgg.medians.ead}{L(' 天', ' 天', 'd')}</div>}
+                {tlAgg.medians?.approved !== null && tlAgg.counts?.approved >= 3 && <div>{L('递件→批准 中位 ', '遞件→批准 中位 ', 'filed→approved median ')}{tlAgg.medians.approved}{L(' 天', ' 天', 'd')}</div>}
+              </div>
+            </div>
+          ) : tlAgg ? (
+            <div style={{ marginBottom: '10px', fontSize: '10.5px', color: 'var(--gc-muted)' }}>
+              {L(`${userCase.category} 已收集 ${tlAgg.total || 0} 份时间线，满 3 份后显示中位耗时。`,
+                 `${userCase.category} 已收集 ${tlAgg.total || 0} 份時間線，滿 3 份後顯示中位耗時。`,
+                 `${tlAgg.total || 0} timeline(s) so far — medians appear at 3+.`)}
+            </div>
+          ) : null}
+          {rfeAgg && rfeAgg.total >= 3 && (
+            <div style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', marginBottom: '10px' }}>
+              {L(`补件（RFE）：${rfeAgg.total} 份上报中 ${rfeAgg.gotRfe} 份收到过`,
+                 `補件（RFE）：${rfeAgg.total} 份上報中 ${rfeAgg.gotRfe} 份收到過`,
+                 `RFE: ${rfeAgg.gotRfe} of ${rfeAgg.total} reported receiving one`)}
+            </div>
+          )}
+          {/* pointer — the forms themselves live in 社区段1 now */}
+          <div className="flex items-center justify-between" style={{ gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.55 }}>
+              {L('这些数字来自同路人上报。报你的时间线、补件经历，去社区——', '這些數字來自同路人上報。報你的時間線、補件經歷，去社區——', 'These numbers come from fellow applicants. To report your own timeline or RFE —')}
+            </span>
+            <button type="button" onClick={() => setTab('compare')}
+              style={{ fontSize: '11px', fontWeight: 700, padding: '6px 12px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-green)', color: 'var(--gc-paper)', flexShrink: 0 }}>
+              {L('去社区报一条 →', '去社區報一條 →', 'Report yours →')}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// CrowdReportForms — UI-16: 时间线 + RFE 上报表单，UI-16 前住在个人页
+// ActionCenter ④；现迁入社区段1「报一条你的数据」卡组（CommunityPage 挂载），
+// 与换类别/费用调查（CommunityPage 的 ReportSurveys）并列。表单逻辑、
+// POST /api/community 的 type/字段、localStorage 已报标记全部原样；
+// 唯一新增：示例模式守卫（个人页时代表单只对真实案子渲染、无需守卫；
+// 社区对示例访客也可见，故 sample 时点提交先引导去填案子，与社区其他
+// 上报入口的既有守卫同口径）。导出去给 CommunityPage 引用。
+// ============================================================
+export const CrowdReportForms = ({ userCase, sample = false, onNeedCase = null }) => {
+  const { lang } = useLang();
+  const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
+  // Same tri-state as ActionCenter: unfilled inUS assumes I-485 (cp is the
+  // rarer path), matching the caliber the forms ran under on 个人页.
+  const inUSKnown = userCase.inUS != null;
+  const inUS = inUSKnown ? !!userCase.inUS : true;
+  const [tlOpen, setTlOpen] = useState(false);
+  const [tlAgg, setTlAgg] = useState(null);
+  const [rfeAgg, setRfeAgg] = useState(null);
+  const [tlDates, setTlDates] = useState({ filed: '', receipt: '', biometrics: '', ead: '', interview: '', approved: '' });
+  const [tlCenter, setTlCenter] = useState('unknown');
+  const [tlState, setTlState] = useState(''); // '' | 'loading' | 'done' | 'error'
+  const [rfeGot, setRfeGot] = useState(null); // null | false | true
+  const [rfeType, setRfeType] = useState(null);
+  const [rfeDone, setRfeDone] = useState(() => {
+    try { return !!window.localStorage.getItem('gc_cd_rfe'); } catch { return false; }
+  });
+  useEffect(() => {
+    if (!tlOpen || tlAgg) return;
+    fetch(`${API_BASE}/api/community?type=timeline&cat=${userCase.category}`)
+      .then((r) => r.json()).then(setTlAgg).catch(() => setTlAgg({ total: 0 }));
+    fetch(`${API_BASE}/api/community?type=rfe&cat=${userCase.category}`)
+      .then((r) => r.json()).then(setRfeAgg).catch(() => {});
+  }, [tlOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sampleBlocked = () => { if (sample) { onNeedCase?.(); return true; } return false; };
+  const submitTimeline = async () => {
+    if (!tlDates.filed || sampleBlocked()) return;
+    setTlState('loading');
+    try {
+      const dates = {};
+      Object.entries(tlDates).forEach(([k, v]) => { if (v) dates[k] = v; });
+      const r = await fetch(`${API_BASE}/api/community`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'timeline', cat: userCase.category, country: userCase.country, path: inUS ? 'aos' : 'cp', center: tlCenter, dates }),
+      });
+      if (!r.ok) throw new Error();
+      setTlState('done');
+      try { window.localStorage.setItem('gc_cd_timeline', '1'); } catch { /* noop */ }
+      setTlAgg(null); // refetch
+    } catch { setTlState('error'); setTimeout(() => setTlState(''), 2500); }
+  };
+  const submitRfe = async (got, type2) => {
+    if (sampleBlocked()) return;
+    try {
+      const r = await fetch(`${API_BASE}/api/community`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'rfe', cat: userCase.category, country: userCase.country, got, rfeType: type2 }),
+      });
+      if (r.ok) {
+        setRfeDone(true);
+        try { window.localStorage.setItem('gc_cd_rfe', '1'); } catch { /* noop */ }
+      }
+    } catch { /* noop */ }
+  };
+  const CENTER_OPTIONS = inUS ? [
+    ['unknown', L('不确定/跳过', '不確定/跳過', 'Not sure')],
+    ['NBC', 'NBC'], ['MSC', 'MSC'], ['SRC（德州）', 'SRC（德州）'], ['LIN（内布拉斯加）', 'LIN（內布拉斯加）'], ['WAC（加州）', 'WAC（加州）'], ['EAC（佛蒙特）', 'EAC（佛蒙特）'], ['YSC（波托马克）', 'YSC（波托馬克）'], ['IOE', 'IOE'],
+  ] : [
+    ['unknown', L('不确定/跳过', '不確定/跳過', 'Not sure')],
+    ['consulate', L('领事馆处理', '領事館處理', 'Consulate')],
+  ];
+  const dateFields = [
+    ['filed', L('递件日 ⭐', '遞件日 ⭐', 'Filed ⭐')],
+    ['receipt', L('收据日', '收據日', 'Receipt')],
+    ['biometrics', L('打指纹', '打指紋', 'Biometrics')],
+    ['ead', L('EAD 批准', 'EAD 批准', 'EAD approved')],
+    ...(inUS ? [['interview', L('面试日', '面試日', 'Interview')]] : []),
+    ['approved', L('批准日', '批准日', 'Approved')],
+  ];
+  const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden', marginBottom: '8px' };
+  const subTitle = { fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)' };
+  return (
+    <>
+      {/* —— 时间线 —— */}
       <div style={card}>
-        <button type="button" onClick={() => setCrowdOpen((v) => !v)}
+        <button type="button" onClick={() => setTlOpen((v) => !v)}
           className="flex items-center justify-between"
           style={{ width: '100%', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
-          <span className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
-            {L('真实时间线互助（匿名）', '真實時間線互助（匿名）', 'REAL TIMELINES (ANONYMOUS)')}
+          <span style={subTitle}>
+            {L('真实时间线 · 报你的关键日期', '真實時間線 · 報你的關鍵日期', 'Real timeline · report your key dates')}
             {tlAgg && tlAgg.total > 0 && (
-              <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--gc-green)', letterSpacing: 0, textTransform: 'none' }}>
-                {tlAgg.total}
-              </span>
+              <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--gc-green)' }}>{tlAgg.total}</span>
             )}
           </span>
-          <span style={{ fontSize: '9px', color: 'var(--gc-muted)', transform: crowdOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+          <span style={{ fontSize: '9px', color: 'var(--gc-muted)', transform: tlOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
         </button>
-        {crowdOpen && (
+        {tlOpen && (
           <div style={{ padding: '0 14px 12px' }}>
-            {/* aggregates first — give before you ask */}
             {tlAgg && tlAgg.total >= 3 ? (
               <div style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--gc-green-soft)', borderRadius: '3px' }}>
                 <div style={{ fontSize: '10.5px', color: 'var(--gc-green-ink)', fontWeight: 700, marginBottom: '3px' }}>
@@ -4048,103 +4175,90 @@ const ActionCenter = ({ userCase }) => {
             ) : null}
 
             {tlState === 'done' ? (
-              <div style={{ marginBottom: '8px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 600 }}>
-                  {L('时间线已提交 ✓ 谢谢你帮到了后来人', '時間線已提交 ✓ 謝謝', 'Timeline submitted ✓')}
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 700, padding: '6px 0' }}>
+                  ✓ {L('已记录，谢谢。你的时间线正在帮后面的人估算。', '已記錄，謝謝。你的時間線正在幫後面的人估算。', 'Saved — your timeline now helps everyone behind you.')}
                 </div>
-                <InlineSubscribeCTA userCase={userCase}
-                  label={L('订阅后，你类别的时间线统计每月发到你邮箱', '訂閱後，你類別的時間線統計每月發到你信箱', 'Get your category\'s timeline stats by email monthly')} />
+                <InlineSubscribeCTA userCase={userCase} />
               </div>
             ) : (
-              <>
-                <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', marginBottom: '7px', lineHeight: 1.55 }}>
-                  {L('报你的关键日期（记得几个填几个，完全匿名），后来人就能看到真实的处理耗时：',
-                     '報你的關鍵日期（記得幾個填幾個，完全匿名）：',
-                     'Report the dates you know — fully anonymous:')}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '7px' }}>
-                  {[['filed', L('递件日 *', '遞件日 *', 'Filed *')], ['receipt', L('收据', '收據', 'Receipt')],
-                    ['biometrics', L('打指模', '打指模', 'Biometrics')], ['ead', L('EAD 到手', 'EAD 到手', 'EAD')],
-                    ['interview', L('面试', '面試', 'Interview')], ['approved', L('批准', '批准', 'Approved')]].map(([k, label]) => (
-                    <div key={k} style={{ fontSize: '9.5px', color: 'var(--gc-muted)' }}>
-                      {label}
-                      <div style={{ marginTop: '2px' }}>
-                        <DateDropdown allowEmpty value={tlDates[k]}
-                          onChange={(v) => setTlDates({ ...tlDates, [k]: v })}
-                          triggerStyle={{ padding: '5px 7px', fontSize: '11px' }} />
-                      </div>
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
+                  {dateFields.map(([key, label]) => (
+                    <div key={key}>
+                      <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginBottom: '2px' }}>{label}</div>
+                      <DateDropdown value={tlDates[key]} onChange={(v) => setTlDates((s) => ({ ...s, [key]: v }))} allowEmpty />
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{inUS ? L('服务中心', '服務中心', 'Service center') : L('领事馆', '領事館', 'Consulate')}</span>
-                  <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden', flexWrap: 'wrap' }}>
-                    {(inUS
-                      ? [['unknown', L('不确定', '不確定', 'N/A')], ['NSC', 'NSC'], ['TSC', 'TSC'], ['Potomac', 'Potomac'], ['MSC', 'MSC'], ['other-center', L('其他', '其他', 'Other')]]
-                      : [['guangzhou', L('广州', '廣州', 'Guangzhou')], ['other-consulate', L('其他', '其他', 'Other')]]
-                    ).map(([id, label], ci) => (
-                      <button key={id} type="button" onClick={() => setTlCenter(id)}
-                        style={{
-                          fontSize: '10px', fontWeight: 700, padding: '4px 8px', border: 'none', cursor: 'pointer',
-                          borderLeft: ci === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                          background: tlCenter === id ? 'var(--gc-green)' : 'var(--gc-surface)',
-                          color: tlCenter === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
-                        }}>{label}</button>
-                    ))}
-                  </span>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <select value={tlCenter} onChange={(e) => setTlCenter(e.target.value)} aria-label={L('处理中心', '處理中心', 'Service center')}
+                    style={{ fontSize: '11px', padding: '7px 6px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-surface)', color: 'var(--gc-ink)', maxWidth: '170px' }}>
+                    {CENTER_OPTIONS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                  </select>
                   <button type="button" onClick={submitTimeline} disabled={!tlDates.filed || tlState === 'loading'}
-                    style={{ fontSize: '11px', fontWeight: 700, padding: '6px 12px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: tlDates.filed ? 'var(--gc-green)' : 'var(--gc-rule)', color: 'var(--gc-paper)' }}>
-                    {tlState === 'loading' ? '…' : L('匿名提交', '匿名提交', 'Submit')}
+                    style={{ fontSize: '11px', fontWeight: 700, padding: '7px 14px', border: 'none', borderRadius: '3px', cursor: tlDates.filed && tlState !== 'loading' ? 'pointer' : 'not-allowed', background: tlDates.filed ? 'var(--gc-green)' : 'var(--gc-rule-soft)', color: tlDates.filed ? 'var(--gc-paper)' : 'var(--gc-muted)' }}>
+                    {tlState === 'loading' ? '…' : tlState === 'error' ? L('失败，重试', '失敗，重試', 'Failed — retry') : L('匿名提交时间线', '匿名提交時間線', 'Submit anonymously')}
                   </button>
                 </div>
-                {tlState === 'error' && (
-                  <div style={{ fontSize: '10px', color: 'var(--gc-red)', marginBottom: '6px' }}>{L('提交失败，检查递件日是否早于其他日期', '提交失敗', 'Failed — check that filed is the earliest date')}</div>
+                {!inUSKnown && (
+                  <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '6px', lineHeight: 1.5 }}>
+                    {L('按人在美国递 I-485 显示字段——境外领馆流程请到个人页点「编辑」补填所在位置。', '按人在美國遞 I-485 顯示欄位——境外領館流程請到個人頁點「編輯」補填所在位置。', 'Fields assume filing I-485 inside the US — for consular processing, set your location via Edit on the Overview tab.')}
+                  </div>
                 )}
-              </>
-            )}
-
-            {/* RFE mini-survey */}
-            <div style={{ paddingTop: '8px', borderTop: '1px solid var(--gc-rule-soft)' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
-                {L('收到过补件（RFE）吗？', '收到過補件（RFE）嗎？', 'Ever received an RFE?')}
-                {rfeAgg && rfeAgg.total >= 3 && (
-                  <span style={{ fontWeight: 400, fontSize: '10px', color: 'var(--gc-muted)', marginLeft: '7px' }}>
-                    {L(`${rfeAgg.total} 份中 ${rfeAgg.gotRfe} 份收到过`, `${rfeAgg.total} 份中 ${rfeAgg.gotRfe} 份收到過`, `${rfeAgg.gotRfe}/${rfeAgg.total} did`)}
-                  </span>
-                )}
+                <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '6px' }}>
+                  {L('只需填你记得的日期（递件日必填），大约日期也行。完全匿名。', '只需填你記得的日期（遞件日必填），大約日期也行。完全匿名。', 'Fill what you remember (filed date required); approximate is fine. Fully anonymous.')}
+                </div>
               </div>
-              {rfeDone ? (
-                <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 600 }}>{L('已记录 ✓', '已記錄 ✓', 'Recorded ✓')}</div>
-              ) : rfeGot === true ? (
-                <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
-                  {[['medical', L('体检相关', '體檢相關', 'Medical')], ['financial', L('资金/担保', '資金/擔保', 'Financial')], ['relationship', L('关系证明', '關係證明', 'Relationship')], ['other', L('其他', '其他', 'Other')]].map(([id, label]) => (
-                    <button key={id} type="button" onClick={() => { setRfeType(id); submitRfe(true, id); }}
-                      style={{ fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', border: '1px solid var(--gc-rule)', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-surface)', color: 'var(--gc-ink-soft)' }}>{label}</button>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex" style={{ gap: '6px' }}>
-                  <button type="button" onClick={() => submitRfe(false, null)}
-                    style={{ fontSize: '10.5px', fontWeight: 700, padding: '5px 12px', border: '1px solid var(--gc-rule)', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-surface)', color: 'var(--gc-ink-soft)' }}>
-                    {L('没有', '沒有', 'No')}
-                  </button>
-                  <button type="button" onClick={() => setRfeGot(true)}
-                    style={{ fontSize: '10.5px', fontWeight: 700, padding: '5px 12px', border: '1px solid var(--gc-amber-border)', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-amber-soft)', color: 'var(--gc-amber-ink)' }}>
-                    {L('收到过', '收到過', 'Yes')}
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         )}
+      </div>
+
+      {/* —— RFE —— */}
+      <div style={card}>
+        <div style={{ padding: '12px 14px' }}>
+          <div className="flex items-start justify-between" style={{ marginBottom: rfeDone ? 0 : '8px' }}>
+            <div style={subTitle}>
+              {L('收到过补件（RFE）吗？', '收到過補件（RFE）嗎？', 'Did you get an RFE?')}
+            </div>
+            {rfeAgg && rfeAgg.total >= 3 && (
+              <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-green)', whiteSpace: 'nowrap' }}>
+                {L(`${rfeAgg.total} 份中 ${rfeAgg.gotRfe} 份收到过`, `${rfeAgg.total} 份中 ${rfeAgg.gotRfe} 份收到過`, `${rfeAgg.gotRfe} of ${rfeAgg.total} did`)}
+              </span>
+            )}
+          </div>
+          {rfeDone ? (
+            <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 700 }}>
+              ✓ {L('已记录，谢谢。', '已記錄，謝謝。', 'Recorded — thank you.')}
+            </div>
+          ) : rfeGot === null ? (
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button type="button" onClick={() => setRfeGot(true)} style={{ flex: 1, fontSize: '11px', fontWeight: 700, padding: '8px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--gc-rule)', background: 'var(--gc-surface)', color: 'var(--gc-ink)' }}>
+                {L('收到过', '收到過', 'Yes')}
+              </button>
+              <button type="button" onClick={() => submitRfe(false, null)} style={{ flex: 1, fontSize: '11px', fontWeight: 700, padding: '8px', borderRadius: '3px', cursor: 'pointer', border: '1px solid var(--gc-rule)', background: 'var(--gc-surface)', color: 'var(--gc-ink)' }}>
+                {L('没收到', '沒收到', 'No')}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '6px' }}>{L('补的是什么？（可选，点一下即提交）', '補的是什麼？（可選，點一下即提交）', 'What was it about? (optional — tap to submit)')}</div>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                {[['medical', L('体检', '體檢', 'Medical')], ['birth', L('出生证明', '出生證明', 'Birth cert')], ['marriage', L('婚姻证明', '婚姻證明', 'Marriage')], ['i864', L('经济担保', '經濟擔保', 'I-864')], ['other', L('其他/跳过', '其他/跳過', 'Other / skip')]].map(([v, label]) => (
+                  <button key={v} type="button" onClick={() => submitRfe(true, v)} style={{ fontSize: '10.5px', fontWeight: 600, padding: '6px 10px', borderRadius: '999px', cursor: 'pointer', border: '1px solid var(--gc-rule)', background: 'var(--gc-surface)', color: 'var(--gc-ink-soft)' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );
 };
 
-// ============================================================
-// CommunityHub — the always-on interaction card: monthly one-tap poll, the
-// milestone wall, and the surveys/question box. Every submission is anonymous
 const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = null }) => {
   const { lang } = useLang();
   const [windowMonths, setWindowMonths] = useState(12);
@@ -5196,7 +5310,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
 
       {/* Arrived-date action center — window banner, roadmap, checklist, crowd
           progress. Strictly gated: waiting cases never see any of it. */}
-      {isActionable && <ActionCenter userCase={userCase} />}
+      {isActionable && <ActionCenter userCase={userCase} setTab={setTab} />}
 
       {/* Bulletin movement chart — its own card now. It used to live inside the
           I-485 card's waiting preview; with I-485 hidden until filing opens, the
