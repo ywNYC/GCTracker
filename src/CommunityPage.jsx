@@ -4,7 +4,7 @@
 import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { CheckCircle2, Users, RefreshCw, Lock } from 'lucide-react';
 import { FILING_AUTHORIZED, resolveCountry, computeStatus } from '../functions/api/_gcMath.js';
-import { API_BASE, CrowdReportForms, useLang, bulletinCurrent, paceDaysToCalendar, InlineSubscribeCTA } from './App.jsx';
+import { API_BASE, CrowdReportForms, formatDate, useLang, bulletinCurrent, paceDaysToCalendar, InlineSubscribeCTA } from './App.jsx';
 const TrackerPage = lazy(() => import('./Tracker.jsx'));
 const ChunkFallback = () => (
   <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--gc-muted)', fontSize: '13px', letterSpacing: '0.3em' }}>···</div>
@@ -311,7 +311,7 @@ const WallBlock = ({ userCase, sample = false, onNeedCase }) => {
       {/* 规则条（UI-10 补齐）：打卡墙与讨论区同后端同为公开自由文本，
           与拆分前同一行，位置随本块走。 */}
       <div style={{
-        fontSize: '10.5px', lineHeight: 1.5, color: '#92400e',
+        fontSize: '11px', lineHeight: 1.5, color: '#92400e',
         background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--gc-radius-sm)',
         padding: '5px 8px', marginTop: '7px',
       }}>
@@ -657,14 +657,14 @@ const BulletinTalk = ({ lang }) => {
         <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-ink)' }}>
           {lang === 'en' ? 'Bulletin talk' : lang === 'tw' ? '排期討論' : '排期讨论'}
           {data && (
-            <span style={{ fontWeight: 500, color: 'var(--gc-muted)', fontSize: '10.5px', marginLeft: '6px' }}>
+            <span style={{ fontWeight: 500, color: 'var(--gc-muted)', fontSize: '11px', marginLeft: '6px' }}>
               {lang === 'en' ? `${data.total} posts` : `${data.total} 条`}
             </span>
           )}
         </span>
         {talkExpanded && items.length > 0 && (
           <button type="button" onClick={() => setTalkExpanded(false)}
-            style={{ fontSize: '10px', fontWeight: 700, padding: '3px 10px', border: '1px solid var(--gc-rule)', borderRadius: '999px', background: 'var(--gc-surface)', color: 'var(--gc-muted)', cursor: 'pointer' }}>
+            style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', border: '1px solid var(--gc-rule)', borderRadius: '999px', background: 'var(--gc-surface)', color: 'var(--gc-muted)', cursor: 'pointer' }}>
             {lang === 'en' ? 'Collapse ▴' : '收起 ▴'}
           </button>
         )}
@@ -673,7 +673,7 @@ const BulletinTalk = ({ lang }) => {
           {[['new', lang === 'en' ? 'Latest' : '最新'], ['hot', lang === 'en' ? 'Top' : '最热']].map(([id, label], i) => (
             <button key={id} type="button" onClick={() => setSortTab(id)}
               style={{
-                fontSize: '10px', fontWeight: 700, padding: '3px 11px', border: 'none', cursor: 'pointer',
+                fontSize: '11px', fontWeight: 700, padding: '3px 11px', border: 'none', cursor: 'pointer',
                 borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                 background: sortTab === id ? 'var(--gc-green)' : 'var(--gc-surface)',
                 color: sortTab === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
@@ -702,7 +702,7 @@ const BulletinTalk = ({ lang }) => {
               background: 'transparent', border: 'none', borderBottom: '1px dashed var(--gc-rule)',
               padding: '1px 2px', minWidth: 0, width: '120px', outline: 'none',
             }} />
-          <span style={{ fontSize: '9px', color: 'var(--gc-muted)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>
             {lang === 'en' ? '(tap to edit)' : '（可改）'}
           </span>
         </div>
@@ -710,7 +710,7 @@ const BulletinTalk = ({ lang }) => {
             told users not to post the case/receipt numbers that identify them,
             and there is no self-serve delete once a post is up. */}
         <div style={{
-          fontSize: '10.5px', lineHeight: 1.5, color: '#92400e',
+          fontSize: '11px', lineHeight: 1.5, color: '#92400e',
           background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--gc-radius-sm)',
           padding: '5px 8px', marginBottom: '6px',
         }}>
@@ -729,7 +729,7 @@ const BulletinTalk = ({ lang }) => {
             background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)',
           }} />
         <div className="flex items-center justify-between mt-1.5">
-          <span style={{ fontSize: '9.5px', color: 'var(--gc-muted)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>
             {lang === 'en' ? 'Anonymous · be kind' : '匿名发布 · 文明发言，含链接/联系方式会被拒收'}
           </span>
           <button type="button" onClick={submit} disabled={posting || msg.trim().length < 2}
@@ -766,12 +766,12 @@ const BulletinTalk = ({ lang }) => {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="flex items-center gap-1.5 flex-wrap">
               <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink)' }}>{c.name || (lang === 'en' ? 'Guest' : '游客')}</span>
-              {c.cat && <span style={{ fontSize: '9px', fontWeight: 700, color: 'var(--gc-green-ink)', background: 'var(--gc-green-soft)', borderRadius: '999px', padding: '1px 6px' }}>{c.cat}</span>}
-              <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{rel(c.ts)}</span>
+              {c.cat && <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-green-ink)', background: 'var(--gc-green-soft)', borderRadius: '999px', padding: '1px 6px' }}>{c.cat}</span>}
+              <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>{rel(c.ts)}</span>
             </div>
             <div style={{ fontSize: '12.5px', color: 'var(--gc-ink-soft)', lineHeight: 1.55, marginTop: '2px', wordBreak: 'break-word' }}>{c.message}</div>
             <button type="button" onClick={() => { setReplyingTo(replyingTo === c.id ? null : c.id); setReplyMsg(''); }}
-              style={{ marginTop: '3px', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-muted)' }}>
+              style={{ marginTop: '3px', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'var(--gc-muted)' }}>
               {lang === 'en' ? 'Reply' : lang === 'tw' ? '回覆' : '回复'}{(repliesOf[c.id] || []).length > 0 ? ` · ${(repliesOf[c.id] || []).length}` : ''}
             </button>
             {(repliesOf[c.id] || []).length > 0 && (
@@ -781,20 +781,20 @@ const BulletinTalk = ({ lang }) => {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)' }}>{r.name || (lang === 'en' ? 'Guest' : '游客')}</span>
-                        <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{rel(r.ts)}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>{rel(r.ts)}</span>
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', lineHeight: 1.5, marginTop: '1px', wordBreak: 'break-word' }}>
                         {r.replyTo && r.replyTo !== c.name && <span style={{ color: 'var(--gc-green-ink)', fontWeight: 700 }}>@{r.replyTo} </span>}{r.message}
                       </div>
                       <button type="button" onClick={() => { setReplyingTo(r.id); setReplyMsg(''); }}
-                        style={{ marginTop: '2px', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: 700, color: 'var(--gc-muted)' }}>
+                        style={{ marginTop: '2px', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'var(--gc-muted)' }}>
                         {lang === 'en' ? 'Reply' : lang === 'tw' ? '回覆' : '回复'}
                       </button>
                       {replyingTo === r.id && replyBox(r.id, r.name)}
                     </div>
                     <button type="button" onClick={() => like(r.id)}
                       style={{
-                        alignSelf: 'flex-start', flexShrink: 0, padding: '2px 7px', fontSize: '10px', fontWeight: 700,
+                        alignSelf: 'flex-start', flexShrink: 0, padding: '2px 7px', fontSize: '11px', fontWeight: 700,
                         border: `1px solid ${liked.has(r.id) ? 'var(--gc-green)' : 'var(--gc-rule)'}`, borderRadius: '999px',
                         background: liked.has(r.id) ? 'var(--gc-green-soft)' : 'var(--gc-surface)',
                         color: liked.has(r.id) ? 'var(--gc-green-ink)' : 'var(--gc-muted)',
@@ -808,7 +808,7 @@ const BulletinTalk = ({ lang }) => {
           </div>
           <button type="button" onClick={() => like(c.id)}
             style={{
-              alignSelf: 'flex-start', flexShrink: 0, padding: '3px 8px', fontSize: '10.5px', fontWeight: 700,
+              alignSelf: 'flex-start', flexShrink: 0, padding: '3px 8px', fontSize: '11px', fontWeight: 700,
               border: `1px solid ${liked.has(c.id) ? 'var(--gc-green)' : 'var(--gc-rule)'}`, borderRadius: '999px',
               background: liked.has(c.id) ? 'var(--gc-green-soft)' : 'var(--gc-surface)',
               color: liked.has(c.id) ? 'var(--gc-green-ink)' : 'var(--gc-muted)',
@@ -867,10 +867,10 @@ const CompareBarRow = ({ label, r, color, zMin, zMax, lang }) => {
   if (r.now) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '68px', flexShrink: 0, textAlign: 'right', lineHeight: 1.3 }}>{label}</div>
+        <div style={{ fontSize: '11px', color: 'var(--gc-muted)', width: '68px', flexShrink: 0, textAlign: 'right', lineHeight: 1.3 }}>{label}</div>
         <div style={{ flex: 1, height: '16px', borderRadius: '0 4px 4px 0', background: color, display: 'flex', alignItems: 'center', gap: '5px', paddingLeft: '8px' }}>
           <CheckCircle2 size={11} style={{ color: '#fff' }} strokeWidth={2.2} />
-          <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#fff', letterSpacing: '0.01em' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#fff', letterSpacing: '0.01em' }}>
             {lang === 'en' ? 'Available now' : '现在就可推进'}
           </span>
         </div>
@@ -880,7 +880,7 @@ const CompareBarRow = ({ label, r, color, zMin, zMax, lang }) => {
   if (r.unavailable || r.months == null) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '68px', flexShrink: 0, textAlign: 'right' }}>{label}</div>
+        <div style={{ fontSize: '11px', color: 'var(--gc-muted)', width: '68px', flexShrink: 0, textAlign: 'right' }}>{label}</div>
         <div style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>{lang === 'en' ? 'No visas this month (U)' : '本月无名额（U）'}</div>
       </div>
     );
@@ -891,7 +891,7 @@ const CompareBarRow = ({ label, r, color, zMin, zMax, lang }) => {
   const fmtYM2 = r.eta ? (lang === 'en' ? r.eta.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : `${r.eta.getFullYear()}年${r.eta.getMonth() + 1}月`) : '';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <div style={{ fontSize: '10px', color: 'var(--gc-muted)', width: '68px', flexShrink: 0, textAlign: 'right', lineHeight: 1.3 }}>{label}</div>
+      <div style={{ fontSize: '11px', color: 'var(--gc-muted)', width: '68px', flexShrink: 0, textAlign: 'right', lineHeight: 1.3 }}>{label}</div>
       <div style={{ flex: 1, height: '16px', background: 'var(--gc-paper-soft)', borderRadius: '0 4px 4px 0', position: 'relative', overflow: 'hidden' }}>
         {zMin > 0 && (
           <span style={{ position: 'absolute', left: '2px', top: 0, bottom: 0, width: '4px', zIndex: 2,
@@ -899,7 +899,7 @@ const CompareBarRow = ({ label, r, color, zMin, zMax, lang }) => {
         )}
         <div style={{ position: 'relative', height: '100%', width: `${pct}%`, background: color, borderRadius: '0 4px 4px 0' }} />
       </div>
-      <div className="gc-mono" style={{ fontSize: '10.5px', fontWeight: 700, color, whiteSpace: 'nowrap', flexShrink: 0 }}>
+      <div className="gc-mono" style={{ fontSize: '11px', fontWeight: 700, color, whiteSpace: 'nowrap', flexShrink: 0 }}>
         {fmtEta}{fmtYM2 ? ` · ${fmtYM2}` : ''}
       </div>
     </div>
@@ -948,11 +948,11 @@ const CompareRows = ({ rowA, rowB, lang }) => {
         <CompareBarRow label={rowA.label} r={rowA.r} color={rowA.color} zMin={zMin} zMax={zMax} lang={lang} />
         <CompareBarRow label={rowB.label} r={rowB.r} color={rowB.color} zMin={zMin} zMax={zMax} lang={lang} />
       </div>
-      <div style={{ fontSize: '10.5px', fontWeight: 700, color: deltaColor, margin: '5px 0 0 76px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 700, color: deltaColor, margin: '5px 0 0 76px' }}>
         {deltaTxt}
         {zoom && <span style={{ fontWeight: 600, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · bars zoomed to show the gap' : ' · 条形已局部放大，便于看清差距'}</span>}
       </div>
-      <div className="flex items-center justify-between" style={{ fontSize: '9px', color: 'var(--gc-muted-soft)', marginTop: '2px', marginLeft: '76px' }}>
+      <div className="flex items-center justify-between" style={{ fontSize: '11px', color: 'var(--gc-muted-soft)', marginTop: '2px', marginLeft: '76px' }}>
         <span>{zoom ? (lang === 'en' ? 'zoomed' : '局部放大') : (lang === 'en' ? 'today' : '今天')}</span>
         <span>{lang === 'en' ? `~${(maxM / 12).toFixed(1)} yrs out` : `约 ${(maxM / 12).toFixed(1)} 年后`}</span>
       </div>
@@ -1074,8 +1074,8 @@ const CompareHub = ({ userCase }) => {
         </h2>
         <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: 0 }}>
           {lang === 'en'
-            ? `Auto-computed from your case (${userCase.category} · PD ${userCase.priorityDate}). Nothing to configure.`
-            : `已根据你的案子（${userCase.category} · 优先日 ${userCase.priorityDate}）自动算好，无需任何设置。`}
+            ? `Auto-computed from your case (${userCase.category} · PD ${formatDate(userCase.priorityDate, lang)}). Nothing to configure.`
+            : `已根据你的案子（${userCase.category} · 优先日 ${formatDate(userCase.priorityDate, lang)}）自动算好，无需任何设置。`}
         </p>
       </div>
       {cards.map((c, i) => {
@@ -1089,7 +1089,7 @@ const CompareHub = ({ userCase }) => {
                   <Icon size={15} style={{ color: c.tone, flexShrink: 0 }} strokeWidth={1.8} />
                   <span className="gc-serif" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{c.title}</span>
                 </div>
-                <span className="gc-eyebrow" style={{ fontSize: '9px', fontWeight: 700, color: c.tone, border: `1px solid ${t.border}`, background: t.soft, borderRadius: '2px', padding: '2px 6px', letterSpacing: '0.08em', flexShrink: 0 }}>
+                <span className="gc-eyebrow" style={{ fontSize: '11px', fontWeight: 700, color: c.tone, border: `1px solid ${t.border}`, background: t.soft, borderRadius: '2px', padding: '2px 6px', letterSpacing: '0.08em', flexShrink: 0 }}>
                   {c.badge}
                 </span>
               </div>
@@ -1099,7 +1099,7 @@ const CompareHub = ({ userCase }) => {
                 {c.rule && (
                   <>
                     <button type="button" onClick={() => setOpenRule(openRule === i ? null : i)}
-                      style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600, marginTop: '8px' }}>
+                      style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600, marginTop: '8px' }}>
                       {openRule === i ? (lang === 'en' ? 'hide the rule' : '收起规则') : (lang === 'en' ? 'which rule allows this?' : '依据什么规则？')}
                     </button>
                     {openRule === i && (
@@ -1120,7 +1120,7 @@ const CompareHub = ({ userCase }) => {
           <div style={{ fontSize: '12px', color: 'var(--gc-muted)', lineHeight: 1.4 }}>{catMoveGhost}</div>
         </div>
       )}
-      <p style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.6, margin: '4px 2px 0' }}>
+      <p style={{ fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.6, margin: '4px 2px 0' }}>
         {lang === 'en'
           ? 'Estimates use the same 12-month real pace as the Overview. Individual cases vary — talk to a lawyer before acting.'
           : '估算与总结页同口径（近 12 个月实速）。个案有差异，行动前请咨询律师。'}
