@@ -763,7 +763,7 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
         <div>
           {!quizDone && currentQ && (
             <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius)', padding: '16px', borderTop: '2px solid var(--gc-green)' }}>
-              <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '6px', fontSize: '9px' }}>
+              <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '6px', fontSize: '11px' }}>
                 {lang === 'en' ? `Question ${step + 1}` : `第 ${step + 1} 题`}
               </div>
               <div className="gc-serif" style={{ fontSize: '17px', fontWeight: 700, color: 'var(--gc-ink)', lineHeight: 1.3, marginBottom: '4px', letterSpacing: '-0.005em' }}>
@@ -827,7 +827,7 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
                       <div className="gc-eyebrow" style={{
                         color: 'var(--gc-green-ink)',
                         marginBottom: '5px',
-                        fontSize: '9px',
+                        fontSize: '11px',
                       }}>
                         {lang === 'en' ? 'WHY THIS PATH' : lang === 'tw' ? '為什麼是這條路徑' : '为什么是这条路径'}
                       </div>
@@ -842,15 +842,15 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
                   )}
                   <div style={{ display: 'flex', gap: '12px', fontSize: '11px', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--gc-rule-soft)', flexWrap: 'wrap' }}>
                     <div>
-                      <div className="gc-eyebrow" style={{ fontSize: '8px' }}>{lang === 'en' ? 'WAIT' : '排期'}</div>
+                      <div className="gc-eyebrow" style={{ fontSize: '11px' }}>{lang === 'en' ? 'WAIT' : '排期'}</div>
                       <div style={{ color: wl.color, fontWeight: 700 }}>{wl[lang]}</div>
                     </div>
                     <div>
-                      <div className="gc-eyebrow" style={{ fontSize: '8px' }}>{lang === 'en' ? 'TIMELINE' : '时间线'}</div>
+                      <div className="gc-eyebrow" style={{ fontSize: '11px' }}>{lang === 'en' ? 'TIMELINE' : '时间线'}</div>
                       <div className="gc-mono" style={{ color: 'var(--gc-ink)', fontWeight: 600 }}>{info.timeline}</div>
                     </div>
                   </div>
-                  <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '6px', fontSize: '9px' }}>
+                  <div className="gc-eyebrow" style={{ color: 'var(--gc-muted)', marginBottom: '6px', fontSize: '11px' }}>
                     {lang === 'en' ? 'STEPS' : '步骤'}
                   </div>
                   <ol style={{ paddingLeft: '18px', fontSize: '12px', color: 'var(--gc-ink-soft)', lineHeight: 1.6, margin: '0 0 12px' }}>
@@ -888,7 +888,7 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
                   }}>
                   ↻ {lang === 'en' ? 'Start Over' : '重新开始'}
                 </button>
-                <div style={{ marginTop: '14px', padding: '10px 12px', fontSize: '10px', color: 'var(--gc-muted)', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: 'var(--gc-radius-sm)', lineHeight: 1.5 }}>
+                <div style={{ marginTop: '14px', padding: '10px 12px', fontSize: '11px', color: 'var(--gc-muted)', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: 'var(--gc-radius-sm)', lineHeight: 1.5 }}>
                   {lang === 'en' 
                     ? 'This tool provides general guidance only. It is not legal advice. Always consult a licensed immigration attorney for your specific case.'
                     : lang === 'tw'
@@ -951,7 +951,7 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
                       background: 'transparent', border: 'none', cursor: 'pointer',
                     }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)', fontWeight: 700, letterSpacing: '0.08em' }}>
+                      <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', fontWeight: 700, letterSpacing: '0.08em' }}>
                         {p.category}
                       </div>
                       <div className="gc-serif" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gc-ink)', lineHeight: 1.3, marginTop: '2px' }}>
@@ -961,7 +961,7 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
                         {info.summary}
                       </div>
                     </div>
-                    <span style={{ fontSize: '9px', fontWeight: 700, color: wl.color, whiteSpace: 'nowrap', marginTop: '2px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: wl.color, whiteSpace: 'nowrap', marginTop: '2px' }}>
                       {wl[lang]}
                     </span>
                   </button>
@@ -979,7 +979,7 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
                           <div className="gc-eyebrow" style={{
                             color: 'var(--gc-green-ink)',
                             marginBottom: '4px',
-                            fontSize: '8.5px',
+                            fontSize: '11px',
                           }}>
                             {lang === 'en' ? 'WHY THIS PATH' : lang === 'tw' ? '為什麼是這條路徑' : '为什么是这条路径'}
                           </div>
@@ -992,17 +992,17 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
                           </div>
                         </div>
                       )}
-                      <div className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-muted)', marginBottom: '4px' }}>
+                      <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '4px' }}>
                         {lang === 'en' ? 'TIMELINE' : '时间线'}
                       </div>
                       <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-ink)', marginBottom: '8px' }}>{info.timeline}</div>
-                      <div className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-muted)', marginBottom: '4px' }}>
+                      <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '4px' }}>
                         {lang === 'en' ? 'STEPS' : '步骤'}
                       </div>
                       <ol style={{ paddingLeft: '16px', fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.55, margin: '0 0 8px' }}>
                         {info.steps.map((s, i) => <li key={i} style={{ marginBottom: '2px' }}>{s}</li>)}
                       </ol>
-                      <div style={{ padding: '7px 9px', background: 'var(--gc-amber-soft)', border: '1px solid var(--gc-amber-border)', borderRadius: 'var(--gc-radius-sm)', fontSize: '10.5px', color: 'var(--gc-amber-ink)', lineHeight: 1.5 }}>
+                      <div style={{ padding: '7px 9px', background: 'var(--gc-amber-soft)', border: '1px solid var(--gc-amber-border)', borderRadius: 'var(--gc-radius-sm)', fontSize: '11px', color: 'var(--gc-amber-ink)', lineHeight: 1.5 }}>
                         <b>{lang === 'en' ? 'Note: ' : '注意:'}</b>{info.caveat}
                       </div>
                       {p.goesTo && (onCategoryPicked || (setUserCase && setTab)) && (
@@ -1030,7 +1030,7 @@ const TheIndex = ({ userCase, setTab, setUserCase, previousTab, onSetupCase, onC
               );
             })}
           </div>
-          <div style={{ marginTop: '14px', padding: '10px 12px', fontSize: '10px', color: 'var(--gc-muted)', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: 'var(--gc-radius-sm)', lineHeight: 1.5 }}>
+          <div style={{ marginTop: '14px', padding: '10px 12px', fontSize: '11px', color: 'var(--gc-muted)', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: 'var(--gc-radius-sm)', lineHeight: 1.5 }}>
             {lang === 'en' 
               ? 'This tool provides general guidance only. It is not legal advice. Always consult a licensed immigration attorney for your specific case.'
               : lang === 'tw'
