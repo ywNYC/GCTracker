@@ -1238,6 +1238,20 @@ top8+其他折叠、总数守恒），`wrangler pages dev --local` + Playwright 
 
 ---
 
+## 2026-11-11：iOS App 暂停维持（界面评审 UI-27 定版）
+
+- **状态：暂停，不上线。** iOS 打包工作（Capacitor 壳、`ios/`、`capacitor.config.ts`、
+  `codemagic.yaml`，见文首 2026-08-17 交接）到此冻结，不再继续投入发版与审核成本。
+- **代码留仓不删**：`ios/`、`capacitor.config.ts`、`codemagic.yaml`、`ios/APP_VERSION`
+  原样保留；Codemagic 的路径触发规则也不动（见文首「两个关键架构决定」），
+  后续会话不要顺手清理这批文件。
+- **重启条件（满足其一才重启）**：① 网页版订阅破 300；② 老板点名重启。
+  条件未满足前，再有人提 iOS 上线，先指回这一段。
+- 暂停期间网页版照常迭代；`VITE_API_BASE` 前缀纪律（文首决定二）继续有效，
+  别让网页改版把 App 壳的调用路径弄断——真重启时还要靠它。
+
+---
+
 ## 边界
 
 - 代码不进 kb。kb 里只有一页索引：`~/kb/projects/GCTracker 绿卡排期追踪站.md`。
