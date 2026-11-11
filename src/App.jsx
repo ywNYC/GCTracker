@@ -6817,7 +6817,7 @@ const AboutTab = () => {
 // BulletinTab — the bulletin itself as a first-class page: official notices
 // (trilingual), DV cutoffs, statutory quotas, edition metadata.
 // ============================================================
-const BulletinTab = ({ userCase = null }) => {
+const BulletinTab = ({ userCase = null, embedded = false }) => {
   const { lang } = useLang();
   const [openNotice, setOpenNotice] = useState(null);
   // Category-relevant notices float to the top so the reader doesn't wade through
@@ -6834,6 +6834,9 @@ const BulletinTab = ({ userCase = null }) => {
   const otherNotices = mineNotices.length ? indexed.filter(({ nz }) => !noticeHit(nz)) : indexed;
   return (
     <div className="space-y-2">
+      {/* UI-18: embedded inside 最新's 公告原文 section — the section header
+          already says what this is, so the standalone page header is skipped. */}
+      {!embedded && (
       <div style={{ padding: '4px 0 0' }}>
         <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>{lang === 'en' ? 'BULLETIN' : '公告'}</div>
         <h2 className="gc-serif" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gc-ink)', margin: '2px 0 2px' }}>
@@ -6845,6 +6848,7 @@ const BulletinTab = ({ userCase = null }) => {
           {BULLETIN_EXTRAS?.meta?.printedDate ? ` · ${BULLETIN_EXTRAS.meta.printedDate}` : ''}
         </p>
       </div>
+      )}
       {/* B3: the bulletin's own lettered notices, verbatim — the user's category first */}
       {mineNotices.length > 0 && (
         <div className="bg-white rounded-2xl p-3 shadow-sm mt-2" style={{ border: '1px solid var(--gc-green-border)' }}>
@@ -7246,7 +7250,7 @@ const CommunityTeaser = ({ lang, onGo }) => {
 // 访客在个人页看到的示例案件（只读展示，不写进 localStorage）
 const SAMPLE_CASE = { country: 'Taiwan', category: 'EB3', priorityDate: '2024-07-15', inUS: true, petitionerStatus: 'USC', birthYearMonth: '' };
 
-const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = () => {}, onNeedCase = () => {}, dataPending = false }) => {
+const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = () => {}, onNeedCase = () => {}, dataPending = false, openBulletin = false }) => {
   // 访客（没填案子）看通用视角：默认中国大陆列 + 亲属组，不渲染「你的类别」个人行，
   // category=null 让所有「我的」高亮自然失效——不能拿默认的 Taiwan EB3 冒充访客的案子
   if (!hasCase) userCase = { country: 'China', category: null, priorityDate: null };
@@ -7276,6 +7280,9 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
   // UI-19: visitors meet the plain-language summary + CTA first; the full
   // tables start collapsed behind an explicit toggle (case users unaffected).
   const [visitorTableOpen, setVisitorTableOpen] = useState(false);
+  // UI-18: 公告原文 section — collapsed by default; ?tab=bulletin deep
+  // links arrive with it already open (openBulletin prop, set once in App).
+  const [bulletinOpen, setBulletinOpen] = useState(openBulletin);
   const chartKey = updChart === 'B' ? 'filing' : 'finalAction';
   // UI-01: the bulletin data carries REAL Mexico/Philippines columns, but
   // resolveCountry folds those users into 'Other' — so the table's primary
@@ -7828,6 +7835,31 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
       {/* UI-04：讨论区/社区小组件/换类别对比此前在最新页与社区页各挂一份，
           现已撤下镜像——社区页是唯一挂载点，最新页只留一行摘要入口。 */}
       <CommunityTeaser lang={lang} onGo={() => setTab('compare')} />
+
+      {/* UI-18: 公告原文 section — the standalone 公告 tab was merged into
+          最新 as this collapsible section (trial). Content is the same
+          BulletinTab component on the same data sources (BULLETIN_NOTICES /
+          BULLETIN_EXTRAS); only its mount point and page header changed. */}
+      {!dataPending && (
+        <div style={{ marginTop: '10px', border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', overflow: 'hidden' }}>
+          <button type="button" onClick={() => setBulletinOpen((v) => !v)} aria-expanded={bulletinOpen}
+            className="flex items-center justify-between"
+            style={{ width: '100%', padding: '11px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+            <span style={{ display: 'flex', alignItems: 'baseline', gap: '8px', minWidth: 0 }}>
+              <span className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>
+                {lang === 'en' ? 'OFFICIAL BULLETIN' : lang === 'tw' ? '公告原文' : '公告原文'}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>{BULLETIN_CURRENT_MONTH[lang]}</span>
+            </span>
+            <span style={{ fontSize: '9px', color: 'var(--gc-muted)', transform: bulletinOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
+          </button>
+          {bulletinOpen && (
+            <div style={{ padding: '0 10px 10px' }}>
+              <BulletinTab userCase={userCase} embedded />
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
 
@@ -9411,9 +9443,19 @@ export default function App() {
   });
   // ?tab= deep link (e.g. ?tab=alerts to land on the subscription page from an email).
   // Read-only: switching tabs afterwards doesn't write back to the URL.
+  // UI-18: the standalone 公告 (bulletin) tab was merged into 最新 as its
+  // 公告原文 section. Legacy ?tab=bulletin deep links must not 404/blank:
+  // they alias to 'update' below, and this flag tells MonthlyUpdate to
+  // arrive with that section auto-expanded. The 'bulletin' key stays in
+  // the beacon whitelist on the functions side (untouched) so historical
+  // analytics remain continuous; new visits simply report as 'update'.
+  const [bulletinAlias] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('tab') === 'bulletin'; } catch (e) { return false; }
+  });
   const [tab, setTab] = useState(() => {
     try {
       const p = new URLSearchParams(window.location.search).get('tab');
+      if (p === 'bulletin') return 'update'; // UI-18 alias — see bulletinAlias above
       if (['overview', 'trends', 'update', 'bulletin', 'compare', 'index', 'alerts', 'about'].includes(p)) return p;
     } catch (e) { /* noop */ }
     // 刷新/直开一律默认落「最新」页（用户点名）——个人页只有主动点击或
@@ -10102,7 +10144,8 @@ export default function App() {
     // ForecastHub 代码保留，恢复时解开此行。
     // { id: 'trends', label: t.navTrends, icon: BarChart3 },
     { id: 'compare', label: t.navCompare, icon: Users },
-    { id: 'bulletin', label: lang === 'en' ? 'Bulletin' : '公告', icon: FileText },
+    // UI-18: 公告 tab merged into 最新 (公告原文 section) — nav entry removed;
+    // ?tab=bulletin deep links alias to update (see tab initializer).
     { id: 'index', label: t.navIndex, icon: ClipboardList },
     { id: 'about', label: lang === 'en' ? 'More' : '更多', icon: MoreHorizontal },
   ];
@@ -11132,10 +11175,11 @@ export default function App() {
                   no setTab/deep-link path ever sets tab to 'forecast' — and
                   has been removed.) */}
               {tab === 'trends' && <Suspense fallback={<TabFallback />}><ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} /></Suspense>}
-              {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} setTab={handleTabChange} onNeedCase={openWizardFromSample} dataPending={dataLoad.history === 'pending' && dataLoad.bulletin === 'pending'} />}
+              {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} setTab={handleTabChange} onNeedCase={openWizardFromSample} dataPending={dataLoad.history === 'pending' && dataLoad.bulletin === 'pending'} openBulletin={bulletinAlias} />}
               {tab === 'i485' && <Overview userCase={userCase} onRefineCase={() => { setOnboardingInitialMode('form'); setShowWizard(true); }} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <Suspense fallback={<TabFallback />}><SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} /></Suspense>}
-              {tab === 'bulletin' && <BulletinTab userCase={userCase} />}
+              {/* UI-18: tab 'bulletin' no longer exists — BulletinTab renders
+                  inside MonthlyUpdate as the 公告原文 section. */}
               {tab === 'about' && <AboutTab />}
               {/* 原「如果」（What-if）tab 让位给「社区」：案件进度墙 + 同路人互动挪进来，
                   CompareHub 没删，收进页面底部的 <details> 里，默认收起。 */}
