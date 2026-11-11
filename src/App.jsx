@@ -1461,7 +1461,7 @@ const StatusBadge = ({ status, daysAgo }) => {
   const c = configs[status] || configs.notCurrent;
   const Icon = c.icon;
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold"
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-semibold"
           style={{ backgroundColor: c.bg, border: `1px solid ${c.bd}`, color: c.fg, borderRadius: '2px', letterSpacing: '0.02em' }}>
       <Icon size={10} strokeWidth={2.5} />
       <span>{c.label}</span>
@@ -1485,7 +1485,7 @@ const LangSwitcher = () => {
         <button key={o.v} onClick={() => setLang(o.v)} title={o.title}
           style={{
             padding: '4px 7px',
-            fontSize: '10px',
+            fontSize: '11px',
             fontWeight: 600,
             letterSpacing: '0.04em',
             borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
@@ -1605,7 +1605,7 @@ const CategoryDropdown = ({ value, onChange, triggerStyle = {}, placeholder = ''
           {groups.map((g) => (
             <div key={g.key}>
               <div className="gc-eyebrow" style={{
-                position: 'sticky', top: 0, fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700,
+                position: 'sticky', top: 0, fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700,
                 color: 'var(--gc-green)', background: 'var(--gc-paper-soft)',
                 padding: '5px 10px 4px', borderBottom: '1px solid var(--gc-rule-soft)',
               }}>{g.label}</div>
@@ -1697,7 +1697,7 @@ const SubtypeChips = ({ userCase, setUserCase, required = false, error = false }
             <button key={id} type="button"
               onClick={() => { if (!on) setUserCase({ ...userCase, subtype: id }); }}
               style={{
-                padding: '4px 9px', fontSize: '10.5px', fontWeight: on ? 700 : 500,
+                padding: '4px 9px', fontSize: '11px', fontWeight: on ? 700 : 500,
                 border: `1px solid ${on ? 'var(--gc-green)' : error ? 'var(--gc-red)' : 'var(--gc-rule)'}`,
                 borderRadius: '11px',
                 background: on ? 'var(--gc-green)' : 'var(--gc-surface)',
@@ -1839,7 +1839,7 @@ const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, 
         }}>
           {view === 'years' ? (
             <>
-              <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
+              <div className="gc-eyebrow" style={{ fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
                 {lang === 'en' ? 'PICK A YEAR' : lang === 'tw' ? '選擇年份' : '选择年份'}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
@@ -1854,7 +1854,7 @@ const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, 
             </>
           ) : (
           <>
-          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
+          <div className="gc-eyebrow" style={{ fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', marginBottom: '5px' }}>
             {lang === 'en' ? 'YEAR' : '年'}
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
@@ -1876,7 +1876,7 @@ const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, 
               ›
             </button>
           </div>
-          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', margin: '7px 0 5px' }}>
+          <div className="gc-eyebrow" style={{ fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', margin: '7px 0 5px' }}>
             {lang === 'en' ? 'MONTH' : '月'}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px' }}>
@@ -1887,7 +1887,7 @@ const DateDropdown = ({ value, onChange, triggerStyle = {}, allowEmpty = false, 
               </button>
             ))}
           </div>
-          <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', margin: '7px 0 5px' }}>
+          <div className="gc-eyebrow" style={{ fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-green)', margin: '7px 0 5px' }}>
             {lang === 'en' ? 'DAY' : '日'}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
@@ -2054,7 +2054,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
       {/* Header with hairline */}
       <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
         <div className="gc-eyebrow">{t.inputTitle}</div>
-        <p style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '2px', lineHeight: 1.4 }}>
+        <p style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '2px', lineHeight: 1.4 }}>
           {t.inputSubtitle}
         </p>
       </div>
@@ -2064,7 +2064,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
         <div style={{ width: '100%', marginBottom: '10px' }}>
           <div className="flex items-center gap-1 mb-1.5">
             <MapPin size={10} style={{ color: 'var(--gc-muted-soft)' }} className="flex-shrink-0" />
-            <span className="gc-label" style={{ fontSize: '9px' }}>{t.countryLabel}</span>
+            <span className="gc-label" style={{ fontSize: '11px' }}>{t.countryLabel}</span>
           </div>
           <div className="grid grid-cols-5" style={{ width: '100%', border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
             {countries.map((c, i) => {
@@ -2082,7 +2082,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
                   }}
                   className="flex flex-col items-center gap-1 justify-center">
                   <CountryFlag country={c.v} size={16} />
-                  <span className="gc-mono truncate" style={{ fontSize: '10px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
+                  <span className="gc-mono truncate" style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
                     {countryShortLabel(c.v, lang)}
                   </span>
                 </button>
@@ -2097,7 +2097,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
           <div style={{ minWidth: 0 }}>
             <div className="flex items-center gap-1 mb-1">
               <Briefcase size={10} style={{ color: 'var(--gc-muted-soft)' }} className="flex-shrink-0" />
-              <span className="gc-label" style={{ fontSize: '9px' }}>{t.categoryLabel}</span>
+              <span className="gc-label" style={{ fontSize: '11px' }}>{t.categoryLabel}</span>
             </div>
             <CategoryDropdown value={userCase.category}
               triggerStyle={{ padding: '9px 9px' }}
@@ -2114,7 +2114,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
           <div style={{ minWidth: 0 }}>
             <div className="flex items-center gap-1 mb-1">
               <Calendar size={10} style={{ color: 'var(--gc-muted-soft)' }} className="flex-shrink-0" />
-              <span className="gc-label" style={{ fontSize: '9px' }}>{t.priorityDateLabel}</span>
+              <span className="gc-label" style={{ fontSize: '11px' }}>{t.priorityDateLabel}</span>
             </div>
             <DateDropdown value={userCase.priorityDate}
               triggerStyle={{ padding: '9px 9px' }}
@@ -2125,7 +2125,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
           <div style={{ minWidth: 0 }}>
             <div className="flex items-center justify-center gap-0.5 mb-1">
               <Home size={10} style={{ color: 'var(--gc-muted-soft)' }} className="flex-shrink-0" />
-              <span className="gc-label" style={{ fontSize: '9px' }}>{lang === 'en' ? 'In US' : '在美'}</span>
+              <span className="gc-label" style={{ fontSize: '11px' }}>{lang === 'en' ? 'In US' : '在美'}</span>
             </div>
             <button onClick={() => setUserCase({ ...userCase, inUS: !userCase.inUS })}
               style={{
@@ -2152,7 +2152,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
         <div style={{ width: '100%', marginTop: '10px' }}>
           <div className="flex items-center gap-1 mb-1">
             <Calendar size={10} style={{ color: 'var(--gc-muted-soft)' }} className="flex-shrink-0" />
-            <span className="gc-label" style={{ fontSize: '9px' }}>
+            <span className="gc-label" style={{ fontSize: '11px' }}>
               {lang === 'en' ? 'Date of birth (optional)' : lang === 'tw' ? '出生年月（選填）' : '出生年月（选填）'}
             </span>
           </div>
@@ -2174,7 +2174,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
             <div style={{ width: '100%', marginTop: '10px' }}>
               <div className="flex items-center gap-1 mb-1">
                 <Users size={10} style={{ color: 'var(--gc-muted-soft)' }} className="flex-shrink-0" />
-                <span className="gc-label" style={{ fontSize: '9px' }}>{t.petitionerLabel}</span>
+                <span className="gc-label" style={{ fontSize: '11px' }}>{t.petitionerLabel}</span>
                 <Tooltip text={t.petitionerHelp}>
                   <Info size={10} style={{ color: 'var(--gc-muted-soft)' }} />
                 </Tooltip>
@@ -2219,7 +2219,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
                   background: 'var(--gc-amber-soft)',
                   border: '1px solid var(--gc-amber-border)',
                   borderRadius: '3px',
-                  fontSize: '10px',
+                  fontSize: '11px',
                   color: 'var(--gc-amber-ink)',
                   lineHeight: 1.5,
                 }}>
@@ -2239,7 +2239,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
                   background: 'var(--gc-blue-soft)',
                   border: '1px solid var(--gc-blue-border)',
                   borderRadius: '3px',
-                  fontSize: '10px',
+                  fontSize: '11px',
                   color: 'var(--gc-blue-ink)',
                   lineHeight: 1.5,
                 }}>
@@ -2314,12 +2314,12 @@ export const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false 
           textAlign: 'left',
           minWidth: 0,
         }}>
-        <span className="gc-eyebrow" style={{ fontSize: '8px', letterSpacing: '0.14em', flexShrink: 0, color: 'var(--gc-muted)' }}>
+        <span className="gc-eyebrow" style={{ fontSize: '11px', letterSpacing: '0.14em', flexShrink: 0, color: 'var(--gc-muted)' }}>
           {lang === 'en' ? 'Case' : lang === 'tw' ? '案件' : '案件'}
         </span>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0, overflow: 'hidden' }}>
           <CountryFlag country={userCase.country} size={12} />
-          <span className="gc-mono" style={{ fontSize: '10px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '0.06em', flexShrink: 0 }}>
+          <span className="gc-mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '0.06em', flexShrink: 0 }}>
             {countryShortLabel(userCase.country, lang)}
           </span>
           <span style={{ color: 'var(--gc-rule)', flexShrink: 0 }}>·</span>
@@ -2334,7 +2334,7 @@ export const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false 
             <>
               <span style={{ color: 'var(--gc-rule)', flexShrink: 0 }}>·</span>
               <span className="gc-mono" style={{
-                fontSize: '9px', fontWeight: 700, letterSpacing: '0.04em',
+                fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em',
                 color: userCase.petitionerStatus === 'LPR' ? 'var(--gc-green)' : 'var(--gc-ink-soft)',
                 flexShrink: 0,
               }}>
@@ -2349,7 +2349,7 @@ export const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false 
           )}
         </div>
         <span className="gc-eyebrow" style={{
-          fontSize: '9px',
+          fontSize: '11px',
           color: expanded ? 'var(--gc-ink)' : 'var(--gc-paper)',
           flexShrink: 0,
           display: 'inline-flex',
@@ -2379,7 +2379,7 @@ export const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false 
       {/* EXPANDED body — segmented controls for editing */}
       {expanded && (
         <div style={{ padding: '8px 8px 8px' }}>
-          <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', margin: '2px 2px 7px', letterSpacing: '0.12em' }}>
+          <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', margin: '2px 2px 7px', letterSpacing: '0.12em' }}>
             {lang === 'en' ? 'EDIT · COUNTRY / CATEGORY / PRIORITY DATE' : lang === 'tw' ? '編輯 · 國籍／類別／優先日' : '编辑 · 国籍／类别／优先日'}
           </div>
           {/* Country segmented — 5 tight buttons (flag + passport code) */}
@@ -2404,7 +2404,7 @@ export const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false 
                   }}
                   className="flex flex-col items-center justify-center gap-0.5">
                   <CountryFlag country={c.v} size={13} />
-                  <span className="gc-mono" style={{ fontSize: '8px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
+                  <span className="gc-mono" style={{ fontSize: '11px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
                     {countryShortLabel(c.v, lang)}
                   </span>
                 </button>
@@ -2444,7 +2444,7 @@ export const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false 
                 <button onClick={() => setUserCase({ ...userCase, petitionerStatus: 'USC' })}
                   style={{
                     padding: '6px 7px',
-                    fontSize: '10px',
+                    fontSize: '11px',
                     fontWeight: 700,
                     letterSpacing: '0.04em',
                     background: userCase.petitionerStatus === 'USC' ? 'var(--gc-ink)' : 'transparent',
@@ -2456,7 +2456,7 @@ export const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false 
                 <button onClick={() => setUserCase({ ...userCase, petitionerStatus: 'LPR' })}
                   style={{
                     padding: '6px 7px',
-                    fontSize: '10px',
+                    fontSize: '11px',
                     fontWeight: 700,
                     letterSpacing: '0.04em',
                     borderLeft: '1px solid var(--gc-rule-soft)',
@@ -2476,7 +2476,7 @@ export const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false 
               line on the Overview countdown card. Year+month only, so any age
               computed from it defaults the day to the 1st. */}
           <div style={{ marginTop: '6px' }}>
-            <div className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-muted)', marginBottom: '3px', letterSpacing: '0.1em' }}>
+            <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '3px', letterSpacing: '0.1em' }}>
               {lang === 'en' ? 'DATE OF BIRTH (OPTIONAL)' : lang === 'tw' ? '出生年月（選填）' : '出生年月（选填）'}
             </div>
             <YearMonthDropdown value={userCase.birthYearMonth || ''} allowEmpty
@@ -2492,7 +2492,7 @@ export const CompactCaseBar = ({ userCase, setUserCase, defaultExpanded = false 
               background: 'var(--gc-amber-soft)',
               border: '1px solid var(--gc-amber-border)',
               borderRadius: '3px',
-              fontSize: '10px',
+              fontSize: '11px',
               color: 'var(--gc-amber-ink)',
               lineHeight: 1.4,
               display: 'flex',
@@ -2593,7 +2593,7 @@ const ProgressTimeline = ({ priorityDate, cutoff, chartLabel, sharedScale, showP
         <div className="flex items-center justify-between text-xs">
           <span className="text-slate-500 font-medium">{chartLabel}</span>
           {isCurrent && (
-            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold">
+            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[11px] font-bold">
               {t.currentLabel}
             </span>
           )}
@@ -2678,7 +2678,7 @@ const ProgressTimeline = ({ priorityDate, cutoff, chartLabel, sharedScale, showP
         const pdDate = formatDateShort(priorityDate, lang);
 
         return (
-          <div className="relative text-[10px]" style={{ height: crowded ? '32px' : '18px' }}>
+          <div className="relative text-[11px]" style={{ height: crowded ? '32px' : '18px' }}>
             {/* Cutoff label - dot sits at coPos, text extends in cutoffDir */}
             <div
               className="absolute flex items-center gap-1 whitespace-nowrap"
@@ -2721,7 +2721,7 @@ const ProgressTimeline = ({ priorityDate, cutoff, chartLabel, sharedScale, showP
         );
       })() : (
         /* Current case: only show PD label on the right */
-        <div className="flex items-center justify-end gap-1 text-[10px]">
+        <div className="flex items-center justify-end gap-1 text-[11px]">
           <div className="w-2 h-2 rounded-full bg-emerald-600"></div>
           <span className="font-bold text-slate-900">{lang === 'en' ? 'Your PD' : '你的优先日'}</span>
           <span className="font-semibold text-slate-700">{formatDateShort(priorityDate, lang)}</span>
@@ -2846,9 +2846,9 @@ const I485ProgressBar = ({ completedSteps = [], userCase }) => {
         </div>
         {/* Badge style counter */}
         <div className="inline-flex items-center px-2 py-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 shadow-sm">
-          <span className="text-[10px] font-bold text-white leading-none">{completedCount}</span>
-          <span className="text-[10px] text-white/60 leading-none mx-0.5">/</span>
-          <span className="text-[10px] font-bold text-white/90 leading-none">{totalSteps}</span>
+          <span className="text-[11px] font-bold text-white leading-none">{completedCount}</span>
+          <span className="text-[11px] text-white/60 leading-none mx-0.5">/</span>
+          <span className="text-[11px] font-bold text-white/90 leading-none">{totalSteps}</span>
         </div>
       </div>
 
@@ -2897,7 +2897,7 @@ const I485ProgressBar = ({ completedSteps = [], userCase }) => {
                     borderRadius: '1px'
                   }}></div>
                 {/* Day count label - white background breaks the line */}
-                <div className="absolute text-[10px] text-slate-700 font-semibold whitespace-nowrap bg-white px-1.5"
+                <div className="absolute text-[11px] text-slate-700 font-semibold whitespace-nowrap bg-white px-1.5"
                   style={{
                     left: `${rulerMid}%`,
                     top: '3px',
@@ -2943,7 +2943,7 @@ const I485ProgressBar = ({ completedSteps = [], userCase }) => {
             const stepDate = getStepDate(id);
             return (
               <div key={id} className="flex flex-col items-center" style={{ width: '16.66%' }}>
-                <div className={`w-5 h-5 rounded-full ring-2 ring-white shadow flex items-center justify-center text-[9px] font-bold transition-all ${
+                <div className={`w-5 h-5 rounded-full ring-2 ring-white shadow flex items-center justify-center text-[11px] font-bold transition-all ${
                   isCompleted ? 'bg-emerald-500 text-white' :
                   shouldPulse ? 'bg-indigo-500 text-white animate-pulse' :
                   isCurrent ? 'bg-indigo-500 text-white' :
@@ -2951,14 +2951,14 @@ const I485ProgressBar = ({ completedSteps = [], userCase }) => {
                 }`}>
                   {isCompleted ? '✓' : (idx + 1)}
                 </div>
-                <div className={`text-[9px] mt-1 text-center leading-tight whitespace-nowrap ${
+                <div className={`text-[11px] mt-1 text-center leading-tight whitespace-nowrap ${
                   isCompleted ? 'text-emerald-700 font-semibold' :
                   isCurrent ? 'text-indigo-700 font-bold' :
                   'text-slate-500'
                 }`}>
                   {labels[id]}
                 </div>
-                <div className="text-[8px] text-slate-400 mt-0.5 whitespace-nowrap">
+                <div className="text-[11px] text-slate-400 mt-0.5 whitespace-nowrap">
                   {formatShortDate(stepDate)}
                 </div>
               </div>
@@ -3382,7 +3382,7 @@ const ShareCardModal = ({ userCase, greenCardInfo, lang, onClose }) => {
 
         <div style={{
           marginTop: '8px',
-          fontSize: '10px', color: 'var(--gc-muted)',
+          fontSize: '11px', color: 'var(--gc-muted)',
           textAlign: 'center', lineHeight: 1.5,
         }}>
           {lang === 'en'
@@ -3710,7 +3710,7 @@ const StatusShareModal = ({ userCase, lang, t, country, countryLabel, heroChart,
 
         <div style={{
           marginTop: '8px',
-          fontSize: '10px', color: 'var(--gc-muted)',
+          fontSize: '11px', color: 'var(--gc-muted)',
           textAlign: 'center', lineHeight: 1.5,
         }}>
           {lang === 'en'
@@ -3765,7 +3765,7 @@ const ActionCenter = ({ userCase, setTab = () => {} }) => {
   // echo (CrowdEcho) in the ④ slot — same numbers, same thresholds.
 
   const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' };
-  const eyebrow = { fontSize: '9px', letterSpacing: '0.12em', fontWeight: 700 };
+  const eyebrow = { fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700 };
 
   // ---- roadmap steps ----
   const steps = inUS
@@ -3906,18 +3906,18 @@ const ActionCenter = ({ userCase, setTab = () => {} }) => {
             <div key={i} className="flex" style={{ gap: '10px', padding: '7px 0', borderBottom: i < steps.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none' }}>
               <span className="gc-mono flex-shrink-0" style={{
                 width: '20px', height: '20px', borderRadius: '50%', textAlign: 'center', lineHeight: '20px',
-                fontSize: '10px', fontWeight: 700, background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)',
+                fontSize: '11px', fontWeight: 700, background: 'var(--gc-green-soft)', color: 'var(--gc-green-ink)',
                 border: '1px solid var(--gc-green-border)',
               }}>{i + 1}</span>
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink)' }}>{tt}</span>
-                <span className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginLeft: '7px' }}>{dur}</span>
+                <span className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginLeft: '7px' }}>{dur}</span>
                 <div style={{ fontSize: '11px', lineHeight: 1.55, color: 'var(--gc-ink-soft)', marginTop: '1px' }}>{dd}</div>
               </span>
             </div>
           ))}
           {!inUS && (
-            <div style={{ marginTop: '9px', padding: '8px 10px', background: 'var(--gc-amber-soft)', borderLeft: '2px solid var(--gc-amber)', fontSize: '10.5px', lineHeight: 1.6, color: 'var(--gc-amber-ink)' }}>
+            <div style={{ marginTop: '9px', padding: '8px 10px', background: 'var(--gc-amber-soft)', borderLeft: '2px solid var(--gc-amber)', fontSize: '11px', lineHeight: 1.6, color: 'var(--gc-amber-ink)' }}>
               {L('两个最常踩的坑：①移民签证有效期一般只有 6 个月，逾期作废要重走流程；②入境后不缴 USCIS 移民费，绿卡永远不会寄出。',
                  '兩個最常踩的坑：①移民簽證一般僅 6 個月有效，逾期作廢要重走流程；②入境後不繳 USCIS 移民費，綠卡永遠不會寄出。',
                  'Two classic traps: ① the immigrant visa is typically valid only 6 months — expired means starting over; ② skip the USCIS immigrant fee after entry and the card is never mailed.')}
@@ -3934,7 +3934,7 @@ const ActionCenter = ({ userCase, setTab = () => {} }) => {
           style={{ width: '100%', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
           <span className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
             {L('材料清单', '材料清單', 'DOCUMENT CHECKLIST')}
-            <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '10px', color: doneItems === totalItems && totalItems > 0 ? 'var(--gc-green)' : 'var(--gc-muted)', letterSpacing: 0, textTransform: 'none' }}>
+            <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '11px', color: doneItems === totalItems && totalItems > 0 ? 'var(--gc-green)' : 'var(--gc-muted)', letterSpacing: 0, textTransform: 'none' }}>
               {doneItems}/{totalItems}
             </span>
           </span>
@@ -3944,7 +3944,7 @@ const ActionCenter = ({ userCase, setTab = () => {} }) => {
           <div style={{ padding: '0 14px 12px' }}>
             {groups.map((g, gi) => (
               <div key={gi} style={{ marginBottom: gi < groups.length - 1 ? '10px' : 0 }}>
-                <div className="gc-eyebrow" style={{ fontSize: '8.5px', letterSpacing: '0.1em', fontWeight: 700, color: 'var(--gc-green)', margin: '6px 0 3px' }}>{g.title}</div>
+                <div className="gc-eyebrow" style={{ fontSize: '11px', letterSpacing: '0.1em', fontWeight: 700, color: 'var(--gc-green)', margin: '6px 0 3px' }}>{g.title}</div>
                 {g.items.map(([id, label]) => (
                   <label key={id} className="flex items-center" style={{ gap: '8px', padding: '4px 0', cursor: 'pointer', fontSize: '12px', color: checked[id] ? 'var(--gc-muted)' : 'var(--gc-ink-soft)', textDecoration: checked[id] ? 'line-through' : 'none' }}>
                     <input type="checkbox" checked={!!checked[id]} onChange={() => toggleItem(id)}
@@ -3954,7 +3954,7 @@ const ActionCenter = ({ userCase, setTab = () => {} }) => {
                 ))}
               </div>
             ))}
-            <div style={{ marginTop: '8px', fontSize: '10px', lineHeight: 1.6, color: 'var(--gc-muted)' }}>
+            <div style={{ marginTop: '8px', fontSize: '11px', lineHeight: 1.6, color: 'var(--gc-muted)' }}>
               {inUS
                 ? L('提示：EAD 一般 1-2 年有效，过期前 180 天内可递 I-765 续期，别等断档。清单为常见项，个案差异请以律师意见为准。',
                     '提示：EAD 一般 1-2 年有效，過期前 180 天內可遞 I-765 續期。清單為常見項，個案請以律師意見為準。',
@@ -3997,7 +3997,7 @@ const CrowdEcho = ({ userCase, setTab = () => {} }) => {
       .then((r) => r.json()).then(setRfeAgg).catch(() => {});
   }, [crowdOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' };
-  const eyebrow = { fontSize: '9px', letterSpacing: '0.12em', fontWeight: 700 };
+  const eyebrow = { fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700 };
   return (
     <div style={card}>
       <button type="button" onClick={() => setCrowdOpen((v) => !v)}
@@ -4006,7 +4006,7 @@ const CrowdEcho = ({ userCase, setTab = () => {} }) => {
         <span className="gc-eyebrow" style={{ ...eyebrow, color: 'var(--gc-muted)' }}>
           {L('真实时间线互助（匿名）', '真實時間線互助（匿名）', 'REAL TIMELINES (ANONYMOUS)')}
           {tlAgg && tlAgg.total > 0 && (
-            <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--gc-green)', letterSpacing: 0, textTransform: 'none' }}>
+            <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--gc-green)', letterSpacing: 0, textTransform: 'none' }}>
               {tlAgg.total}
             </span>
           )}
@@ -4018,24 +4018,24 @@ const CrowdEcho = ({ userCase, setTab = () => {} }) => {
           {/* aggregates — verbatim caliber from the pre-migration ④ card */}
           {tlAgg && tlAgg.total >= 3 ? (
             <div style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--gc-green-soft)', borderRadius: '3px' }}>
-              <div style={{ fontSize: '10.5px', color: 'var(--gc-green-ink)', fontWeight: 700, marginBottom: '3px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 700, marginBottom: '3px' }}>
                 {L(`${userCase.category} · ${tlAgg.total} 份真实时间线`, `${userCase.category} · ${tlAgg.total} 份真實時間線`, `${userCase.category} · ${tlAgg.total} real timelines`)}
               </div>
-              <div className="gc-mono" style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', lineHeight: 1.7 }}>
+              <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.7 }}>
                 {tlAgg.medians?.receipt !== null && tlAgg.counts?.receipt >= 3 && <div>{L('递件→收据 中位 ', '遞件→收據 中位 ', 'filed→receipt median ')}{tlAgg.medians.receipt}{L(' 天', ' 天', 'd')}</div>}
                 {tlAgg.medians?.ead !== null && tlAgg.counts?.ead >= 3 && <div>{L('递件→EAD 中位 ', '遞件→EAD 中位 ', 'filed→EAD median ')}{tlAgg.medians.ead}{L(' 天', ' 天', 'd')}</div>}
                 {tlAgg.medians?.approved !== null && tlAgg.counts?.approved >= 3 && <div>{L('递件→批准 中位 ', '遞件→批准 中位 ', 'filed→approved median ')}{tlAgg.medians.approved}{L(' 天', ' 天', 'd')}</div>}
               </div>
             </div>
           ) : tlAgg ? (
-            <div style={{ marginBottom: '10px', fontSize: '10.5px', color: 'var(--gc-muted)' }}>
+            <div style={{ marginBottom: '10px', fontSize: '11px', color: 'var(--gc-muted)' }}>
               {L(`${userCase.category} 已收集 ${tlAgg.total || 0} 份时间线，满 3 份后显示中位耗时。`,
                  `${userCase.category} 已收集 ${tlAgg.total || 0} 份時間線，滿 3 份後顯示中位耗時。`,
                  `${tlAgg.total || 0} timeline(s) so far — medians appear at 3+.`)}
             </div>
           ) : null}
           {rfeAgg && rfeAgg.total >= 3 && (
-            <div style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', marginBottom: '10px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', marginBottom: '10px' }}>
               {L(`补件（RFE）：${rfeAgg.total} 份上报中 ${rfeAgg.gotRfe} 份收到过`,
                  `補件（RFE）：${rfeAgg.total} 份上報中 ${rfeAgg.gotRfe} 份收到過`,
                  `RFE: ${rfeAgg.gotRfe} of ${rfeAgg.total} reported receiving one`)}
@@ -4148,7 +4148,7 @@ export const CrowdReportForms = ({ userCase, sample = false, onNeedCase = null }
           <span style={subTitle}>
             {L('真实时间线 · 报你的关键日期', '真實時間線 · 報你的關鍵日期', 'Real timeline · report your key dates')}
             {tlAgg && tlAgg.total > 0 && (
-              <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--gc-green)' }}>{tlAgg.total}</span>
+              <span className="gc-mono" style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--gc-green)' }}>{tlAgg.total}</span>
             )}
           </span>
           <span style={{ fontSize: '9px', color: 'var(--gc-muted)', transform: tlOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>▼</span>
@@ -4157,17 +4157,17 @@ export const CrowdReportForms = ({ userCase, sample = false, onNeedCase = null }
           <div style={{ padding: '0 14px 12px' }}>
             {tlAgg && tlAgg.total >= 3 ? (
               <div style={{ marginBottom: '10px', padding: '8px 10px', background: 'var(--gc-green-soft)', borderRadius: '3px' }}>
-                <div style={{ fontSize: '10.5px', color: 'var(--gc-green-ink)', fontWeight: 700, marginBottom: '3px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 700, marginBottom: '3px' }}>
                   {L(`${userCase.category} · ${tlAgg.total} 份真实时间线`, `${userCase.category} · ${tlAgg.total} 份真實時間線`, `${userCase.category} · ${tlAgg.total} real timelines`)}
                 </div>
-                <div className="gc-mono" style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)', lineHeight: 1.7 }}>
+                <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.7 }}>
                   {tlAgg.medians?.receipt !== null && tlAgg.counts?.receipt >= 3 && <div>{L('递件→收据 中位 ', '遞件→收據 中位 ', 'filed→receipt median ')}{tlAgg.medians.receipt}{L(' 天', ' 天', 'd')}</div>}
                   {tlAgg.medians?.ead !== null && tlAgg.counts?.ead >= 3 && <div>{L('递件→EAD 中位 ', '遞件→EAD 中位 ', 'filed→EAD median ')}{tlAgg.medians.ead}{L(' 天', ' 天', 'd')}</div>}
                   {tlAgg.medians?.approved !== null && tlAgg.counts?.approved >= 3 && <div>{L('递件→批准 中位 ', '遞件→批准 中位 ', 'filed→approved median ')}{tlAgg.medians.approved}{L(' 天', ' 天', 'd')}</div>}
                 </div>
               </div>
             ) : tlAgg ? (
-              <div style={{ marginBottom: '10px', fontSize: '10.5px', color: 'var(--gc-muted)' }}>
+              <div style={{ marginBottom: '10px', fontSize: '11px', color: 'var(--gc-muted)' }}>
                 {L(`${userCase.category} 已收集 ${tlAgg.total || 0} 份时间线，满 3 份后显示中位耗时。`,
                    `${userCase.category} 已收集 ${tlAgg.total || 0} 份時間線，滿 3 份後顯示中位耗時。`,
                    `${tlAgg.total || 0} timeline(s) so far — medians appear at 3+.`)}
@@ -4186,7 +4186,7 @@ export const CrowdReportForms = ({ userCase, sample = false, onNeedCase = null }
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
                   {dateFields.map(([key, label]) => (
                     <div key={key}>
-                      <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginBottom: '2px' }}>{label}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '2px' }}>{label}</div>
                       <DateDropdown value={tlDates[key]} onChange={(v) => setTlDates((s) => ({ ...s, [key]: v }))} allowEmpty />
                     </div>
                   ))}
@@ -4202,11 +4202,11 @@ export const CrowdReportForms = ({ userCase, sample = false, onNeedCase = null }
                   </button>
                 </div>
                 {!inUSKnown && (
-                  <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '6px', lineHeight: 1.5 }}>
+                  <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px', lineHeight: 1.5 }}>
                     {L('按人在美国递 I-485 显示字段——境外领馆流程请到个人页点「编辑」补填所在位置。', '按人在美國遞 I-485 顯示欄位——境外領館流程請到個人頁點「編輯」補填所在位置。', 'Fields assume filing I-485 inside the US — for consular processing, set your location via Edit on the Overview tab.')}
                   </div>
                 )}
-                <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '6px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '6px' }}>
                   {L('只需填你记得的日期（递件日必填），大约日期也行。完全匿名。', '只需填你記得的日期（遞件日必填），大約日期也行。完全匿名。', 'Fill what you remember (filed date required); approximate is fine. Fully anonymous.')}
                 </div>
               </div>
@@ -4223,7 +4223,7 @@ export const CrowdReportForms = ({ userCase, sample = false, onNeedCase = null }
               {L('收到过补件（RFE）吗？', '收到過補件（RFE）嗎？', 'Did you get an RFE?')}
             </div>
             {rfeAgg && rfeAgg.total >= 3 && (
-              <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-green)', whiteSpace: 'nowrap' }}>
+              <span className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-green)', whiteSpace: 'nowrap' }}>
                 {L(`${rfeAgg.total} 份中 ${rfeAgg.gotRfe} 份收到过`, `${rfeAgg.total} 份中 ${rfeAgg.gotRfe} 份收到過`, `${rfeAgg.gotRfe} of ${rfeAgg.total} did`)}
               </span>
             )}
@@ -4243,10 +4243,10 @@ export const CrowdReportForms = ({ userCase, sample = false, onNeedCase = null }
             </div>
           ) : (
             <div>
-              <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '6px' }}>{L('补的是什么？（可选，点一下即提交）', '補的是什麼？（可選，點一下即提交）', 'What was it about? (optional — tap to submit)')}</div>
+              <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '6px' }}>{L('补的是什么？（可选，点一下即提交）', '補的是什麼？（可選，點一下即提交）', 'What was it about? (optional — tap to submit)')}</div>
               <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                 {[['medical', L('体检', '體檢', 'Medical')], ['birth', L('出生证明', '出生證明', 'Birth cert')], ['marriage', L('婚姻证明', '婚姻證明', 'Marriage')], ['i864', L('经济担保', '經濟擔保', 'I-864')], ['other', L('其他/跳过', '其他/跳過', 'Other / skip')]].map(([v, label]) => (
-                  <button key={v} type="button" onClick={() => submitRfe(true, v)} style={{ fontSize: '10.5px', fontWeight: 600, padding: '6px 10px', borderRadius: '999px', cursor: 'pointer', border: '1px solid var(--gc-rule)', background: 'var(--gc-surface)', color: 'var(--gc-ink-soft)' }}>
+                  <button key={v} type="button" onClick={() => submitRfe(true, v)} style={{ fontSize: '11px', fontWeight: 600, padding: '6px 10px', borderRadius: '999px', cursor: 'pointer', border: '1px solid var(--gc-rule)', background: 'var(--gc-surface)', color: 'var(--gc-ink-soft)' }}>
                     {label}
                   </button>
                 ))}
@@ -4352,7 +4352,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
     <div style={{ padding: '10px 12px 9px' }}>
       {/* Header: eyebrow + chart (A/B) and window (12/24) toggles */}
       <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
-        <span className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', minWidth: 0 }}>
+        <span className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', minWidth: 0 }}>
           {lang === 'en' ? 'Bulletin movement' : lang === 'tw' ? '排期推進' : '排期推进'}
           <span style={{ fontWeight: 400, letterSpacing: 0, textTransform: 'none', marginLeft: '5px', color: 'var(--gc-muted-soft)' }}>
             {chartSel === 'A'
@@ -4368,7 +4368,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
                 onClick={() => { setChartSel(c); setSel(null); }}
                 className="gc-mono"
                 style={{
-                  fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.4,
+                  fontSize: '11px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.4,
                   border: 'none', cursor: 'pointer',
                   borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                   background: chartSel === c ? 'var(--gc-green)' : 'var(--gc-surface)',
@@ -4384,7 +4384,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
                 onClick={() => { setWindowMonths(w); setSel(null); }}
                 className="gc-mono"
                 style={{
-                  fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.4,
+                  fontSize: '11px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.4,
                   border: 'none', cursor: 'pointer',
                   borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                   background: windowMonths === w ? 'var(--gc-ink)' : 'transparent',
@@ -4415,7 +4415,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
         {showLine && (
           <span className="gc-mono" style={{
             position: 'absolute', right: 0, top: `${Math.min(Math.max(yOf(cums[n - 1]) - 5, LABEL_ROOM - 4), UP_PX - 12)}px`,
-            fontSize: '9.5px', fontWeight: 700, color: 'var(--gc-green-ink)',
+            fontSize: '11px', fontWeight: 700, color: 'var(--gc-green-ink)',
             pointerEvents: 'none',
           }}>
             {total >= 0 ? '+' : '−'}{Math.abs(total)}
@@ -4501,7 +4501,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
       {/* X ticks: every 3rd month (12-mo view) / every 6th (24-mo), plus the latest.
           Cells mirror the bar columns exactly (same flex + gutter), so each tick sits
           centered under its own column instead of floating at the row's edges. */}
-      <div className="gc-mono" style={{ display: 'flex', gap: '2px', paddingRight: showLine ? '34px' : 0, marginTop: '3px', fontSize: '8.5px', color: 'var(--gc-muted-soft)' }}>
+      <div className="gc-mono" style={{ display: 'flex', gap: '2px', paddingRight: showLine ? '34px' : 0, marginTop: '3px', fontSize: '11px', color: 'var(--gc-muted-soft)' }}>
         {points.map((p, i) => {
           const every = windowMonths === 24 ? 6 : 3;
           const show = (i % every === 0 && i < n - 2) || i === n - 1;
@@ -4520,7 +4520,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
 
       {/* Readout for the tapped column (defaults to the latest month) */}
       <div className="gc-mono" style={{
-        fontSize: '10.5px', fontWeight: manual ? 700 : 600,
+        fontSize: '11px', fontWeight: manual ? 700 : 600,
         color: manual ? 'var(--gc-ink)' : 'var(--gc-ink-soft)',
         marginTop: '6px',
         borderLeft: manual ? `3px solid ${selPt.days > 0 ? 'var(--gc-blue)' : selPt.days < 0 ? 'var(--gc-red)' : 'var(--gc-green)'}` : 'none',
@@ -4534,7 +4534,7 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
       </div>
 
       {/* Legend — the line's scale independence is declared here */}
-      <div className="flex items-center gap-3" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginTop: '4px', flexWrap: 'wrap' }}>
+      <div className="flex items-center gap-3" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '4px', flexWrap: 'wrap' }}>
         <span className="inline-flex items-center gap-1">
           <span style={{ width: '7px', height: '7px', background: 'var(--gc-blue)', borderRadius: '1px', display: 'inline-block' }} />
           {lang === 'en' ? 'Monthly advance' : lang === 'tw' ? '單月前進' : '单月前进'}
@@ -4725,7 +4725,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                   </>
                 )}
               </div>
-              <div style={{ marginTop: '6px', fontSize: '10px', color: 'var(--gc-red)' }}>
+              <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--gc-red)' }}>
                 {lang === 'en'
                   ? 'Please consult an immigration attorney if you believe your PD is correct.'
                   : '如确认优先日正确，请咨询移民律师了解案子状态。'}
@@ -4766,7 +4766,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
             }}>
             <ClipboardList size={16} style={{ color: 'var(--gc-green)', flexShrink: 0 }} strokeWidth={1.8} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-green)', letterSpacing: '0.14em', marginBottom: '2px' }}>
+              <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-green)', letterSpacing: '0.14em', marginBottom: '2px' }}>
                 {lang === 'en' ? 'NOT SURE WHICH CATEGORY YOU ARE?' : lang === 'tw' ? '不確定自己屬於哪個類別?' : '不确定自己属于哪个类别?'}
               </div>
               <div className="gc-serif" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--gc-ink)', lineHeight: 1.3, letterSpacing: '-0.005em' }}>
@@ -4941,7 +4941,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
               <span className="flex items-center gap-2 flex-shrink-0">
                 {waitingLayout && (
                   <span className="gc-eyebrow" style={{
-                    fontSize: '9px', fontWeight: 700, color: accentColor,
+                    fontSize: '11px', fontWeight: 700, color: accentColor,
                     border: `1px solid ${accentColor}`, borderRadius: '2px',
                     padding: '2px 6px', letterSpacing: '0.08em',
                   }}>
@@ -5002,7 +5002,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                 </div>
                 {/* Right: small mono caption with lead time — for the curious, not the main message */}
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-muted)', marginBottom: '2px' }}>
+                  <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '2px' }}>
                     {lang === 'en' ? 'Ahead by' : lang === 'tw' ? '提前' : '提前'}
                   </div>
                   <div className="gc-mono" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gc-ink-soft)' }}>
@@ -5076,7 +5076,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                     ) : (
                       <>
                         {/* What the number IS, said before the number */}
-                        <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
+                        <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
                           {heroSel === 'B'
                             ? (lang === 'en' ? 'TIME UNTIL YOU CAN FILE' : lang === 'tw' ? '距離可以遞件，還需要' : '距离可以递件，还需要')
                             : (lang === 'en' ? 'TIME UNTIL APPROVAL WINDOW' : lang === 'tw' ? '距離可以獲批，還需要' : '距离可以获批，还需要')}
@@ -5113,7 +5113,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                         )}
                         {/* Where the number comes from — declared up front, expandable proof */}
                         {paceMo && (
-                          <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginTop: '5px', lineHeight: 1.5 }}>
+                          <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '5px', lineHeight: 1.5 }}>
                             {lang === 'en'
                               ? `Assumes the last 12 months' real pace holds (${Math.round(paceMo)} days forward per month). `
                               : lang === 'tw'
@@ -5130,7 +5130,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                                 ? '表B始終不落後於表A，預計按不晚於表A估算。'
                                 : '表B始终不落后于表A，预计按不晚于表A估算。')}
                             <button type="button" onClick={() => setShowHeroMath((v) => !v)}
-                              style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600 }}>
+                              style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-green)', textDecoration: 'underline', textUnderlineOffset: '2px', fontWeight: 600 }}>
                               {showHeroMath
                                 ? (lang === 'en' ? 'hide the math' : lang === 'tw' ? '收起推導' : '收起推导')
                                 : (lang === 'en' ? 'how is this derived?' : lang === 'tw' ? '怎麼算的？' : '怎么算的？')}
@@ -5157,7 +5157,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                           ];
                           return (
                             <div className="gc-mono" style={{
-                              fontSize: '10px', lineHeight: 1.8, color: 'var(--gc-ink-soft)',
+                              fontSize: '11px', lineHeight: 1.8, color: 'var(--gc-ink-soft)',
                               background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)',
                               borderRadius: '3px', padding: '7px 10px', marginTop: '6px',
                             }}>
@@ -5173,7 +5173,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                             <div style={{ height: '6px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
                               <div style={{ height: '100%', width: `${pct}%`, background: accentColor === 'var(--gc-muted)' ? 'var(--gc-green)' : accentColor, borderRadius: '3px' }} />
                             </div>
-                            <div className="flex items-center justify-between gc-mono" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginTop: '4px' }}>
+                            <div className="flex items-center justify-between gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '4px' }}>
                               <span>{lang === 'en' ? 'PD ' : '优先日 '}{pdD ? fmtYM(pdD) : ''}</span>
                               <span style={{ fontWeight: 700, color: 'var(--gc-ink-soft)' }}>
                                 {lang === 'en' ? `you're ~${pct}% of the way there` : lang === 'tw' ? `你已走完約 ${pct}% 的等待` : `你已走完约 ${pct}% 的等待`}
@@ -5267,7 +5267,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                       boxShadow: isSelStation ? 'inset 0 2px 0 var(--gc-green)' : 'none',
                       cursor: 'pointer',
                     }}>
-                      <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: blk.adopted ? 'var(--gc-green)' : 'var(--gc-muted)', letterSpacing: '0.1em', marginBottom: '2px' }}>
+                      <div className="gc-eyebrow" style={{ fontSize: '11px', color: blk.adopted ? 'var(--gc-green)' : 'var(--gc-muted)', letterSpacing: '0.1em', marginBottom: '2px' }}>
                         {blk.title}{blk.adopted ? (lang === 'en' ? ' · ACTIVE' : ' · 采用') : ''}
                       </div>
                       {/* Movement first and biggest — what changed this month is the
@@ -5573,7 +5573,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                     {doneCount}/{I485_STEPS.length}
                   </span>
                   <span className="gc-eyebrow" style={{
-                    fontSize: '9px',
+                    fontSize: '11px',
                     color: i485Expanded ? 'var(--gc-ink)' : 'var(--gc-green-ink)',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -5634,7 +5634,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                   gap: '8px',
                 }}>
                   <span className="gc-eyebrow" style={{
-                    fontSize: '8px',
+                    fontSize: '11px',
                     color: 'var(--gc-green)',
                     letterSpacing: '0.12em',
                     padding: '1px 5px',
@@ -5656,7 +5656,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                     {titleText}
                   </span>
                   <span className="gc-mono" style={{
-                    fontSize: '10.5px',
+                    fontSize: '11px',
                     fontWeight: 600,
                     color: 'var(--gc-green-ink)',
                     flexShrink: 0,
@@ -5679,7 +5679,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                 borderLeft: '2px solid var(--gc-green)',
               }}>
                 <div className="gc-eyebrow" style={{
-                  fontSize: '8.5px',
+                  fontSize: '11px',
                   color: 'var(--gc-green)',
                   letterSpacing: '0.16em',
                   marginBottom: '3px',
@@ -5728,7 +5728,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                   gap: '8px',
                 }}>
                   <span className="gc-eyebrow" style={{
-                    fontSize: '9px', letterSpacing: '0.12em', color: 'var(--gc-muted)',
+                    fontSize: '11px', letterSpacing: '0.12em', color: 'var(--gc-muted)',
                     flexShrink: 0,
                   }}>
                     {lang === 'en' ? 'SPEED' : lang === 'tw' ? '速度' : '速度'}
@@ -5770,7 +5770,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                     })}
                   </div>
                   <span className="gc-mono" style={{
-                    fontSize: '10px',
+                    fontSize: '11px',
                     color: 'var(--gc-muted)',
                     flexShrink: 0,
                   }}>
@@ -5784,7 +5784,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                 {isFilingProjected && (
                   <div className="gc-eyebrow" style={{
                     padding: '6px 12px 4px',
-                    fontSize: '8.5px',
+                    fontSize: '11px',
                     color: 'var(--gc-muted)',
                     letterSpacing: '0.1em',
                     display: 'flex', alignItems: 'center', gap: '5px',
@@ -5835,7 +5835,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: step.done ? 'var(--gc-paper)' : (isNext ? 'var(--gc-green-ink)' : 'var(--gc-muted)'),
-                          fontSize: '9px',
+                          fontSize: '11px',
                           fontWeight: 700,
                         }}>
                           {step.done ? <CheckCircle2 size={12} strokeWidth={2.5} /> : (i + 1)}
@@ -5853,7 +5853,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                           {isNext && (
                             <span className="gc-eyebrow" style={{
                               flexShrink: 0,
-                              fontSize: '8px',
+                              fontSize: '11px',
                               color: 'var(--gc-green)',
                               letterSpacing: '0.12em',
                               padding: '1px 5px',
@@ -5876,7 +5876,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                                 it has no actual date yet — guides user to start anchoring. */}
                             {!stepActualDates[step.id] && step.id === completedI485Steps[completedI485Steps.length - 1] && !hasAnchor && (
                               <span style={{
-                                fontSize: '9.5px',
+                                fontSize: '11px',
                                 color: 'var(--gc-green)',
                                 fontWeight: 600,
                                 letterSpacing: '0.02em',
@@ -5893,13 +5893,13 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                                 else delete next[step.id];
                                 setStepActualDates(next);
                               }}
-                              triggerStyle={{ padding: '3px 6px', fontSize: '10.5px' }} />
+                              triggerStyle={{ padding: '3px 6px', fontSize: '11px' }} />
                           </span>
                           </div>
                         ) : (
                           <span className="gc-mono" style={{
                             flexShrink: 0,
-                            fontSize: '10px',
+                            fontSize: '11px',
                             fontWeight: isNext ? 600 : 500,
                             color: isNext ? 'var(--gc-green-ink)' : 'var(--gc-muted)',
                             letterSpacing: '0.01em',
@@ -5920,7 +5920,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                     borderTop: '1px solid var(--gc-rule-soft)',
                     background: 'var(--gc-green-soft)',
                     borderLeft: '2px solid var(--gc-green)',
-                    fontSize: '10px',
+                    fontSize: '11px',
                     color: 'var(--gc-green-ink)',
                     lineHeight: 1.45,
                   }}>
@@ -5946,7 +5946,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                     padding: '7px 12px',
                     borderTop: '1px solid var(--gc-rule-soft)',
                     background: 'var(--gc-paper-soft)',
-                    fontSize: '10px', color: 'var(--gc-muted)', lineHeight: 1.4,
+                    fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.4,
                   }}>
                     {lang === 'en'
                       ? 'Tap any step — earlier steps auto-complete, later ones clear.'
@@ -6005,7 +6005,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                       {/* Celebratory title — editorial style, no emoji */}
                       <div style={{ padding: '16px 14px 12px', textAlign: 'center' }}>
                         <div className="gc-eyebrow" style={{
-                          fontSize: '9px',
+                          fontSize: '11px',
                           color: 'var(--gc-green)',
                           letterSpacing: '0.2em',
                           marginBottom: '6px',
@@ -6050,7 +6050,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                         borderTop: '1px solid var(--gc-rule-soft)',
                         borderBottom: '1px solid var(--gc-rule-soft)',
                       }}>
-                        <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', letterSpacing: '0.12em', marginBottom: '6px' }}>
+                        <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', letterSpacing: '0.12em', marginBottom: '6px' }}>
                           {lang === 'en' ? 'GREEN CARD DETAILS' : lang === 'tw' ? '綠卡資訊' : '绿卡信息'}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
@@ -6083,7 +6083,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                                 : '条件 2 年绿卡 (CR-1) — 需要递 I-751')}
                         </label>
                         {isEB5Card && !greenCardInfo.isConditional && (
-                          <div style={{ fontSize: '10px', color: 'var(--gc-amber-ink)', marginTop: '4px', lineHeight: 1.5 }}>
+                          <div style={{ fontSize: '11px', color: 'var(--gc-amber-ink)', marginTop: '4px', lineHeight: 1.5 }}>
                             {lang === 'en'
                               ? 'Note: every new EB-5 green card is a 2-year conditional card — this almost certainly applies to you.'
                               : lang === 'tw'
@@ -6112,7 +6112,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                         return (
                           <details style={{ padding: '10px 14px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
                             {/* UI-07：postgc 三个月仅 2 条，入口默认收起（数据与端点保留，展开即答）。 */}
-                            <summary className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', letterSpacing: '0.12em', cursor: 'pointer', listStyle: 'revert' }}>
+                            <summary className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', letterSpacing: '0.12em', cursor: 'pointer', listStyle: 'revert' }}>
                               {lang === 'en' ? 'NEXT 12 MONTHS (ANONYMOUS) — TAP TO ANSWER' : lang === 'tw' ? '接下來 12 個月（匿名）— 點開選一個' : '接下来 12 个月（匿名）— 点开选一个'}
                             </summary>
                             <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
@@ -6122,7 +6122,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                                 ['naturalize', lang === 'en' ? 'Start the citizenship clock' : lang === 'tw' ? '開始攢入籍' : '开始攒入籍'],
                                 ['none', lang === 'en' ? 'Not sure yet' : lang === 'tw' ? '還沒想' : '还没想']].map(([id, label]) => (
                                 <button key={id} type="button" onClick={() => send(id)}
-                                  style={{ fontSize: '10.5px', fontWeight: 700, padding: '5px 10px', border: '1px solid var(--gc-green-border)', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-surface)', color: 'var(--gc-green-ink)' }}>
+                                  style={{ fontSize: '11px', fontWeight: 700, padding: '5px 10px', border: '1px solid var(--gc-green-border)', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-surface)', color: 'var(--gc-green-ink)' }}>
                                   {label}
                                 </button>
                               ))}
@@ -6139,7 +6139,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                           background: inI751Window ? 'var(--gc-amber-soft)' : 'transparent',
                           borderLeft: inI751Window ? '2px solid var(--gc-amber)' : 'none',
                         }}>
-                          <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: inI751Window ? 'var(--gc-amber-ink)' : 'var(--gc-muted)', letterSpacing: '0.12em', marginBottom: '4px' }}>
+                          <div className="gc-eyebrow" style={{ fontSize: '11px', color: inI751Window ? 'var(--gc-amber-ink)' : 'var(--gc-muted)', letterSpacing: '0.12em', marginBottom: '4px' }}>
                             {inI751Window
                               ? (lang === 'en' ? `⚠ ${removalForm} WINDOW OPEN NOW` : `⚠ ${removalForm} 申请窗口已开`)
                               : (lang === 'en' ? `${removalForm} (REMOVE CONDITIONS)` : `${removalForm} 解除条件`)}
@@ -6165,7 +6165,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                       {/* N-400 countdown */}
                       {approvalDate && daysUntilN400 !== null && (
                         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
-                          <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', letterSpacing: '0.12em', marginBottom: '4px' }}>
+                          <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', letterSpacing: '0.12em', marginBottom: '4px' }}>
                             {lang === 'en' ? 'N-400 (CITIZENSHIP)' : lang === 'tw' ? 'N-400 入籍' : 'N-400 入籍'}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
@@ -6221,7 +6221,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                               <Plane size={12} style={{ color: hasLongTrip ? 'var(--gc-amber-ink)' : 'var(--gc-muted)', flexShrink: 0 }} strokeWidth={2} />
                               <div style={{ flex: '1 1 auto', minWidth: 0 }}>
                                 <div className="gc-eyebrow" style={{
-                                  fontSize: '8.5px',
+                                  fontSize: '11px',
                                   color: hasLongTrip ? 'var(--gc-amber-ink)' : 'var(--gc-muted)',
                                   letterSpacing: '0.12em',
                                 }}>
@@ -6258,14 +6258,14 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                                           borderBottom: i < travelRecords.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none',
                                         }}>
                                           <span className="gc-mono" style={{
-                                            fontSize: '10.5px',
+                                            fontSize: '11px',
                                             color: isLong ? 'var(--gc-amber-ink)' : 'var(--gc-ink)',
                                             flex: '1 1 auto', minWidth: 0,
                                           }}>
                                             {r.from} → {r.to}
                                           </span>
                                           <span className="gc-mono" style={{
-                                            fontSize: '10px', fontWeight: 600,
+                                            fontSize: '11px', fontWeight: 600,
                                             color: isLong ? 'var(--gc-amber-ink)' : 'var(--gc-muted)',
                                           }}>
                                             {isLong && '⚠ '}{days}{lang === 'en' ? 'd' : '天'}
@@ -6329,7 +6329,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                                     border: '1px solid var(--gc-amber-border)',
                                     borderLeft: '2px solid var(--gc-amber)',
                                     borderRadius: '3px',
-                                    fontSize: '10.5px', color: 'var(--gc-amber-ink)', lineHeight: 1.5,
+                                    fontSize: '11px', color: 'var(--gc-amber-ink)', lineHeight: 1.5,
                                   }}>
                                     {lang === 'en'
                                       ? '⚠ Single trips over 180 days can break continuous residence for N-400 — consult an attorney before your next long trip.'
@@ -6366,7 +6366,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                       </div>
 
                       {/* Footer tips */}
-                      <div style={{ padding: '10px 14px', fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.55 }}>
+                      <div style={{ padding: '10px 14px', fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.55 }}>
                         {lang === 'en'
                           ? 'Tips: don\'t spend >6 months outside the US per trip (breaks continuous residence), renew card every 10 years, keep tax filings current.'
                           : lang === 'tw'
@@ -6588,7 +6588,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                     <button key={i} type="button"
                       onClick={() => setSumPaceIdx(i)}
                       style={{
-                        fontSize: '9px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.5,
+                        fontSize: '11px', fontWeight: 700, padding: '2px 7px', lineHeight: 1.5,
                         border: 'none', cursor: 'pointer', letterSpacing: '0.05em',
                         borderLeft: i === 0 ? 'none' : '1px solid var(--gc-green-border)',
                         background: paceIdx === i ? 'var(--gc-green)' : 'transparent',
@@ -6613,7 +6613,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                   onClick={() => setSumFormulaOpen((v) => !v)}
                   style={{
                     border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
-                    fontSize: '10.5px', color: 'var(--gc-green)', textDecoration: 'underline',
+                    fontSize: '11px', color: 'var(--gc-green)', textDecoration: 'underline',
                     textUnderlineOffset: '2px', fontWeight: 600,
                   }}>
                   {sumFormulaOpen
@@ -6624,7 +6624,7 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
             )}
             {etaBlock && sumFormulaOpen && (
               <div className="gc-mono" style={{
-                fontSize: '10.5px', lineHeight: 1.6, color: 'var(--gc-ink-soft)',
+                fontSize: '11px', lineHeight: 1.6, color: 'var(--gc-ink-soft)',
                 background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)',
                 borderRadius: '3px', padding: '6px 9px', margin: '6px 0 0',
                 overflowX: 'auto', whiteSpace: 'nowrap',
@@ -6757,7 +6757,7 @@ const CopyChip = ({ label, value, hint, compact = false }) => {
 const AboutTab = () => {
   const { lang } = useLang();
   const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '14px 16px' };
-  const eyebrow = { fontSize: '9px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--gc-green)', fontWeight: 700, marginBottom: '6px' };
+  const eyebrow = { fontSize: '11px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--gc-green)', fontWeight: 700, marginBottom: '6px' };
   return (
     <div className="space-y-2">
       <div style={{ padding: '4px 0 0' }}>
@@ -6794,7 +6794,7 @@ const AboutTab = () => {
             <div className="gc-serif" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gc-ink)' }}>
               Jack ｜ 全美房贷 MLO
             </div>
-            <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>
               {lang === 'en' ? 'Licensed Mortgage Loan Officer · built this site' : lang === 'tw' ? '持牌 Mortgage Loan Officer · 本站作者' : '持牌 Mortgage Loan Officer · 本站作者'}
             </div>
           </div>
@@ -6810,7 +6810,7 @@ const AboutTab = () => {
           <CopyChip label={lang === 'en' ? 'WeChat' : '微信'} value="yiaccount" />
           <CopyChip label={lang === 'en' ? 'XHS ID' : '小红书号'} value="49330048750" />
         </div>
-        <p style={{ fontSize: '10px', color: 'var(--gc-muted)', margin: '8px 0 0' }}>
+        <p style={{ fontSize: '11px', color: 'var(--gc-muted)', margin: '8px 0 0' }}>
           {lang === 'en' ? 'Mortgage services are independent of this site\'s bulletin data. Not financial advice.' : lang === 'tw' ? '貸款服務與本站排期資料相互獨立，不構成金融建議。' : '贷款服务与本站排期数据相互独立，不构成金融建议。'}
         </p>
       </div>
@@ -6832,7 +6832,7 @@ const AboutTab = () => {
                 textDecoration: 'none', display: 'inline-flex', alignItems: 'baseline', gap: '5px',
               }}>
               {lang === 'en' ? 'Wu Law Office ｜ SIJS' : lang === 'tw' ? '吳律師事務所 ｜ SIJS' : '吴律师事务所 ｜ SIJS'}
-              <span className="gc-mono" style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--gc-green)' }}>
+              <span className="gc-mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-green)' }}>
                 robertwulaw.com ↗
               </span>
             </a>
@@ -6847,7 +6847,7 @@ const AboutTab = () => {
         </p>
         <div className="flex items-center" style={{ gap: '6px', flexWrap: 'wrap' }}>
           <span className="gc-mono" style={{
-            fontSize: '9.5px', padding: '3px 7px', borderRadius: '10px',
+            fontSize: '11px', padding: '3px 7px', borderRadius: '10px',
             border: '1px solid var(--gc-rule)', color: 'var(--gc-muted)', whiteSpace: 'nowrap',
           }}>{lang === 'en' ? 'Court 3-9mo · petition 3-8mo · GC 1-3yr' : lang === 'tw' ? '家事法院 3-9 月 · 移民申請 3-8 月 · 排期 1-3 年' : '家事法院 3-9 月 · 移民申请 3-8 月 · 排期 1-3 年'}</span>
         </div>
@@ -6855,7 +6855,7 @@ const AboutTab = () => {
           <CopyChip compact label={lang === 'en' ? 'Tel' : '电话'} value="718-567-5566" />
           <CopyChip compact value="info@robertwulaw.com" />
         </div>
-        <p style={{ fontSize: '9.5px', color: 'var(--gc-muted)', margin: '7px 0 0' }}>
+        <p style={{ fontSize: '11px', color: 'var(--gc-muted)', margin: '7px 0 0' }}>
           {lang === 'en'
             ? 'Paid slot · Flushing NY 133-32 41 Rd 3A · this site is not a law firm; timings are the firm\u2019s own figures.'
             : lang === 'tw'
@@ -6888,7 +6888,7 @@ const AboutTab = () => {
             </div>
           </div>
           <span className="gc-mono flex-shrink-0" style={{
-            fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em',
+            fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em',
             border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)',
             color: 'var(--gc-green-ink)', borderRadius: '11px', padding: '4px 10px',
           }}>
@@ -6966,7 +6966,7 @@ const BulletinTab = ({ userCase = null, embedded = false }) => {
       {/* B3: the bulletin's own lettered notices, verbatim — the user's category first */}
       {mineNotices.length > 0 && (
         <div className="bg-white rounded-2xl p-3 shadow-sm mt-2" style={{ border: '1px solid var(--gc-green-border)' }}>
-          <div className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--gc-green)' }}>
+          <div className="text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--gc-green)' }}>
             {lang === 'en' ? `About your category · ${catTok}` : lang === 'tw' ? `與你的類別相關 · ${catTok}` : `与你的类别相关 · ${catTok}`}
           </div>
           {mineNotices.map(({ nz, ni }) => {
@@ -6983,13 +6983,13 @@ const BulletinTab = ({ userCase = null, embedded = false }) => {
               {loc.translated && (
                 <div style={{ marginTop: '3px' }}>
                   <button type="button" onClick={() => setOpenNotice(isOpen ? null : ni)}
-                    style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '9.5px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                    style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
                     {isOpen
                       ? (lang === 'tw' ? '收起英文原文' : '收起英文原文')
                       : (lang === 'tw' ? 'AI 譯文 · 查看英文原文' : 'AI 译文 · 查看英文原文')}
                   </button>
                   {isOpen && (
-                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.6, marginTop: '3px', fontStyle: 'italic' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.6, marginTop: '3px', fontStyle: 'italic' }}>
                       {nz.title}{nz.text ? ` — ${nz.text}` : ''}
                     </div>
                   )}
@@ -7002,7 +7002,7 @@ const BulletinTab = ({ userCase = null, embedded = false }) => {
       )}
       {otherNotices.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
             {mineNotices.length
               ? (lang === 'en' ? 'Other notices' : lang === 'tw' ? '其餘公告' : '其余公告')
               : (lang === 'en' ? 'Official notices (from the bulletin)' : lang === 'tw' ? '公告原文提醒（官方）' : '公告原文提醒（官方）')}
@@ -7021,13 +7021,13 @@ const BulletinTab = ({ userCase = null, embedded = false }) => {
               {loc.translated && (
                 <div style={{ marginTop: '3px' }}>
                   <button type="button" onClick={() => setOpenNotice(isOpen ? null : ni)}
-                    style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '9.5px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                    style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
                     {isOpen
                       ? (lang === 'tw' ? '收起英文原文' : '收起英文原文')
                       : (lang === 'tw' ? 'AI 譯文 · 查看英文原文' : 'AI 译文 · 查看英文原文')}
                   </button>
                   {isOpen && (
-                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.6, marginTop: '3px', fontStyle: 'italic' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.6, marginTop: '3px', fontStyle: 'italic' }}>
                       {nz.title}{nz.text ? ` — ${nz.text}` : ''}
                     </div>
                   )}
@@ -7044,7 +7044,7 @@ const BulletinTab = ({ userCase = null, embedded = false }) => {
       {/* B1: DV lottery rank cutoffs — scraped since day one, displayed at last */}
       {BULLETIN_EXTRAS?.dv && (
         <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
             {lang === 'en' ? 'DV lottery rank cutoffs' : lang === 'tw' ? 'DV 抽籤排名截止' : 'DV 抽签排名截止'}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '6px' }}>
@@ -7061,7 +7061,7 @@ const BulletinTab = ({ userCase = null, embedded = false }) => {
               <div key={k} className="flex items-center justify-between" style={{ fontSize: '11.5px', padding: '3px 0', borderTop: '1px solid var(--gc-rule-soft)' }}>
                 <span style={{ color: 'var(--gc-ink-soft)' }}>{label}
                   {cur.exceptions && Object.keys(cur.exceptions).length > 0 && (
-                    <span style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginLeft: '5px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--gc-muted)', marginLeft: '5px' }}>
                       {Object.entries(cur.exceptions).map(([cc, vv]) => `${cc} ${fmtDv(vv)}`).join(' · ')}
                     </span>
                   )}
@@ -7074,7 +7074,7 @@ const BulletinTab = ({ userCase = null, embedded = false }) => {
             );
           })}
           {BULLETIN_EXTRAS?.dvNext?.monthName && (
-            <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '4px' }}>
               {lang === 'en' ? `→ = advance notification for ${BULLETIN_EXTRAS.dvNext.monthName}` : `→ 为下月（${BULLETIN_EXTRAS.dvNext.monthName}）预告`}
             </div>
           )}
@@ -7083,7 +7083,7 @@ const BulletinTab = ({ userCase = null, embedded = false }) => {
 
       {/* B12: statutory annual limits — INA §201/202/203 constants, cited */}
       <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm mt-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
           {lang === 'en' ? 'Why the backlog: statutory annual limits' : lang === 'tw' ? '為什麼積壓：法定年度配額' : '为什么积压：法定年度配额'}
         </div>
         {[
@@ -7095,7 +7095,7 @@ const BulletinTab = ({ userCase = null, embedded = false }) => {
             <span className="gc-mono" style={{ fontWeight: 600, color: 'var(--gc-ink)' }}>{v}{lang === 'en' ? '/yr' : ' 张/年'}</span>
           </div>
         ))}
-        <div style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '5px', lineHeight: 1.6 }}>
+        <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '5px', lineHeight: 1.6 }}>
           {lang === 'en'
             ? 'Plus a 7% per-country ceiling — that ceiling, not processing speed, is why China/India queues are long. Source: INA §201–203.'
             : lang === 'tw'
@@ -7277,7 +7277,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat, onCh
           {[['filing', lang === 'en' ? 'Chart B' : '表B'], ['finalAction', lang === 'en' ? 'Chart A' : '表A']].map(([id, label], i) => (
             <button key={id} type="button" onClick={() => { setCk(id); onChartKey?.(id); }}
               style={{
-                fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
+                fontSize: '11px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
                 borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                 background: ck === id ? 'var(--gc-green)' : 'var(--gc-surface)',
                 color: ck === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
@@ -7288,7 +7288,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat, onCh
           {[['emp', lang === 'en' ? 'EB' : '人才类'], ['family', lang === 'en' ? 'Family' : '亲属类']].map(([id, label], i) => (
             <button key={id} type="button" onClick={() => { setGrp(id); onCatGroup?.(id); }}
               style={{
-                fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
+                fontSize: '11px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
                 borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                 background: grp === id ? 'var(--gc-green)' : 'var(--gc-surface)',
                 color: grp === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
@@ -7300,7 +7300,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat, onCh
             {countryOpts.map((c, i) => (
               <button key={c} type="button" onClick={() => setTrendCountry(c)}
                 style={{
-                  fontSize: '9.5px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
+                  fontSize: '11px', fontWeight: 700, padding: '2px 9px', border: 'none', cursor: 'pointer',
                   borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                   background: trendCountry === c ? 'var(--gc-green)' : 'var(--gc-surface)',
                   color: trendCountry === c ? 'var(--gc-paper)' : 'var(--gc-muted)',
@@ -7312,7 +7312,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat, onCh
           {cats.map((c) => (
             <button key={c} type="button" onClick={() => setCat(c)}
               style={{
-                fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px',
+                fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px',
                 border: `1px solid ${cat === c ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
                 background: cat === c ? 'var(--gc-green)' : 'var(--gc-surface)',
                 color: cat === c ? 'var(--gc-paper)' : 'var(--gc-muted)', cursor: 'pointer',
@@ -7523,7 +7523,7 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
               const chip = (key, text, bg, fg, bd) => (
                 <span key={key} style={{
                   display: 'inline-block', padding: '1px 6px', borderRadius: '999px',
-                  fontSize: '9.5px', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
+                  fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
                   background: bg, color: fg, border: `1px solid ${bd}`,
                 }}>{text}</span>
               );
@@ -7731,7 +7731,7 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
               <button key={c} type="button" onClick={() => { setUpdChart(c); setUpdChartTouched(true); }}
                 className="gc-mono"
                 style={{
-                  fontSize: '10px', fontWeight: 700, padding: '3px 9px', lineHeight: 1.4,
+                  fontSize: '11px', fontWeight: 700, padding: '3px 9px', lineHeight: 1.4,
                   border: 'none', cursor: 'pointer',
                   borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                   background: updChart === c ? 'var(--gc-green)' : 'var(--gc-surface)',
@@ -7746,7 +7746,7 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
               ['family', lang === 'en' ? 'Family' : lang === 'tw' ? '親屬類' : '亲属类']].map(([g, gl], i) => (
               <button key={g} type="button" onClick={() => setCatGroup(g)}
                 style={{
-                  fontSize: '10px', fontWeight: 700, padding: '3px 9px', lineHeight: 1.4,
+                  fontSize: '11px', fontWeight: 700, padding: '3px 9px', lineHeight: 1.4,
                   border: 'none', cursor: 'pointer',
                   borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                   background: catGroup === g ? 'var(--gc-green)' : 'var(--gc-surface)',
@@ -7812,7 +7812,7 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
               the movement pills next to it and broke the column rhythm. */}
           const Pill = ({ tone, children }) => (
             <span style={{
-              display: 'inline-block', fontSize: '10.5px', fontWeight: 700,
+              display: 'inline-block', fontSize: '11px', fontWeight: 700,
               color: P[tone].fg, background: P[tone].bg, borderRadius: '999px',
               padding: '3px 9px', whiteSpace: 'nowrap',
             }}>{children}</span>
@@ -7857,15 +7857,15 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
                 display: 'grid', gridTemplateColumns: gridCols, alignItems: 'center',
                 padding: '8px 8px', background: 'var(--gc-paper-soft)', borderRadius: '4px',
               }}>
-                <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>
                   {lang === 'en' ? 'Category' : lang === 'tw' ? '簽證類別' : '签证类别'}
                 </div>
-                <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-ink-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                   <CountryFlag country={userCase.country} size={12} />
                   <span>{userCase.country === 'China' && lang !== 'en' ? (lang === 'tw' ? '中國大陸' : '中国大陆') : countryShortLabel(userCase.country, lang)}</span>
                 </div>
                 {tableCountry !== 'Other' && (
-                  <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-ink-soft)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink-soft)', textAlign: 'center' }}>
                     {lang === 'en' ? 'ROW' : lang === 'tw' ? '全球 / 港澳台' : '全球 / 港澳台'}
                   </div>
                 )}
@@ -7886,12 +7886,12 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
                         background: (ch.cat === userCase.category || ch.mine) ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
                         border: '1px solid var(--gc-rule)',
                         color: (ch.cat === userCase.category || ch.mine) ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
-                        fontSize: '10px', fontWeight: 700,
+                        fontSize: '11px', fontWeight: 700,
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       }}>{idx + 1}</span>
                       <span style={{ minWidth: 0 }}>
                         <span style={{ display: 'block', fontSize: '14px', fontWeight: 800, color: 'var(--gc-ink)', lineHeight: 1.15, whiteSpace: 'nowrap' }}>{code}</span>
-                        {sub && <span style={{ display: 'block', fontSize: '8.5px', color: 'var(--gc-muted)', lineHeight: 1.25 }}>{sub}</span>}
+                        {sub && <span style={{ display: 'block', fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.25 }}>{sub}</span>}
                         {ch.merged && (
                           <button type="button"
                             onClick={() => setExpandedMerges((m) => ({ ...m, [ch.cat]: true }))}
@@ -7899,7 +7899,7 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
                               display: 'inline-block', marginTop: '3px', padding: '2px 9px',
                               background: 'var(--gc-green)', color: 'var(--gc-paper)',
                               border: 'none', borderRadius: '999px', cursor: 'pointer',
-                              fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.02em',
+                              fontSize: '11px', fontWeight: 700, letterSpacing: '0.02em',
                             }}>
                             {lang === 'en' ? 'expand ⌄' : '展开 ⌄'}
                           </button>
@@ -7911,7 +7911,7 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
                               display: 'inline-block', marginTop: '3px', padding: '2px 9px',
                               background: 'var(--gc-paper-soft)', color: 'var(--gc-muted)',
                               border: '1px solid var(--gc-rule)', borderRadius: '999px', cursor: 'pointer',
-                              fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.02em',
+                              fontSize: '11px', fontWeight: 700, letterSpacing: '0.02em',
                             }}>
                             {lang === 'en' ? 'collapse ⌃' : '收起 ⌃'}
                           </button>
@@ -7932,7 +7932,7 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
             hardcoded chartFooterNote froze May 2026's adoption). Latest month
             only — in Time Machine the note would describe the wrong snapshot. */}
         {chartsSel && chartsSel.monthKey === BULLETIN_CURRENT_KEY.value && (
-          <div style={{ marginTop: '10px', fontSize: '10.5px', lineHeight: 1.55, color: 'var(--gc-muted)' }}>
+          <div style={{ marginTop: '10px', fontSize: '11px', lineHeight: 1.55, color: 'var(--gc-muted)' }}>
             {buildChartFooterNote(lang, chartsSel)}
           </div>
         )}
@@ -8460,7 +8460,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                 flexWrap: 'wrap',
               }}>
                 <span className="gc-eyebrow" style={{
-                  fontSize: '9px',
+                  fontSize: '11px',
                   color: 'var(--gc-muted)',
                   letterSpacing: '0.14em',
                 }}>
@@ -8544,7 +8544,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                       onClick={() => setForm({ ...form, country: c.v })}
                       style={{
                         padding: '5px 4px',
-                        fontSize: '10px', fontWeight: 600,
+                        fontSize: '11px', fontWeight: 600,
                         background: active ? 'var(--gc-ink)' : 'transparent',
                         color: active ? 'var(--gc-paper)' : 'var(--gc-muted)',
                         borderLeft: i > 0 ? '1px solid var(--gc-rule)' : 'none',
@@ -8553,7 +8553,7 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                         minWidth: 0,
                       }}>
                       <CountryFlag country={c.v} size={12} />
-                      <span style={{ fontSize: '9px', letterSpacing: '0.04em' }}>
+                      <span style={{ fontSize: '11px', letterSpacing: '0.04em' }}>
                         {c.code[lang] || c.code.en}
                       </span>
                     </button>
@@ -9083,7 +9083,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
               </div>
             </div>
             {!updateMode && (
-              <div className="gc-eyebrow" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginBottom: '6px' }}>
+              <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '6px' }}>
                 {lang === 'en' ? 'NEW SIGNUP' : lang === 'tw' ? '新訂閱' : '新订阅'}
               </div>
             )}
@@ -9104,7 +9104,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
               <>
                 <CompactCaseBar userCase={userCase} setUserCase={setUserCase} defaultExpanded />
                 <div style={{
-                  fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.5,
+                  fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.5,
                   marginBottom: '8px', padding: '6px 8px', marginTop: '-2px',
                   background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px',
                 }}>
@@ -9130,7 +9130,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                 borderRadius: '4px', background: 'var(--gc-paper)', color: 'var(--gc-ink)',
               }} />
             {(status === 'invalid' || status === 'error') && (
-              <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--gc-red)', marginTop: '4px' }}>
                 {status === 'invalid'
                   ? (lang === 'en' ? 'That email doesn\'t look right' : lang === 'tw' ? '郵箱格式不對' : '邮箱格式不对')
                   : (lang === 'en' ? 'Something went wrong — try again' : lang === 'tw' ? '出錯了，再試一次' : '出错了，再试一次')}
@@ -9172,13 +9172,13 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
                       {lang === 'en' ? <>Which <b>{userCase.category}</b> subtype is your case?</>
                         : <>你的 <b>{userCase.category}</b> 属于哪个细分？</>}
                     </div>
                     <SubtypeChips userCase={{ ...userCase, subtype: subtypePick }} setUserCase={(uc) => { setSubtypePick(uc.subtype); setSubtypeAttempted(false); }} required />
                     {subtypeAttempted && !subtypePick && (
-                      <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--gc-red)', marginTop: '4px' }}>
                         {lang === 'en' ? 'Please pick a subtype' : lang === 'tw' ? '請選擇細分' : '请选择细分'}
                       </div>
                     )}
@@ -9204,7 +9204,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
                       {lang === 'en' ? 'Your date of birth' : '你的出生年月'}{' '}
                       <span style={{ color: 'var(--gc-ink-soft)' }}>
                         {lang === 'en' ? '(helps us predict your timeline more precisely)' : lang === 'tw' ? '（幫助我們更準確地預測你的排期）' : '（帮助我们更准确地预测你的排期）'}
@@ -9214,7 +9214,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                       triggerStyle={dobAttempted && !birthYM ? { border: '1px solid var(--gc-red)' } : {}}
                       onChange={(ym) => { setBirthYM(ym); setDobAttempted(false); }} />
                     {dobAttempted && !birthYM && (
-                      <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--gc-red)', marginTop: '4px' }}>
                         {lang === 'en' ? 'Please pick your date of birth' : lang === 'tw' ? '請選擇出生年月' : '请选择出生年月'}
                       </div>
                     )}
@@ -9223,12 +9223,12 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
               </div>
             )}
             <div className="flex items-center" style={{ gap: '6px', margin: '10px 0 2px' }}>
-              <span style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>{lang === 'en' ? 'Email language' : lang === 'tw' ? '郵件語言' : '邮件语言'}</span>
+              <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>{lang === 'en' ? 'Email language' : lang === 'tw' ? '郵件語言' : '邮件语言'}</span>
               <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
                 {[{ v: 'zh', label: '简体' }, { v: 'tw', label: '繁體' }, { v: 'en', label: 'EN' }].map((opt, oi) => (
                   <button key={opt.v} type="button" onClick={() => setSubLang(opt.v)}
                     style={{
-                      fontSize: '10px', fontWeight: 700, padding: '3px 9px', border: 'none', cursor: 'pointer',
+                      fontSize: '11px', fontWeight: 700, padding: '3px 9px', border: 'none', cursor: 'pointer',
                       borderLeft: oi === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
                       background: subLang === opt.v ? 'var(--gc-green)' : 'var(--gc-surface)',
                       color: subLang === opt.v ? 'var(--gc-paper)' : 'var(--gc-muted)',
@@ -9258,11 +9258,11 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                 : (lang === 'en' ? 'Subscribe' : lang === 'tw' ? '一鍵訂閱' : '一键订阅')}
             </button>
             <div className="flex items-center justify-between" style={{ marginTop: '8px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>
                 {lang === 'en' ? 'Unsubscribe anytime.' : lang === 'tw' ? '隨時可退訂。' : '随时可退订。'}
               </span>
               <button type="button" onClick={() => { onClose(); window.dispatchEvent(new Event('gc-goto-alerts')); }}
-                style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '10px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
+                style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: '11px', color: 'var(--gc-muted)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
                 {lang === 'en' ? 'More reminder settings →' : lang === 'tw' ? '更多提醒設定 →' : '更多提醒设置 →'}
               </button>
             </div>
@@ -9370,7 +9370,7 @@ const SubtypeUpdateModal = ({ userCase, email, token, currentName = '', theme = 
             </div>
             <SubtypeChips userCase={{ ...userCase, subtype: pick }} setUserCase={(uc) => { setPick(uc.subtype); setSubtypeAttempted(false); }} required />
             {subtypeAttempted && !pick && (
-              <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--gc-red)', marginTop: '4px' }}>
                 {lang === 'en' ? 'Please pick a subtype' : lang === 'tw' ? '請選擇細分' : '请选择细分'}
               </div>
             )}
@@ -9385,7 +9385,7 @@ const SubtypeUpdateModal = ({ userCase, email, token, currentName = '', theme = 
               triggerStyle={dobAttempted && !birthYM ? { border: '1px solid var(--gc-red)' } : {}}
               onChange={(ym) => { setBirthYM(ym); setDobAttempted(false); }} />
             {dobAttempted && !birthYM && (
-              <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--gc-red)', marginTop: '4px' }}>
                 {lang === 'en' ? 'Please pick your date of birth' : lang === 'tw' ? '請選擇出生年月' : '请选择出生年月'}
               </div>
             )}
@@ -9406,7 +9406,7 @@ const SubtypeUpdateModal = ({ userCase, email, token, currentName = '', theme = 
           </div>
         )}
         {status === 'error' && (
-          <div style={{ fontSize: '10.5px', color: 'var(--gc-red)', marginTop: '6px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--gc-red)', marginTop: '6px' }}>
             {lang === 'en' ? 'Something went wrong — try again.' : lang === 'tw' ? '出錯了，再試一次。' : '出错了，再试一次。'}
           </div>
         )}
@@ -9499,7 +9499,7 @@ export const InlineSubscribeCTA = ({ userCase, label }) => {
 
   return (
     <div style={{ marginTop: '10px', paddingTop: '9px', borderTop: '1px dashed var(--gc-rule)' }}>
-      <div style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--gc-ink-soft)', marginBottom: '5px' }}>{label}</div>
+      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--gc-ink-soft)', marginBottom: '5px' }}>{label}</div>
       <div style={{ display: 'flex', gap: '6px' }}>
         <input
           type="email" value={email} onChange={(e) => setEmail(e.target.value)}
@@ -9521,7 +9521,7 @@ export const InlineSubscribeCTA = ({ userCase, label }) => {
         </button>
       </div>
       {(status === 'invalid' || status === 'error') && (
-        <div style={{ fontSize: '10px', color: 'var(--gc-red)', marginTop: '3px' }}>
+        <div style={{ fontSize: '11px', color: 'var(--gc-red)', marginTop: '3px' }}>
           {status === 'invalid'
             ? (lang === 'en' ? 'That email doesn\'t look right' : lang === 'tw' ? '郵箱格式不對' : '邮箱格式不对')
             : (lang === 'en' ? 'Something went wrong — try again' : lang === 'tw' ? '出錯了，再試一次' : '出错了，再试一次')}
@@ -10965,7 +10965,7 @@ export default function App() {
                       onClick={() => setShowTimeMachine((v) => !v)}
                       className="flex items-center gap-1 active:opacity-70"
                       style={{
-                        fontSize: '9px',
+                        fontSize: '11px',
                         fontWeight: 700,
                         letterSpacing: '0.1em',
                         textTransform: 'uppercase',
@@ -10981,7 +10981,7 @@ export default function App() {
                       <span className="gc-mono" style={{ letterSpacing: '0.02em', textTransform: 'none' }}>
                         {BULLETIN_CURRENT_MONTH[lang]}
                       </span>
-                      <span style={{ opacity: 0.5, fontSize: '8px' }}>▾</span>
+                      <span style={{ opacity: 0.5, fontSize: '11px' }}>▾</span>
                     </button>
                     {showTimeMachine && (
                       <>
@@ -11021,7 +11021,7 @@ export default function App() {
                                 <span className="flex items-center gap-2">
                                   <span className="gc-mono" style={{ fontSize: '11px' }}>{snap.label[lang]}</span>
                                   {isDefault && (
-                                    <span className="gc-eyebrow" style={{ fontSize: '8px', color: 'var(--gc-green)', letterSpacing: '0.14em' }}>
+                                    <span className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-green)', letterSpacing: '0.14em' }}>
                                       {lang === 'en' ? 'LATEST' : '最新'}
                                     </span>
                                   )}
@@ -11031,7 +11031,7 @@ export default function App() {
                             );
                           })}
                           <div style={{ borderTop: '1px solid var(--gc-rule-soft)', marginTop: '4px', padding: '6px 12px' }}>
-                            <p style={{ fontSize: '10px', color: 'var(--gc-muted)', lineHeight: 1.5 }}>
+                            <p style={{ fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.5 }}>
                               {lang === 'en' ? 'View the app as it looked in a past month.'
                                : lang === 'tw' ? '用過去某個月份的視角查看應用。'
                                : '用过去某个月份的视角查看应用。'}
@@ -11125,7 +11125,7 @@ export default function App() {
                     padding: '3px 8px',
                     background: 'var(--gc-amber)',
                     color: 'var(--gc-paper)',
-                    fontSize: '10px',
+                    fontSize: '11px',
                     fontWeight: 700,
                     letterSpacing: '0.04em',
                     borderRadius: '2px',
@@ -11320,7 +11320,7 @@ export default function App() {
               justifyContent: 'center',
               flexWrap: 'wrap',
               gap: '6px 8px',
-              fontSize: '10px',
+              fontSize: '11px',
               color: 'var(--gc-muted-soft, var(--gc-muted))',
             }}>
               {/* Small theme dropdown — low-key, sits inline with copyright */}
@@ -11346,7 +11346,7 @@ export default function App() {
                         borderRadius: '3px',
                         background: 'transparent',
                         cursor: 'pointer',
-                        fontSize: '10px',
+                        fontSize: '11px',
                         color: 'var(--gc-muted)',
                         lineHeight: 1,
                         letterSpacing: '0.02em',
@@ -11393,7 +11393,7 @@ export default function App() {
                             borderBottom: '1px solid var(--gc-rule-soft)',
                             marginBottom: '2px',
                             color: 'var(--gc-muted)',
-                            fontSize: '9px',
+                            fontSize: '11px',
                           }}>
                             {lang === 'en' ? 'Visual Style' : lang === 'tw' ? '版面風格' : '版面风格'}
                           </div>
@@ -11428,7 +11428,7 @@ export default function App() {
                                   }}></span>
                                 </span>
                                 <span className="gc-serif flex-1" style={{ letterSpacing: '0.005em' }}>{th.name}</span>
-                                {active && <span style={{ color: 'var(--gc-green)', fontSize: '10px' }}>✓</span>}
+                                {active && <span style={{ color: 'var(--gc-green)', fontSize: '11px' }}>✓</span>}
                               </button>
                             );
                           })}
@@ -11469,7 +11469,7 @@ export default function App() {
                 </button>
               ) : (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--gc-amber, #b45309)', fontWeight: 600 }}>
+                  <span style={{ fontSize: '11px', color: 'var(--gc-amber, #b45309)', fontWeight: 600 }}>
                     {lang === 'en' ? 'Clear everything?' : lang === 'tw' ? '確定清除全部?' : '确定清除全部?'}
                   </span>
                   <button
@@ -11495,7 +11495,7 @@ export default function App() {
                       background: 'var(--gc-amber, #b45309)',
                       color: '#fff',
                       cursor: 'pointer',
-                      fontSize: '10px',
+                      fontSize: '11px',
                       fontWeight: 600,
                       lineHeight: 1,
                       fontFamily: 'inherit',
@@ -11510,7 +11510,7 @@ export default function App() {
                       borderRadius: '2px',
                       background: 'transparent',
                       cursor: 'pointer',
-                      fontSize: '10px',
+                      fontSize: '11px',
                       color: 'var(--gc-muted)',
                       lineHeight: 1,
                       fontFamily: 'inherit',
