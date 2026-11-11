@@ -106,7 +106,7 @@ const DataSource = () => {
                 <it.icon size={14} className="text-slate-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">{it.label}</div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">{it.label}</div>
                 <div className="text-xs text-slate-700 leading-relaxed">{it.value}</div>
               </div>
             </div>
@@ -165,7 +165,7 @@ const FAQ = () => {
               <div className="border-t border-slate-300 mt-1 pt-1 flex justify-between font-bold text-slate-900">
                 <span>小计</span><span className="font-mono">~$3,600-3,900</span>
               </div>
-              <p className="text-[9px] text-slate-500 mt-1">* PERM政府无费用，但雇主广告/审核成本约 $5,000-10,000（全由雇主承担）</p>
+              <p className="text-[11px] text-slate-500 mt-1">* PERM政府无费用，但雇主广告/审核成本约 $5,000-10,000（全由雇主承担）</p>
             </div>
             <div className="bg-amber-50 rounded-lg p-2.5 text-[11px]">
               <div className="font-bold text-amber-900 mb-1">律师费（可选但推荐）：</div>
@@ -175,19 +175,19 @@ const FAQ = () => {
             </div>
             <div className="bg-emerald-50 rounded-lg p-2.5 text-[11px] text-emerald-900">
               <div className="flex justify-between items-baseline py-0.5">
-                <span className="gc-eyebrow" style={{ fontSize: '8px' }}>总预算</span>
+                <span className="gc-eyebrow" style={{ fontSize: '11px' }}>总预算</span>
                 <span className="font-mono font-bold">$6,000 – $13,000</span>
               </div>
               <div className="flex justify-between items-baseline py-0.5" style={{ borderTop: '1px solid var(--gc-green-border)' }}>
-                <span className="gc-eyebrow" style={{ fontSize: '8px' }}>DIY</span>
+                <span className="gc-eyebrow" style={{ fontSize: '11px' }}>DIY</span>
                 <span className="font-mono font-bold">$3,600 – $3,900</span>
               </div>
               <div className="flex justify-between items-baseline py-0.5" style={{ borderTop: '1px solid var(--gc-green-border)' }}>
-                <span className="gc-eyebrow" style={{ fontSize: '8px' }}>雇主出</span>
+                <span className="gc-eyebrow" style={{ fontSize: '11px' }}>雇主出</span>
                 <span className="font-mono font-bold">$8,000 – $16,000</span>
               </div>
             </div>
-            <p className="text-[10px] text-slate-500">※ 配偶和21岁以下子女需各自缴 I-485/EAD/AP/体检费用（AP自2024年起收费$630）。雇主通常承担PERM和I-140所有费用。</p>
+            <p className="text-[11px] text-slate-500">※ 配偶和21岁以下子女需各自缴 I-485/EAD/AP/体检费用（AP自2024年起收费$630）。雇主通常承担PERM和I-140所有费用。</p>
           </div>
         )
       },
@@ -415,7 +415,7 @@ const FAQ = () => {
               <div className="border-t border-slate-300 mt-1 pt-1 flex justify-between font-bold text-slate-900">
                 <span>小計</span><span className="font-mono">~$3,600-3,900</span>
               </div>
-              <p className="text-[9px] text-slate-500 mt-1">* PERM政府無費用，但雇主廣告/審核成本約 $5,000-10,000（全由雇主承擔）</p>
+              <p className="text-[11px] text-slate-500 mt-1">* PERM政府無費用，但雇主廣告/審核成本約 $5,000-10,000（全由雇主承擔）</p>
             </div>
             <div className="bg-amber-50 rounded-lg p-2.5 text-[11px]">
               <div className="font-bold text-amber-900 mb-1">律師費（可選但推薦）：</div>
@@ -425,19 +425,19 @@ const FAQ = () => {
             </div>
             <div className="bg-emerald-50 rounded-lg p-2.5 text-[11px] text-emerald-900">
               <div className="flex justify-between items-baseline py-0.5">
-                <span className="gc-eyebrow" style={{ fontSize: '8px' }}>總預算</span>
+                <span className="gc-eyebrow" style={{ fontSize: '11px' }}>總預算</span>
                 <span className="font-mono font-bold">$6,000 – $13,000</span>
               </div>
               <div className="flex justify-between items-baseline py-0.5" style={{ borderTop: '1px solid var(--gc-green-border)' }}>
-                <span className="gc-eyebrow" style={{ fontSize: '8px' }}>DIY</span>
+                <span className="gc-eyebrow" style={{ fontSize: '11px' }}>DIY</span>
                 <span className="font-mono font-bold">$3,600 – $3,900</span>
               </div>
               <div className="flex justify-between items-baseline py-0.5" style={{ borderTop: '1px solid var(--gc-green-border)' }}>
-                <span className="gc-eyebrow" style={{ fontSize: '8px' }}>雇主出</span>
+                <span className="gc-eyebrow" style={{ fontSize: '11px' }}>雇主出</span>
                 <span className="font-mono font-bold">$8,000 – $16,000</span>
               </div>
             </div>
-            <p className="text-[10px] text-slate-500">※ 配偶和21歲以下子女需各自繳 I-485/EAD/AP/體檢費用（AP自2024年起收費$630）。雇主通常承擔PERM和I-140所有費用。</p>
+            <p className="text-[11px] text-slate-500">※ 配偶和21歲以下子女需各自繳 I-485/EAD/AP/體檢費用（AP自2024年起收費$630）。雇主通常承擔PERM和I-140所有費用。</p>
           </div>
         )
       },
@@ -665,7 +665,7 @@ const FAQ = () => {
               <div className="border-t border-slate-300 mt-1 pt-1 flex justify-between font-bold text-slate-900">
                 <span>Subtotal</span><span className="font-mono">~$3,600-3,900</span>
               </div>
-              <p className="text-[9px] text-slate-500 mt-1">* PERM has no govt fee, but employer recruitment/audit costs ~$5,000-10,000 (employer pays)</p>
+              <p className="text-[11px] text-slate-500 mt-1">* PERM has no govt fee, but employer recruitment/audit costs ~$5,000-10,000 (employer pays)</p>
             </div>
             <div className="bg-amber-50 rounded-lg p-2.5 text-[11px]">
               <div className="font-bold text-amber-900 mb-1">Attorney fees (optional but recommended):</div>
@@ -675,19 +675,19 @@ const FAQ = () => {
             </div>
             <div className="bg-emerald-50 rounded-lg p-2.5 text-[11px] text-emerald-900">
               <div className="flex justify-between items-baseline py-0.5">
-                <span className="gc-eyebrow" style={{ fontSize: '8px' }}>Total</span>
+                <span className="gc-eyebrow" style={{ fontSize: '11px' }}>Total</span>
                 <span className="font-mono font-bold">$6,000 – $13,000</span>
               </div>
               <div className="flex justify-between items-baseline py-0.5" style={{ borderTop: '1px solid var(--gc-green-border)' }}>
-                <span className="gc-eyebrow" style={{ fontSize: '8px' }}>DIY</span>
+                <span className="gc-eyebrow" style={{ fontSize: '11px' }}>DIY</span>
                 <span className="font-mono font-bold">$3,600 – $3,900</span>
               </div>
               <div className="flex justify-between items-baseline py-0.5" style={{ borderTop: '1px solid var(--gc-green-border)' }}>
-                <span className="gc-eyebrow" style={{ fontSize: '8px' }}>Employer</span>
+                <span className="gc-eyebrow" style={{ fontSize: '11px' }}>Employer</span>
                 <span className="font-mono font-bold">$8,000 – $16,000</span>
               </div>
             </div>
-            <p className="text-[10px] text-slate-500">※ Spouse and children under 21 need their own I-485/EAD/AP/medical fees (AP no longer free as of 2024, now $630). Employer typically pays all PERM and I-140 fees.</p>
+            <p className="text-[11px] text-slate-500">※ Spouse and children under 21 need their own I-485/EAD/AP/medical fees (AP no longer free as of 2024, now $630). Employer typically pays all PERM and I-140 fees.</p>
           </div>
         )
       },
@@ -958,7 +958,7 @@ const FAQ = () => {
                 style={{ padding: '10px 4px', boxSizing: 'border-box' }}>
                 {/* Number marker — editorial/legal clause style */}
                 <span className="gc-mono flex-shrink-0" style={{
-                  fontSize: '10px',
+                  fontSize: '11px',
                   color: 'var(--gc-muted)',
                   fontWeight: 600,
                   width: '18px',
@@ -983,7 +983,7 @@ const FAQ = () => {
                 </span>
                 {/* Chevron — typographic */}
                 <span className="flex-shrink-0" style={{
-                  fontSize: '10px',
+                  fontSize: '11px',
                   color: 'var(--gc-muted-soft)',
                   marginTop: '4px',
                   transition: 'transform 120ms',
@@ -1018,7 +1018,7 @@ const FAQ = () => {
         gap: '6px',
       }}>
         <AlertTriangle size={11} style={{ color: 'var(--gc-amber)', flexShrink: 0, marginTop: '2px' }} />
-        <p style={{ fontSize: '10px', color: 'var(--gc-amber-ink)', lineHeight: 1.5, margin: 0 }}>
+        <p style={{ fontSize: '11px', color: 'var(--gc-amber-ink)', lineHeight: 1.5, margin: 0 }}>
           {lang === 'en'
             ? 'This information is for reference only. For your specific case, consult a licensed immigration attorney.'
             : lang === 'tw'
@@ -1087,7 +1087,7 @@ const Glossary = () => {
       <div className="space-y-3">
         {groups.map((g, gi) => (
           <div key={gi}>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-1">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 px-1">
               {g.title}
             </div>
             <div className="space-y-1.5">
