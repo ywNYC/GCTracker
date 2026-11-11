@@ -67,7 +67,7 @@ const Forecast = ({ userCase }) => {
             </div>
             <p className="text-xs text-slate-500">{t.forecastSubtitle}</p>
           </div>
-          <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ring-1 ${confTone}`}>
+          <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold ring-1 ${confTone}`}>
             {t.forecastConfidence}: {confLabel}
           </span>
         </div>
@@ -147,14 +147,14 @@ const Forecast = ({ userCase }) => {
                     <div className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--gc-ink-soft)' }}>
                       {paceBasis === 'recent' ? t.paceExplainRecent : t.paceExplainConservative}
                     </div>
-                    <div className="mt-1 text-[10px] leading-relaxed" style={{ color: 'var(--gc-muted)' }}>{t.paceRangeNote}</div>
+                    <div className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--gc-muted)' }}>{t.paceRangeNote}</div>
                   </div>
                 </>
               )}
 
               {/* Why this number differs from the long-term chart and the summary card —
                   three estimators with different assumptions, stated once, here. */}
-              <div className="mt-3 pt-2 text-[10px] leading-relaxed" style={{ borderTop: '1px solid var(--gc-rule-soft)', color: 'var(--gc-muted)' }}>
+              <div className="mt-3 pt-2 text-[11px] leading-relaxed" style={{ borderTop: '1px solid var(--gc-rule-soft)', color: 'var(--gc-muted)' }}>
                 {lang === 'en'
                   ? 'This figure blends the current month with the 21-year long-term average. The Long-term chart and the Overview summary extrapolate observed pace directly, so their numbers differ — different assumptions, same data.'
                   : lang === 'tw'
@@ -1024,7 +1024,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
           </h2>
           {/* Clean mono [AI] tag — replaces the animated purple/pink gradient */}
           <span style={{
-            fontSize: '9px',
+            fontSize: '11px',
             fontWeight: 700,
             letterSpacing: '0.12em',
             padding: '2px 5px',
@@ -1039,7 +1039,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] truncate"
+          <span className="text-[11px] truncate"
                 style={{ color: terminalMode ? C.textMuted : 'var(--gc-muted)',
                          fontFamily: terminalMode ? 'ui-monospace, monospace' : 'inherit' }}>
             <span className="gc-mono" style={{ fontWeight: 700 }}>
@@ -1072,7 +1072,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
               background: 'transparent',
               border: '1px solid var(--gc-green-border)',
               borderRadius: '2px',
-              fontSize: '10px',
+              fontSize: '11px',
               fontWeight: 600,
               color: 'var(--gc-green-ink)',
               cursor: 'pointer',
@@ -1173,13 +1173,13 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
 
       {/* Combined: Chart title + Legend — terminal-aware text colors */}
       <div className="mb-0.5 px-0.5 flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] font-semibold flex-shrink-0"
+        <span className="text-[11px] font-semibold flex-shrink-0"
               style={{ color: terminalMode ? C.nowText : 'var(--gc-blue)',
                        fontFamily: terminalMode ? 'ui-monospace, monospace' : 'inherit',
                        letterSpacing: terminalMode ? '0.08em' : 'normal' }}>
           {terminalMode ? (lang === 'en' ? 'TABLE·A' : 'A表') : (lang === 'en' ? 'Table A' : '表A')}
         </span>
-        <span className="text-[10px] flex-shrink-0" style={{ color: terminalMode ? C.axis : 'var(--gc-muted-soft)' }}>·</span>
+        <span className="text-[11px] flex-shrink-0" style={{ color: terminalMode ? C.axis : 'var(--gc-muted-soft)' }}>·</span>
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           {displayCategories.map((cat) => (
             <span key={cat} className="flex items-center gap-0.5 flex-shrink-0">
@@ -1189,13 +1189,13 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                 backgroundColor: colors[cat],
                 borderRadius: 1
               }}></span>
-              <span className="text-[10px] font-semibold"
+              <span className="text-[11px] font-semibold"
                     style={{ color: colors[cat],
                              fontFamily: terminalMode ? 'ui-monospace, monospace' : 'inherit' }}>{cat}</span>
             </span>
           ))}
         </div>
-        <span className="text-[9px] flex-shrink-0 ml-auto"
+        <span className="text-[11px] flex-shrink-0 ml-auto"
               style={{ color: terminalMode ? C.textMuted : 'var(--gc-muted)',
                        fontFamily: terminalMode ? 'ui-monospace, monospace' : 'inherit' }}>
           {terminalMode
@@ -1208,7 +1208,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
       </div>
 
       {/* Line-style legend: solid vs dotted */}
-      <div className="mb-1.5 px-0.5 flex items-center gap-3 text-[9px]"
+      <div className="mb-1.5 px-0.5 flex items-center gap-3 text-[11px]"
            style={{ color: terminalMode ? C.textMuted : 'var(--gc-muted)' }}>
         <span className="flex items-center gap-1">
           <svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke={terminalMode ? C.text : "#475569"} strokeWidth="2" strokeLinecap="round" /></svg>
@@ -1227,7 +1227,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
 
       {/* Dual-axis indicator */}
       {dualAxis && (
-        <div className="flex items-center justify-between mb-1 text-[10px] px-2">
+        <div className="flex items-center justify-between mb-1 text-[11px] px-2">
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-sm" style={{ background: terminalMode ? C.nowLine : '#3b82f6' }}></span>
             <span style={{ color: terminalMode ? C.textMuted : 'var(--gc-muted)',
@@ -1249,16 +1249,16 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
       {filteredAlwaysCurrent.length > 0 && (
         <div className="mb-2 mx-2 px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-md flex items-center gap-1.5 flex-wrap">
           <CheckCircle2 size={11} className="text-emerald-600 flex-shrink-0" />
-          <span className="text-[10px] text-emerald-700 font-semibold">
+          <span className="text-[11px] text-emerald-700 font-semibold">
             {lang === 'en' ? 'Always Current:' : '一直无排期:'}
           </span>
           {filteredAlwaysCurrent.map((cat, idx) => (
             <React.Fragment key={cat}>
-              <span className="text-[10px] font-bold" style={{ color: colors[cat] }}>{cat}</span>
+              <span className="text-[11px] font-bold" style={{ color: colors[cat] }}>{cat}</span>
               {idx < filteredAlwaysCurrent.length - 1 && <span className="text-emerald-400">·</span>}
             </React.Fragment>
           ))}
-          <span className="text-[9px] text-emerald-600 ml-1">
+          <span className="text-[11px] text-emerald-600 ml-1">
             ({lang === 'en' ? 'no wait for your country' : '你的出生国无需等待'})
           </span>
         </div>
@@ -2404,19 +2404,19 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
           {/* PAST range */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] font-semibold flex items-center gap-1" style={{ color: 'var(--gc-ink-soft)' }}>
+              <label className="text-[11px] font-semibold flex items-center gap-1" style={{ color: 'var(--gc-ink-soft)' }}>
                 <History size={11} strokeWidth={2.2} className="flex-shrink-0" style={{ color: 'var(--gc-muted)' }} />
                 {lang === 'en' ? 'Historical Range' : '历史范围'}
                 {autoFitted && (
                   <span className="gc-eyebrow flex-shrink-0"
-                        style={{ fontSize: '8px', color: 'var(--gc-muted)', letterSpacing: '0.1em', marginLeft: '4px' }}
+                        style={{ fontSize: '11px', color: 'var(--gc-muted)', letterSpacing: '0.1em', marginLeft: '4px' }}
                         title={lang === 'en' ? 'Auto-adjusted to frame your crossover' : '已自动调整以框住你的交叉点'}>
                     {lang === 'en' ? 'AUTO' : '自动'}
                   </span>
                 )}
               </label>
               <span className="gc-mono" style={{
-                fontSize: '10px',
+                fontSize: '11px',
                 fontWeight: 700,
                 color: 'var(--gc-ink)',
                 padding: '2px 6px',
@@ -2451,7 +2451,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                 borderRadius: '2px',
               }}
             />
-            <div className="flex justify-between mt-1 text-[9px]" style={{ color: 'var(--gc-muted)' }}>
+            <div className="flex justify-between mt-1 text-[11px]" style={{ color: 'var(--gc-muted)' }}>
               <span>6{lang === 'en' ? 'mo' : '个月'}</span>
               <button
                 onClick={() => { setPastMonths(12); setRangeUserAdjusted(true); setAutoFitted(false); }}
@@ -2492,19 +2492,19 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
           {/* FUTURE range */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] font-semibold flex items-center gap-1" style={{ color: 'var(--gc-ink-soft)' }}>
+              <label className="text-[11px] font-semibold flex items-center gap-1" style={{ color: 'var(--gc-ink-soft)' }}>
                 <TrendingUp size={11} strokeWidth={2.2} className="flex-shrink-0" style={{ color: 'var(--gc-muted)' }} />
                 {lang === 'en' ? 'Forecast Range' : '预测范围'}
                 {autoFitted && (
                   <span className="gc-eyebrow flex-shrink-0"
-                        style={{ fontSize: '8px', color: 'var(--gc-muted)', letterSpacing: '0.1em', marginLeft: '4px' }}
+                        style={{ fontSize: '11px', color: 'var(--gc-muted)', letterSpacing: '0.1em', marginLeft: '4px' }}
                         title={lang === 'en' ? 'Auto-extended to show your crossover' : '已自动延长以显示你的交叉点'}>
                     {lang === 'en' ? 'AUTO' : '自动'}
                   </span>
                 )}
               </label>
               <span className="gc-mono" style={{
-                fontSize: '10px',
+                fontSize: '11px',
                 fontWeight: 700,
                 color: 'var(--gc-ink)',
                 padding: '2px 6px',
@@ -2539,7 +2539,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                 borderRadius: '2px',
               }}
             />
-            <div className="flex justify-between mt-1 text-[9px]" style={{ color: 'var(--gc-muted)' }}>
+            <div className="flex justify-between mt-1 text-[11px]" style={{ color: 'var(--gc-muted)' }}>
               <span>6{lang === 'en' ? 'mo' : '个月'}</span>
               <button
                 onClick={() => { setForecastMonths(12); setRangeUserAdjusted(true); setAutoFitted(false); }}
@@ -2597,7 +2597,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
               <HelpCircle size={12} strokeWidth={2} className="flex-shrink-0" style={{ color: 'var(--gc-muted)' }} />
               {lang === 'en' ? 'How to read this chart & AI model' : '怎么看这个图 & AI模型'}
             </span>
-            <span style={{ color: 'var(--gc-muted)', fontSize: '10px' }}>{showHelp ? '▲' : '▼'}</span>
+            <span style={{ color: 'var(--gc-muted)', fontSize: '11px' }}>{showHelp ? '▲' : '▼'}</span>
           </button>
           {showHelp && (
             <div className="mt-1" style={{
@@ -2606,7 +2606,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
               border: '1px solid var(--gc-rule)',
               borderRadius: '3px',
             }}>
-              <div className="space-y-1.5 text-[10px] leading-relaxed" style={{ color: 'var(--gc-ink-soft)' }}>
+              <div className="space-y-1.5 text-[11px] leading-relaxed" style={{ color: 'var(--gc-ink-soft)' }}>
                 <div className="flex items-start gap-1.5">
                   <span className="flex-shrink-0" style={{ color: "var(--gc-muted-soft)", fontSize: "9px", marginTop: "2px" }}>▸</span>
                   <span>{lang === 'en'
@@ -2667,10 +2667,10 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
               
               {/* Calculation formula - helps technical users understand */}
               <div className="mt-2 pt-2 border-t border-blue-300">
-                <div className="text-[10px] font-bold text-blue-900 mb-1 flex items-center gap-1">
+                <div className="text-[11px] font-bold text-blue-900 mb-1 flex items-center gap-1">
                   {lang === 'en' ? 'Calculation formula' : lang === 'tw' ? '計算公式' : '计算公式'}
                 </div>
-                <div className="bg-white/60 rounded p-1.5 text-[9px] font-mono text-blue-900 leading-relaxed mb-1">
+                <div className="bg-white/60 rounded p-1.5 text-[11px] font-mono text-blue-900 leading-relaxed mb-1">
                   {lang === 'en' ? '// Time-horizon blended rate' : '// 时间段混合速率'}<br/>
                   {lang === 'en' ? 'if months ≤ 12:' : '若 月份 ≤ 12:'}<br/>
                   &nbsp;&nbsp;rate = 0.7 × recent12mo + 0.3 × recent5yr<br/>
@@ -2684,14 +2684,14 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                   {lang === 'en' ? 'forecast =' : '预测值 ='}<br/>
                   &nbsp;&nbsp;latest + Σ(rate × scenarioMult)
                 </div>
-                <div className="text-[9px] text-blue-700 leading-snug">
+                <div className="text-[11px] text-blue-700 leading-snug">
                   {lang === 'en'
                     ? 'Scenario multiplier: Optimistic=1.5, Expected=1.0, Pessimistic=0.5. Near-term forecasts prioritize recent observed trends; long-term forecasts gradually anchor to 21yr historical averages for stability.'
                     : lang === 'tw'
                     ? '情景乘數：樂觀=1.5、預期=1.0、悲觀=0.5。近期預測優先近期觀察到的趨勢；長期預測逐漸錨定到21年歷史均值以保持穩定。'
                     : '情景乘数：乐观=1.5、预期=1.0、悲观=0.5。近期预测优先近期观察到的趋势；长期预测逐渐锚定到21年历史均值以保持稳定。'}
                 </div>
-                <div className="mt-1.5 pt-1.5 border-t border-blue-200 text-[9px] text-blue-600 italic leading-snug">
+                <div className="mt-1.5 pt-1.5 border-t border-blue-200 text-[11px] text-blue-600 italic leading-snug">
                   {lang === 'en'
                     ? 'Historical data: 6 real anchors (Jan 2000/2005/2010/2015/2020, May 2026) interpolated across 26 years.'
                     : lang === 'tw'
@@ -2796,7 +2796,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
               </div>
 
               {/* Eyebrow */}
-              <div className="gc-eyebrow mb-1 pr-6" style={{ color: 'var(--gc-green)', fontSize: '9px' }}>
+              <div className="gc-eyebrow mb-1 pr-6" style={{ color: 'var(--gc-green)', fontSize: '11px' }}>
                 {lang === 'en' ? 'Estimated Eligibility' : '预计可递件日期'}
               </div>
 
@@ -2812,7 +2812,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
               </div>
 
               {/* Relative time — neutral muted */}
-              <div className="gc-mono" style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '7px' }}>
+              <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginBottom: '7px' }}>
                 {lang === 'en'
                   ? `≈ ${Math.ceil(monthsToReach)} mo`
                   : `≈ ${Math.ceil(monthsToReach)} 个月`}
@@ -2828,13 +2828,13 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
 
               {/* ===== Live formula breakdown — real numbers, no filler ===== */}
               <div className="gc-mono" style={{
-                fontSize: '10px',
+                fontSize: '11px',
                 color: 'var(--gc-ink-soft)',
                 lineHeight: 1.55,
                 borderTop: '1px solid var(--gc-rule)',
                 paddingTop: '6px',
               }}>
-                <div className="gc-eyebrow mb-1" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', letterSpacing: '0.16em' }}>
+                <div className="gc-eyebrow mb-1" style={{ fontSize: '11px', color: 'var(--gc-muted)', letterSpacing: '0.16em' }}>
                   {lang === 'en' ? 'CALCULATION' : '计算'}
                 </div>
                 <div className="flex items-baseline justify-between gap-2">
@@ -2845,7 +2845,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                   <div className="flex items-baseline justify-between gap-2">
                     <span style={{ color: 'var(--gc-muted)' }}>
                       {lang === 'en' ? 'Recent 12mo' : '近 12 月'}
-                      <span style={{ color: 'var(--gc-muted-soft)', marginLeft: '4px', fontSize: '9px' }}>· 55%</span>
+                      <span style={{ color: 'var(--gc-muted-soft)', marginLeft: '4px', fontSize: '11px' }}>· 55%</span>
                     </span>
                     <span style={{ color: 'var(--gc-ink)' }}><b>{recentRateDpm}</b> {lang === 'en' ? 'd/mo' : '天/月'}</span>
                   </div>
@@ -2853,14 +2853,14 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                 <div className="flex items-baseline justify-between gap-2">
                   <span style={{ color: 'var(--gc-muted)' }}>
                     {lang === 'en' ? '5y policy' : '5 年政策'}
-                    <span style={{ color: 'var(--gc-muted-soft)', marginLeft: '4px', fontSize: '9px' }}>· 20%</span>
+                    <span style={{ color: 'var(--gc-muted-soft)', marginLeft: '4px', fontSize: '11px' }}>· 20%</span>
                   </span>
                   <span style={{ color: 'var(--gc-ink)' }}><b>{Math.round((RATES_DB[`${userCat}-${country}`]?.recent || longRateDpy) / 12)}</b> {lang === 'en' ? 'd/mo' : '天/月'}</span>
                 </div>
                 <div className="flex items-baseline justify-between gap-2">
                   <span style={{ color: 'var(--gc-muted)' }}>
                     {lang === 'en' ? '21y avg' : '21 年均值'}
-                    <span style={{ color: 'var(--gc-muted-soft)', marginLeft: '4px', fontSize: '9px' }}>· 25%</span>
+                    <span style={{ color: 'var(--gc-muted-soft)', marginLeft: '4px', fontSize: '11px' }}>· 25%</span>
                   </span>
                   <span style={{ color: 'var(--gc-ink)' }}><b>{Math.round(longRateDpy / 12)}</b> {lang === 'en' ? 'd/mo' : '天/月'}</span>
                 </div>
@@ -2879,7 +2879,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                   marginTop: '6px',
                   paddingTop: '6px',
                   borderTop: '1px solid var(--gc-rule)',
-                  fontSize: '10.5px',
+                  fontSize: '11px',
                   color: 'var(--gc-ink)',
                   letterSpacing: '0.01em',
                   textAlign: 'right',
@@ -2953,7 +2953,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                 const isApproved = completedI485Steps.includes('approval');
                 return (
                   <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--gc-rule)' }}>
-                    <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-green)', marginBottom: '3px' }}>
+                    <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-green)', marginBottom: '3px' }}>
                       {lang === 'en' ? 'Then · GC Approval' : '然后 · 拿到绿卡'}
                     </div>
                     <div className="gc-serif" style={{
@@ -2970,18 +2970,18 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                     </div>
                     {!isApproved && (
                       <>
-                        <div className="gc-mono" style={{ fontSize: '10.5px', color: 'var(--gc-muted)' }}>
+                        <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>
                           {sameMonth
                             ? scLabel
                             : <><span>~{spanMonths} {lang === 'en' ? 'mo window' : '个月区间'}</span>
                                 <span style={{ margin: '0 5px', color: 'var(--gc-rule)' }}>·</span>
                                 <span style={{ color: 'var(--gc-ink-soft)' }}>{scLabel}</span></>}
                         </div>
-                        <div style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '3px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '3px' }}>
                           <span style={{ color: 'var(--gc-ink-soft)', fontWeight: 600 }}>{lang === 'en' ? 'Your progress: ' : '你的进度: '}</span>
                           {progressDesc}
                         </div>
-                        <div style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '4px', lineHeight: 1.45, fontStyle: 'italic' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '4px', lineHeight: 1.45, fontStyle: 'italic' }}>
                           {lang === 'en'
                             ? 'Matches the range shown on the Overview I-485 card (approval step).'
                             : lang === 'tw'
@@ -3040,7 +3040,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                   const dateText = raw === 'C' ? (lang === 'en' ? 'Current ✓' : '无排期 ✓') :
                                   (d && d !== 'CURRENT') ? d.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short' }) : 'N/A';
                   return (
-                    <div key={cat} className="text-[10px] flex items-center gap-1.5">
+                    <div key={cat} className="text-[11px] flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: colors[cat] }}></div>
                       <span className="font-semibold" style={{ color: colors[cat] }}>{cat}:</span>
                       <span className="text-slate-700">{dateText}</span>
@@ -3097,7 +3097,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                 <Activity size={10} style={{ color: 'var(--gc-muted)' }} />
                 {futureLabel}
               </div>
-              <div className="text-[9px] mb-1.5 pb-1" style={{ color: 'var(--gc-muted)', borderBottom: '1px solid var(--gc-rule-soft)' }}>
+              <div className="text-[11px] mb-1.5 pb-1" style={{ color: 'var(--gc-muted)', borderBottom: '1px solid var(--gc-rule-soft)' }}>
                 {lang === 'en'
                   ? `Forecast (+${hoveredForecast.monthOffset}mo from now)`
                   : `预测中 (距现在+${hoveredForecast.monthOffset}个月)`}
@@ -3109,7 +3109,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
 
                   if (forecast.isCurrent) {
                     return (
-                      <div key={cat} className="text-[10px] flex items-center gap-1.5">
+                      <div key={cat} className="text-[11px] flex items-center gap-1.5">
                         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: colors[cat] }}></div>
                         <span className="font-semibold" style={{ color: colors[cat] }}>{cat}:</span>
                         <span className="text-slate-700">{lang === 'en' ? 'Current ✓' : '无排期 ✓'}</span>
@@ -3129,7 +3129,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                   const fmt = (d) => d.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-CN', { year: '2-digit', month: 'short' });
 
                   return (
-                    <div key={cat} className="text-[10px] flex items-center gap-1.5">
+                    <div key={cat} className="text-[11px] flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: colors[cat] }}></div>
                       <span className="font-semibold" style={{ color: colors[cat] }}>{cat}:</span>
                       <span className="text-slate-700 font-medium">{fmt(expectedDate)}</span>
@@ -3137,7 +3137,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                   );
                 })}
               </div>
-              <div className="mt-1.5 pt-1.5 text-[8px] italic" style={{ color: 'var(--gc-muted)', borderTop: '1px solid var(--gc-rule-soft)' }}>
+              <div className="mt-1.5 pt-1.5 text-[11px] italic" style={{ color: 'var(--gc-muted)', borderTop: '1px solid var(--gc-rule-soft)' }}>
                 {lang === 'en'
                   ? '* Based on avg monthly progress over past 12 months'
                   : '* 基于过去12个月的平均推进速度估算'}
@@ -3158,7 +3158,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>
           {lang === 'en' ? 'Advanced · forecast scenarios (5-tier)' : lang === 'tw' ? '高級設置 · 預測情景（五檔倍率）' : '高级设置 · 预测情景（五档倍率）'}
         </span>
-        <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{showScenario ? '▲' : '▼'}</span>
+        <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>{showScenario ? '▲' : '▼'}</span>
       </button>
       {showScenario && (<>
       {/* Forecast Scenario Selector — editorial dial.
@@ -3172,14 +3172,14 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
         borderRadius: 'var(--gc-radius-sm)',
       }}>
         <div className="flex items-baseline justify-between mb-2">
-          <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', letterSpacing: '0.14em' }}>
+          <div className="gc-eyebrow" style={{ fontSize: '11px', color: 'var(--gc-muted)', letterSpacing: '0.14em' }}>
             {lang === 'en'
               ? 'FORECAST · SCENARIO'
               : lang === 'tw'
               ? '預測 · 情景'
               : '预测 · 情景'}
           </div>
-          <span style={{ fontSize: '9px', color: 'var(--gc-muted-soft)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--gc-muted-soft)' }}>
             {lang === 'en' ? 'tap to switch' : lang === 'tw' ? '點擊切換' : '点击切换'}
           </span>
         </div>
@@ -3221,7 +3221,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                   }}>
                   {/* Arrow + label — top row */}
                   <div style={{
-                    fontSize: '10.5px',
+                    fontSize: '11px',
                     fontWeight: active ? 700 : 500,
                     color: active ? 'var(--gc-ink)' : 'var(--gc-muted)',
                     letterSpacing: '0.01em',
@@ -3232,7 +3232,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                   </div>
                   {/* Multiplier — bottom row, smaller + monospace for tabular alignment */}
                   <div className="gc-mono" style={{
-                    fontSize: '8.5px',
+                    fontSize: '11px',
                     fontWeight: active ? 600 : 400,
                     color: active ? 'var(--gc-ink-soft)' : 'var(--gc-muted-soft)',
                     letterSpacing: '0.02em',
@@ -3260,10 +3260,10 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
         <div className="mt-2 flex items-start gap-2" style={{ padding: '6px 8px', background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: 'var(--gc-radius-sm)' }}>
           <Activity size={11} strokeWidth={2.2} className="flex-shrink-0" style={{ color: 'var(--gc-muted)', marginTop: '2px' }} />
           <div className="flex-1 min-w-0">
-            <span className="gc-eyebrow" style={{ fontSize: '8px', marginRight: '6px' }}>
+            <span className="gc-eyebrow" style={{ fontSize: '11px', marginRight: '6px' }}>
               {lang === 'en' ? 'MODEL' : lang === 'tw' ? '模型' : '模型'}
             </span>
-            <span style={{ fontSize: '10px', color: 'var(--gc-ink-soft)', lineHeight: 1.5 }}>
+            <span style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', lineHeight: 1.5 }}>
           {scenario === 'optimistic' && (lang === 'en'
             ? 'Fast-track: current pace + strong policy / visa pool recovery boost.'
             : lang === 'tw'
@@ -3322,14 +3322,14 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
             <div key={cat} className="px-1.5 py-1 bg-slate-50 rounded-md" style={{ minWidth: 0 }}>
               <div className="flex items-center gap-1 mb-0">
                 <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: colors[cat] }}></div>
-                <span className="text-[10px] font-bold text-slate-700 truncate">{cat}</span>
+                <span className="text-[11px] font-bold text-slate-700 truncate">{cat}</span>
                 {Math.abs(movementDays) > 0 && (
-                  <span className={`text-[9px] font-medium flex-shrink-0 ml-auto ${isAdvanced ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <span className={`text-[11px] font-medium flex-shrink-0 ml-auto ${isAdvanced ? 'text-emerald-600' : 'text-red-600'}`}>
                     {isAdvanced ? '+' : ''}{movementDays}
                   </span>
                 )}
               </div>
-              <div className="text-[10px] text-slate-600 truncate">
+              <div className="text-[11px] text-slate-600 truncate">
                 {displayDate}
               </div>
             </div>
