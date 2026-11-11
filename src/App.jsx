@@ -119,7 +119,6 @@ const translations = {
     statusTableB: 'Table B Status',
     nextAction: 'Recommended Next Action',
     whichChart: 'Which table should I use?',
-    whichChartDesc: 'USCIS announces monthly which table to use for I-485 filing. For May 2026: Employment categories use Table A, Family categories use Table B.',
     compareSubtitle: 'See why country of birth matters for the same category and priority date',
     compareCategory: 'Category',
     comparePD: 'Priority Date',
@@ -292,7 +291,6 @@ const translations = {
     moreThanYear: '> 60 months',
     currentlyCurrent: 'Your category is already current',
     eligibleNow: 'You are already eligible to file',
-    chartFooterNote: 'For May 2026, USCIS uses Final Action Dates for employment-based filings (Chart A) and Dates for Filing for family-based filings (Chart B). We automatically pick the right chart based on your category.',
     navOverview: 'Overview',
     ctaBanner: "You're viewing the public bulletin — enter your case to see your own timeline.",
     ctaBannerBtn: 'My timeline →',
@@ -396,7 +394,6 @@ const translations = {
     statusTableB: '表B状态',
     nextAction: '建议下一步',
     whichChart: '我应该用哪个表?',
-    whichChartDesc: 'USCIS每月公布I-485递件应使用哪个表。2026年5月：职业移民用表A，亲属移民用表B。',
     compareCategory: '类别',
     comparePD: '优先日',
     chinaBorn: '中国大陆出生',
@@ -568,7 +565,6 @@ const translations = {
     moreThanYear: '> 60 个月',
     currentlyCurrent: '你的类别已经无排期',
     eligibleNow: '你已经符合递件条件',
-    chartFooterNote: '2026 年 5 月:USCIS 对职业移民使用表A (最终裁定排期),对亲属移民使用表B (递件排期)。系统会根据你的类别自动选用正确的表。',
   },
   tw: {
     appTitle: '綠卡晴雨表',
@@ -667,7 +663,6 @@ const translations = {
     statusTableB: '表B狀態',
     nextAction: '建議下一步',
     whichChart: '我應該用哪個表?',
-    whichChartDesc: 'USCIS每月公布I-485遞件應使用哪個表。2026年5月：職業移民用表A，親屬移民用表B。',
     compareCategory: '類別',
     comparePD: '優先日',
     chinaBorn: '中國大陸出生',
@@ -839,7 +834,6 @@ const translations = {
     moreThanYear: '> 60 個月',
     currentlyCurrent: '你的類別已經無排期',
     eligibleNow: '你已經符合遞件條件',
-    chartFooterNote: '2026 年 5 月:USCIS 對職業移民使用表A (最終裁定排期),對親屬移民使用表B (遞件排期)。系統會根據你的類別自動選用正確的表。',
   }
 };
 
@@ -4491,7 +4485,53 @@ const BulletinMovementChart = ({ cat, country, chart = null, onChartChange = nul
   );
 };
 
-const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCompletedI485Steps = () => {}, greenCardInfo = { approvalDate: null, isConditional: false, celebrated: false }, setGreenCardInfo = () => {}, travelRecords = [], setTravelRecords = () => {}, i485ServiceCenter = 'average', setI485ServiceCenter = () => {}, stepActualDates = {}, setStepActualDates = () => {} }) => {
+// ── UI-02: chart-adoption copy, generated from the live charts selection ──────
+// The dictionary used to carry whichChartDesc / chartFooterNote as hardcoded
+// sentences frozen on May 2026's adoption ("Employment categories use Table
+// A…") — wrong for every month whose designation differs, and rendered
+// nowhere. These generators build the copy from chartsSel (the entry of
+// uscis-charts.json that matched the current bulletin month, see App), in all
+// three languages, covering family/employment × Chart A/B. When the selection
+// is unconfirmed they say exactly that instead of asserting a chart.
+function chartNameFor(kind, lang) {
+  if (kind === 'filing') return lang === 'en' ? 'Dates for Filing (Chart B)' : lang === 'tw' ? '表B（遞件排期）' : '表B（递件排期）';
+  return lang === 'en' ? 'Final Action Dates (Chart A)' : lang === 'tw' ? '表A（最終裁定排期）' : '表A（最终裁定排期）';
+}
+function chartsMonthLabel(monthKey, lang) {
+  if (!monthKey) return '';
+  const [y, m] = monthKey.split('-').map(Number);
+  if (!y || !m) return monthKey;
+  if (lang === 'en') return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return `${y}年${m}月`;
+}
+function buildWhichChartDesc(lang, sel) {
+  if (!sel || !sel.confirmed) return lang === 'en'
+    ? "USCIS's chart choice for the latest month hasn't been confirmed yet — both charts are shown side by side below; don't rely on a single one."
+    : lang === 'tw'
+      ? '本月 USCIS 用表尚未確認——下方雙表並列展示，請勿只按單一表判斷。'
+      : '本月 USCIS 用表尚未确认——下方双表并列展示，请勿只按单一表判断。';
+  const ml = chartsMonthLabel(sel.monthKey, lang);
+  return lang === 'en'
+    ? `USCIS announces each month which chart to use for I-485 filing. For ${ml}: employment-based categories use ${chartNameFor(sel.employment, lang)}, family-sponsored categories use ${chartNameFor(sel.family, lang)}.`
+    : lang === 'tw'
+      ? `USCIS 每月公布 I-485 遞件應使用哪個表。${ml}：職業移民用${chartNameFor(sel.employment, lang)}，親屬移民用${chartNameFor(sel.family, lang)}。`
+      : `USCIS 每月公布 I-485 递件应使用哪个表。${ml}：职业移民用${chartNameFor(sel.employment, lang)}，亲属移民用${chartNameFor(sel.family, lang)}。`;
+}
+function buildChartFooterNote(lang, sel) {
+  if (!sel || !sel.confirmed) return lang === 'en'
+    ? "This month's USCIS chart choice hasn't been confirmed yet — filing guidance here is tentative. Please verify at uscis.gov before filing."
+    : lang === 'tw'
+      ? '本月 USCIS 用表尚未確認，遞件判斷為暫定，遞件前請到 USCIS 官網核對。'
+      : '本月 USCIS 用表尚未确认，递件判断为暂定，递件前请到 USCIS 官网核对。';
+  const ml = chartsMonthLabel(sel.monthKey, lang);
+  return lang === 'en'
+    ? `For ${ml}, USCIS uses ${chartNameFor(sel.employment, lang)} for employment-based filings and ${chartNameFor(sel.family, lang)} for family-based filings. We automatically pick the right chart based on your category.`
+    : lang === 'tw'
+      ? `${ml}：USCIS 對職業移民遞件使用${chartNameFor(sel.employment, lang)}，對親屬移民使用${chartNameFor(sel.family, lang)}。系統會根據你的類別自動選用正確的表。`
+      : `${ml}：USCIS 对职业移民递件使用${chartNameFor(sel.employment, lang)}，对亲属移民使用${chartNameFor(sel.family, lang)}。系统会根据你的类别自动选用正确的表。`;
+}
+
+const Overview = ({ userCase, chartsSel = null, setTab = () => {}, completedI485Steps = [], setCompletedI485Steps = () => {}, greenCardInfo = { approvalDate: null, isConditional: false, celebrated: false }, setGreenCardInfo = () => {}, travelRecords = [], setTravelRecords = () => {}, i485ServiceCenter = 'average', setI485ServiceCenter = () => {}, stepActualDates = {}, setStepActualDates = () => {} }) => {
   const isSubscribedOv = useSubscribed();
   const { t, lang } = useLang();
   const country = resolveCountry(userCase.country);
@@ -5155,6 +5195,15 @@ const Overview = ({ userCase, setTab = () => {}, completedI485Steps = [], setCom
                     </div>
                     );
                   })}
+              </div>
+            )}
+            {/* UI-02: "which chart applies to me" — the generated answer lives
+                directly under the A/B dual-status row it explains. Only shown
+                while viewing the latest month (in Time Machine the current
+                designation would describe the wrong snapshot). */}
+            {chartsSel && chartsSel.monthKey === BULLETIN_CURRENT_KEY.value && (
+              <div style={{ padding: '7px 14px 9px', borderTop: '1px solid var(--gc-rule-soft)', fontSize: '11px', lineHeight: 1.55, color: 'var(--gc-ink-soft)' }}>
+                <b style={{ color: 'var(--gc-ink)' }}>{t.whichChart}</b>{' '}{buildWhichChartDesc(lang, chartsSel)}
               </div>
             )}
           </div>
@@ -7216,6 +7265,20 @@ const BulletinTalk = ({ lang }) => {
   const [data, setData] = useState(null);
   const [msg, setMsg] = useState('');
   const [posting, setPosting] = useState(false);
+  // Visible rejection feedback (UI-10): a refused post used to fail silently —
+  // the text just sat in the box and the user couldn't tell whether it went up.
+  const [postError, setPostError] = useState('');
+  const postFailMsg = (status) => {
+    if (status === 429) return lang === 'en'
+      ? 'Too many posts in a short time — please wait a bit and try again.'
+      : lang === 'tw' ? '發布太頻繁——請稍等一會兒再試。' : '发布太频繁——请稍等一会儿再试。';
+    if (status === 0) return lang === 'en'
+      ? 'Post failed — network error. Please try again.'
+      : lang === 'tw' ? '發布失敗——網絡異常，請稍後重試。' : '发布失败——网络异常，请稍后重试。';
+    return lang === 'en'
+      ? 'Post rejected — it may contain a link, contact details, or a long number. Please edit and try again.'
+      : lang === 'tw' ? '發布被拒收——內容可能含連結、聯繫方式或長數字，請修改後重試。' : '发布被拒收——内容可能包含链接、联系方式或长数字，请修改后重试。';
+  };
   const [liked, setLiked] = useState(() => {
     try { return new Set(JSON.parse(window.localStorage.getItem('gc_talk_liked') || '[]')); } catch { return new Set(); }
   });
@@ -7256,8 +7319,9 @@ const BulletinTalk = ({ lang }) => {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'comment', message: text, name: guestName.trim() || (lang === 'en' ? 'Guest' : '游客') }),
       });
-      if (r.ok) { setMsg(''); load(); }
-    } catch { /* noop */ }
+      if (r.ok) { setMsg(''); setPostError(''); load(); }
+      else setPostError(postFailMsg(r.status));
+    } catch { setPostError(postFailMsg(0)); }
     setPosting(false);
   };
   const [replyingTo, setReplyingTo] = useState(null);
@@ -7271,8 +7335,9 @@ const BulletinTalk = ({ lang }) => {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'comment', message: text, parentId, name: guestName.trim() || (lang === 'en' ? 'Guest' : '游客') }),
       });
-      if (r.ok) { setReplyMsg(''); setReplyingTo(null); load(); }
-    } catch { /* noop */ }
+      if (r.ok) { setReplyMsg(''); setReplyingTo(null); setPostError(''); load(); }
+      else setPostError(postFailMsg(r.status));
+    } catch { setPostError(postFailMsg(0)); }
     setPosting(false);
   };
   const like = async (id) => {
@@ -7314,7 +7379,7 @@ const BulletinTalk = ({ lang }) => {
     <div style={{ marginTop: '5px' }}>
       <textarea value={replyMsg} maxLength={300} rows={2} autoFocus
         placeholder={(lang === 'en' ? 'Reply to ' : '回复 ') + (targetName || (lang === 'en' ? 'Guest' : '游客')) + '…'}
-        onChange={(e) => setReplyMsg(e.target.value)}
+        onChange={(e) => { setReplyMsg(e.target.value); if (postError) setPostError(''); }}
         style={{
           width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '40px',
           padding: '6px 8px', fontSize: '12px', lineHeight: 1.5, color: 'var(--gc-ink)',
@@ -7331,6 +7396,11 @@ const BulletinTalk = ({ lang }) => {
             background: replyMsg.trim().length < 2 ? 'var(--gc-rule)' : 'var(--gc-green)', color: 'var(--gc-paper)', opacity: posting ? 0.6 : 1,
           }}>{lang === 'en' ? 'Reply' : '回复'}</button>
       </div>
+      {postError && (
+        <div role="alert" style={{ fontSize: '11px', lineHeight: 1.5, color: 'var(--gc-red-ink)', marginTop: '4px' }}>
+          {postError}
+        </div>
+      )}
     </div>
   );
 
@@ -7378,9 +7448,23 @@ const BulletinTalk = ({ lang }) => {
             {lang === 'en' ? '(tap to edit)' : '（可改）'}
           </span>
         </div>
+        {/* Rules bar (UI-10): the old hint only warned about ads/links — nothing
+            told users not to post the case/receipt numbers that identify them,
+            and there is no self-serve delete once a post is up. */}
+        <div style={{
+          fontSize: '10.5px', lineHeight: 1.5, color: '#92400e',
+          background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--gc-radius-sm)',
+          padding: '5px 8px', marginBottom: '6px',
+        }}>
+          {lang === 'en'
+            ? "Please don't post case or receipt numbers, full names, or phone numbers. Others' experiences are not advice for your case."
+            : lang === 'tw'
+              ? '請勿發布案號、收據號、全名、電話等個資；他人經驗不構成個案建議。'
+              : '请勿发布案号、收据号、全名、电话等个人信息；他人经验不构成个案建议。'}
+        </div>
         <textarea value={msg} maxLength={300} rows={2}
           placeholder={lang === 'en' ? 'Say something about this bulletin… (no links)' : '聊聊这期排期…（不能带链接/联系方式）'}
-          onChange={(e) => setMsg(e.target.value)}
+          onChange={(e) => { setMsg(e.target.value); if (postError) setPostError(''); }}
           style={{
             width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '48px',
             padding: '7px 9px', fontSize: '12px', lineHeight: 1.5, color: 'var(--gc-ink)',
@@ -7398,6 +7482,11 @@ const BulletinTalk = ({ lang }) => {
               color: 'var(--gc-paper)', opacity: posting ? 0.6 : 1,
             }}>{lang === 'en' ? 'Post' : '发布'}</button>
         </div>
+        {postError && (
+          <div role="alert" style={{ fontSize: '11px', lineHeight: 1.5, color: 'var(--gc-red-ink)', marginTop: '6px' }}>
+            {postError}
+          </div>
+        )}
       </div>
 
       {/* 评论列表 */}
@@ -7474,7 +7563,7 @@ const BulletinTalk = ({ lang }) => {
 // 访客在个人页看到的示例案件（只读展示，不写进 localStorage）
 const SAMPLE_CASE = { country: 'Taiwan', category: 'EB3', priorityDate: '2024-07-15', inUS: true, petitionerStatus: 'USC', birthYearMonth: '' };
 
-const MonthlyUpdate = ({ userCase, hasCase = true }) => {
+const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true }) => {
   // 访客（没填案子）看通用视角：默认中国大陆列 + 亲属组，不渲染「你的类别」个人行，
   // category=null 让所有「我的」高亮自然失效——不能拿默认的 Taiwan EB3 冒充访客的案子
   if (!hasCase) userCase = { country: 'China', category: null, priorityDate: null };
@@ -7488,7 +7577,18 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
   // 同日期合并行（EB-4/SR、EB-5 预留）点「展开」后按 cat 记录，本次会话内保持展开
   const [expandedMerges, setExpandedMerges] = useState({});
   const chartKey = updChart === 'B' ? 'filing' : 'finalAction';
-  const showsTwoColumns = userCase.country === 'China' || userCase.country === 'India'; // These have separate cutoffs from ROW
+  // UI-01: the bulletin data carries REAL Mexico/Philippines columns, but
+  // resolveCountry folds those users into 'Other' — so the table's primary
+  // column showed ROW dates under a Mexico/Philippines header (F4 Mexico was
+  // off by 11 years). The header prints the raw country, so the primary
+  // column must read the raw country's column. Taiwan has no column of its
+  // own in the bulletin and correctly stays on 'Other'. Per-cell fallback to
+  // the resolved column covers the bundled seed (Other/China/India only)
+  // until history.json lands.
+  const tableCountry = (userCase.country === 'Mexico' || userCase.country === 'Philippines')
+    ? userCase.country
+    : userCountry;
+  const cellOf = (table, cat) => table?.[cat]?.[tableCountry] ?? table?.[cat]?.[userCountry];
 
   // Time machine: detect if we have previous-month data to diff against
   // (earliest month in archive has no previous reference)
@@ -7506,24 +7606,24 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
       // Return category rows but with no movement deltas
       return cats.map(c => ({
         cat: c, label: catLabels[c],
-        primaryDate: bulletinCurrent[chartKey][c]?.[userCountry],
-        secondaryDate: userCountry !== 'Other' ? bulletinCurrent[chartKey][c]?.Other : null,
+        primaryDate: cellOf(bulletinCurrent[chartKey], c),
+        secondaryDate: tableCountry !== 'Other' ? bulletinCurrent[chartKey][c]?.Other : null,
         primary: { type: 'none', days: 0 },
-        secondary: userCountry !== 'Other' ? { type: 'none', days: 0 } : null,
+        secondary: tableCountry !== 'Other' ? { type: 'none', days: 0 } : null,
       }));
     }
     return cats.map(c => ({
       cat: c, label: catLabels[c],
-      primaryDate: bulletinCurrent[chartKey][c]?.[userCountry],
-      secondaryDate: userCountry !== 'Other' ? bulletinCurrent[chartKey][c]?.Other : null,
-      primary: computeMovement(bulletinCurrent[chartKey][c]?.[userCountry], bulletinPrevious[chartKey]?.[c]?.[userCountry]),
-      secondary: userCountry !== 'Other' ? computeMovement(bulletinCurrent[chartKey][c]?.Other, bulletinPrevious[chartKey]?.[c]?.Other) : null,
+      primaryDate: cellOf(bulletinCurrent[chartKey], c),
+      secondaryDate: tableCountry !== 'Other' ? bulletinCurrent[chartKey][c]?.Other : null,
+      primary: computeMovement(cellOf(bulletinCurrent[chartKey], c), cellOf(bulletinPrevious[chartKey], c)),
+      secondary: tableCountry !== 'Other' ? computeMovement(bulletinCurrent[chartKey][c]?.Other, bulletinPrevious[chartKey]?.[c]?.Other) : null,
     }));
   })();
 
   const userImpact = !hasPreviousData
     ? { type: 'none', days: 0 }
-    : computeMovement(bulletinCurrent[chartKey][userCase.category]?.[userCountry], bulletinPrevious[chartKey]?.[userCase.category]?.[userCountry]);
+    : computeMovement(cellOf(bulletinCurrent[chartKey], userCase.category), cellOf(bulletinPrevious[chartKey], userCase.category));
 
   const impactTextRaw = {
     advanced: t.impactAdvanced, retrogressed: t.impactRetrogressed, none: t.impactNoChange, current: t.impactBecameCurrent,
@@ -7815,7 +7915,7 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
             const sp = label.indexOf(' ');
             return sp === -1 ? [label, ''] : [label.slice(0, sp), label.slice(sp + 1)];
           };
-          const gridCols = '0.85fr 1.1fr 1.1fr';
+          const gridCols = tableCountry !== 'Other' ? '0.85fr 1.1fr 1.1fr' : '0.85fr 1.1fr';
           return (
             <div>
               {/* Header band — grey strip naming the columns once, like the shared table */}
@@ -7830,9 +7930,11 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
                   <CountryFlag country={userCase.country} size={12} />
                   <span>{userCase.country === 'China' && lang !== 'en' ? (lang === 'tw' ? '中國大陸' : '中国大陆') : countryShortLabel(userCase.country, lang)}</span>
                 </div>
-                <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-ink-soft)', textAlign: 'center' }}>
-                  {lang === 'en' ? 'ROW' : lang === 'tw' ? '全球 / 港澳台' : '全球 / 港澳台'}
-                </div>
+                {tableCountry !== 'Other' && (
+                  <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--gc-ink-soft)', textAlign: 'center' }}>
+                    {lang === 'en' ? 'ROW' : lang === 'tw' ? '全球 / 港澳台' : '全球 / 港澳台'}
+                  </div>
+                )}
               </div>
               {groupChanges.map((ch, idx) => {
                 const [code, sub] = splitLabel(ch.label);
@@ -7883,13 +7985,23 @@ const MonthlyUpdate = ({ userCase, hasCase = true }) => {
                       </span>
                     </div>
                     <div style={{ textAlign: 'center' }}>{cell(ch.primaryDate, ch.primary)}</div>
-                    <div style={{ textAlign: 'center' }}>{ch.secondaryDate !== null ? cell(ch.secondaryDate, ch.secondary) : <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>—</span>}</div>
+                    {tableCountry !== 'Other' && (
+                      <div style={{ textAlign: 'center' }}>{ch.secondaryDate !== null && ch.secondaryDate !== undefined ? cell(ch.secondaryDate, ch.secondary) : <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>—</span>}</div>
+                    )}
                   </div>
                 );
               })}
             </div>
           );
         })()}
+        {/* UI-02: generated chart-adoption footer for this table (the old
+            hardcoded chartFooterNote froze May 2026's adoption). Latest month
+            only — in Time Machine the note would describe the wrong snapshot. */}
+        {chartsSel && chartsSel.monthKey === BULLETIN_CURRENT_KEY.value && (
+          <div style={{ marginTop: '10px', fontSize: '10.5px', lineHeight: 1.55, color: 'var(--gc-muted)' }}>
+            {buildChartFooterNote(lang, chartsSel)}
+          </div>
+        )}
       </div>
 
       {/* 仿 careerengine：表格下面接排期趋势图 + 排期讨论区 */}
@@ -12042,10 +12154,10 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                 </div>
                 <div className="text-[9px] text-blue-700 leading-snug">
                   {lang === 'en'
-                    ? 'Scenario multiplier: Optimistic=1.5, Expected=1.0, Pessimistic=0.3. Near-term forecasts prioritize recent observed trends; long-term forecasts gradually anchor to 21yr historical averages for stability.'
+                    ? 'Scenario multiplier: Optimistic=1.5, Expected=1.0, Pessimistic=0.5. Near-term forecasts prioritize recent observed trends; long-term forecasts gradually anchor to 21yr historical averages for stability.'
                     : lang === 'tw'
-                    ? '情景乘數：樂觀=1.5、預期=1.0、悲觀=0.3。近期預測優先近期觀察到的趨勢；長期預測逐漸錨定到21年歷史均值以保持穩定。'
-                    : '情景乘数：乐观=1.5、预期=1.0、悲观=0.3。近期预测优先近期观察到的趋势；长期预测逐渐锚定到21年历史均值以保持稳定。'}
+                    ? '情景乘數：樂觀=1.5、預期=1.0、悲觀=0.5。近期預測優先近期觀察到的趨勢；長期預測逐漸錨定到21年歷史均值以保持穩定。'
+                    : '情景乘数：乐观=1.5、预期=1.0、悲观=0.5。近期预测优先近期观察到的趋势；长期预测逐渐锚定到21年历史均值以保持稳定。'}
                 </div>
                 <div className="mt-1.5 pt-1.5 border-t border-blue-200 text-[9px] text-blue-600 italic leading-snug">
                   {lang === 'en'
@@ -14933,6 +15045,13 @@ const LanguageGateModal = ({ theme = 'passport', onPick }) => {
               <span className="gc-serif" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--gc-ink)' }}>
                 {o.label}
               </span>
+              {/* Value proposition in the option's own language — appSubtitle used
+                  to be a dead dictionary string rendered nowhere; the gate is
+                  where a first-time visitor decides whether this site is for
+                  them, so it lives here now. */}
+              <span style={{ display: 'block', marginTop: '4px', fontSize: '12px', fontWeight: 400, color: 'var(--gc-muted)', lineHeight: 1.45 }}>
+                {translations[o.v]?.appSubtitle}
+              </span>
             </button>
           ))}
         </div>
@@ -16032,7 +16151,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
                     <div style={{ fontSize: '10.5px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
                       {lang === 'en' ? 'Your date of birth' : '你的出生年月'}{' '}
                       <span style={{ color: 'var(--gc-ink-soft)' }}>
-                        {lang === 'en' ? '(helps us predict your timeline more precisely)' : '(填了才能算准你的排期预测)'}
+                        {lang === 'en' ? '(helps us predict your timeline more precisely)' : lang === 'tw' ? '（幫助我們更準確地預測你的排期）' : '（帮助我们更准确地预测你的排期）'}
                       </span>
                     </div>
                     <YearMonthDropdown value={birthYM}
@@ -16185,8 +16304,8 @@ const SubtypeUpdateModal = ({ userCase, email, token, currentName = '', theme = 
           {lang === 'en'
             ? 'This helps us calculate your prediction more precisely.'
             : lang === 'tw'
-              ? '這樣才能給你算準排期預測。'
-              : '这样才能给你算准排期预测。'}
+              ? '這能幫助我們更準確地計算你的排期預測。'
+              : '这能帮助我们更准确地计算你的排期预测。'}
         </div>
         {needsSubtype && (
           <>
@@ -16403,6 +16522,18 @@ export default function App() {
   // contents change via Object.assign (mutation doesn't trigger React updates on its own).
   const [_bulletinTick, setBulletinTick] = useState(0);
 
+  // UI-00: data-load status surface. The history/bulletin/charts fetches below
+  // used to fail SILENTLY into the bundled May-2026 seed (the .catch handlers
+  // literally just kept it), so the app presented months-old data as current
+  // with no trace anywhere. These states drive the visible staleness banner
+  // rendered at the top of <main>, and chartsSel feeds the UI-02 copy
+  // generators consumed by Overview / MonthlyUpdate.
+  const [dataLoad, setDataLoad] = useState({ history: 'pending', bulletin: 'pending', charts: 'pending' });
+  const [chartsRaw, setChartsRaw] = useState(undefined); // undefined = loading, null = fetch failed
+  const [chartsSel, setChartsSel] = useState(null); // { monthKey, family, employment, confirmed }
+  const [historyLatestKey, setHistoryLatestKey] = useState(null);
+  const [bulletinMonthKey, setBulletinMonthKey] = useState(null);
+
   // Apply viewingMonth changes: swap bulletinCurrent/bulletinPrevious contents in-place
   // so all the 30+ places reading from these references automatically see the new data.
   useEffect(() => {
@@ -16462,12 +16593,13 @@ export default function App() {
     fetch(`${API_BASE}/history.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('history-fetch-not-ok'))))
       .then((hist) => {
-        if (cancelled || !hist || !Array.isArray(hist.months)) return;
+        if (cancelled) return;
+        if (!hist || !Array.isArray(hist.months)) { setDataLoad((s) => ({ ...s, history: 'failed' })); return; }
         const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'EB5R', 'EB5H', 'EB5I', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
         const asc = hist.months
           .filter((m) => m && m.month && m.finalAction && cats.every((c) => m.finalAction[c]))
           .sort((a, b) => a.month.localeCompare(b.month));
-        if (!asc.length) return;
+        if (!asc.length) { setDataLoad((s) => ({ ...s, history: 'failed' })); return; }
 
         const EN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December'];
@@ -16527,35 +16659,65 @@ export default function App() {
         // sitting on May while DEFAULT_VIEWING_MONTH says August, which reads as the
         // Time Machine being active on a cold load.
         setViewingMonth(latest);
+        setHistoryLatestKey(latest);
+        setDataLoad((s) => ({ ...s, history: 'ok' }));
         setBulletinTick((t) => t + 1);
       })
       .catch(() => {
         // Keep the hardcoded three-month archive — the app still works, just with
-        // a shorter picker and no real history.
+        // a shorter picker and no real history. UI-00: no longer silent — the
+        // banner at the top of <main> says the data may be stale.
+        if (!cancelled) setDataLoad((s) => ({ ...s, history: 'failed' }));
       });
     return () => { cancelled = true; };
   }, []);
 
-  // Override the hardcoded FILING_AUTHORIZED table with USCIS's actual monthly chart
-  // designation (scraped to /uscis-charts.json by scripts/scrape-uscis-chart.mjs).
-  // Same in-place-mutation pattern as RATES_DB; the tick forces a re-render. On any
-  // failure the static table stays — it was correct as of its comment's month.
+  // Fetch USCIS's monthly chart designation (scraped to /uscis-charts.json by
+  // scripts/scrape-uscis-chart.mjs) into state. UI-00/P1-01: the old effect
+  // applied data.current UNCONDITIONALLY the moment it landed — with the file
+  // carrying {current: 2026-10, next: 2026-11}, October's designation was
+  // stamped onto November's bulletin, and any failure silently kept the static
+  // May-2026 table. The apply effect below only adopts the entry whose month
+  // matches the latest bulletin month; anything else stays unconfirmed and the
+  // banner says so.
   useEffect(() => {
     let cancelled = false;
     fetch(`${API_BASE}/uscis-charts.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('uscis-charts-not-ok'))))
-      .then((data) => {
-        if (cancelled || !data?.current?.family || !data?.current?.employment) return;
-        const familyFiling = data.current.family === 'filing';
-        const ebFiling = data.current.employment === 'filing';
-        Object.keys(FILING_AUTHORIZED).forEach((cat) => {
-          FILING_AUTHORIZED[cat] = cat.startsWith('EB') ? ebFiling : familyFiling;
-        });
-        setBulletinTick((t) => t + 1);
-      })
-      .catch(() => {});
+      .then((data) => { if (!cancelled) setChartsRaw(data); })
+      .catch(() => {
+        if (cancelled) return;
+        setChartsRaw(null);
+        setChartsSel({ monthKey: null, family: undefined, employment: undefined, confirmed: false });
+        setDataLoad((s) => ({ ...s, charts: 'failed' }));
+      });
     return () => { cancelled = true; };
   }, []);
+
+  const latestMonthKey = historyLatestKey || bulletinMonthKey;
+  useEffect(() => {
+    if (chartsRaw === undefined || chartsRaw === null) return; // loading / failed
+    if (!latestMonthKey) return; // wait until a bulletin source resolves the month
+    const entry = [chartsRaw.current, chartsRaw.next].find((e) => e && e.month === latestMonthKey);
+    const valid = entry && (entry.family === 'filing' || entry.family === 'final')
+      && (entry.employment === 'filing' || entry.employment === 'final');
+    if (valid) {
+      const familyFiling = entry.family === 'filing';
+      const ebFiling = entry.employment === 'filing';
+      Object.keys(FILING_AUTHORIZED).forEach((cat) => {
+        FILING_AUTHORIZED[cat] = cat.startsWith('EB') ? ebFiling : familyFiling;
+      });
+      setChartsSel({ monthKey: entry.month, family: entry.family, employment: entry.employment, confirmed: true });
+      setDataLoad((s) => ({ ...s, charts: 'ok' }));
+      setBulletinTick((t) => t + 1);
+    } else {
+      // No entry for the current bulletin month: do NOT apply anything — the
+      // static table may describe a different month. Mark unconfirmed so the
+      // banner and the generated copy both say the choice isn't verified.
+      setChartsSel({ monthKey: latestMonthKey, family: chartsRaw.current?.family, employment: chartsRaw.current?.employment, confirmed: false });
+      setDataLoad((s) => ({ ...s, charts: 'mismatch' }));
+    }
+  }, [chartsRaw, latestMonthKey]);
 
   // Auto-update bulletin data: fetch from /bulletin.json on mount; mutate the hardcoded
   // bulletinCurrent / bulletinPrevious objects in place if fresh data is available.
@@ -16570,12 +16732,14 @@ export default function App() {
     fetch(`${API_BASE}/bulletin.json`, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('fetch-not-ok'))))
       .then((data) => {
-        if (cancelled || !data || !data.current || !data.current.finalAction) return;
+        if (cancelled) return;
+        if (!data || !data.current || !data.current.finalAction) { setDataLoad((s) => ({ ...s, bulletin: 'failed' })); return; }
         // Sanity check — must have all 8 categories in finalAction
         const cats = ['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5', 'EB5R', 'EB5H', 'EB5I', 'F1', 'F2A', 'F2B', 'F3', 'F4'];
         const ok = cats.every((c) => data.current.finalAction[c]);
         if (!ok) {
           console.warn('[bulletin] Remote data missing categories, keeping hardcoded fallback');
+          setDataLoad((s) => ({ ...s, bulletin: 'failed' }));
           return;
         }
         // Mutate the existing module-level bulletinCurrent/bulletinPrevious objects in place.
@@ -16600,11 +16764,14 @@ export default function App() {
           BULLETIN_CURRENT_MONTH.tw = `${yr}年${moNum}月`;
         }
         console.log('[bulletin] Loaded fresh data:', data.current.month, 'source:', data.source);
+        if (data.current.month) setBulletinMonthKey(data.current.month);
+        setDataLoad((s) => ({ ...s, bulletin: 'ok' }));
         setBulletinTick((t) => t + 1); // force consumers to re-render
       })
       .catch((e) => {
-        // Silent fallback to hardcoded data — this is expected before scraper is deployed
+        // Fallback to hardcoded data — UI-00: no longer silent, the banner shows.
         console.log('[bulletin] Using hardcoded fallback:', e.message || 'no-remote-data');
+        if (!cancelled) setDataLoad((s) => ({ ...s, bulletin: 'failed' }));
       });
     return () => { cancelled = true; };
   }, [isTimeMachineActive]);
@@ -17945,6 +18112,46 @@ export default function App() {
                 boxSizing: 'border-box',
                 width: '100%',
               }}>
+          {/* UI-00: visible data-staleness banner. The seed fallback used to be
+              indistinguishable from live data; now any load failure, source
+              month mismatch, or unconfirmed USCIS chart choice surfaces here,
+              on every tab, above all content. Strongest warning wins. */}
+          {(() => {
+            const monthsMismatch = historyLatestKey && bulletinMonthKey && historyLatestKey !== bulletinMonthKey;
+            let kind = null;
+            if (dataLoad.history === 'failed' && dataLoad.bulletin === 'failed') kind = 'fallback';
+            else if (dataLoad.history === 'failed' || dataLoad.bulletin === 'failed' || monthsMismatch) kind = 'partial';
+            else if (dataLoad.charts === 'failed' || dataLoad.charts === 'mismatch') kind = 'charts';
+            if (!kind) return null;
+            const text = kind === 'fallback'
+              ? (lang === 'en'
+                ? `Data failed to load — you're seeing the app's built-in data (${BULLETIN_CURRENT_MONTH.en}), which may be out of date. Don't file based on it; check the official bulletin at travel.state.gov.`
+                : lang === 'tw'
+                  ? `數據載入失敗——當前顯示的是應用內置數據（${BULLETIN_CURRENT_MONTH.tw}），可能已過期，請勿據此遞件，請以國務院官網公告為準。`
+                  : `数据加载失败——当前显示的是应用内置数据（${BULLETIN_CURRENT_MONTH.zh}），可能已过期，请勿据此递件，请以国务院官网公告为准。`)
+              : kind === 'partial'
+                ? (lang === 'en'
+                  ? 'Some data failed to refresh — what you see may not be the latest bulletin. Please verify against travel.state.gov.'
+                  : lang === 'tw'
+                    ? '部分數據未能更新——當前顯示的可能不是最新一期公告，請以 travel.state.gov 官方公告為準。'
+                    : '部分数据未能更新——当前显示的可能不是最新一期公告，请以 travel.state.gov 官方公告为准。')
+                : (lang === 'en'
+                  ? "This month's USCIS chart choice hasn't been confirmed yet — filing guidance is tentative. Please verify at uscis.gov before filing."
+                  : lang === 'tw'
+                    ? '本月 USCIS 用表尚未確認——遞件判斷為暫定，遞件前請到 USCIS 官網核對。'
+                    : '本月 USCIS 用表尚未确认——递件判断为暂定，递件前请到 USCIS 官网核对。');
+            return (
+              <div role="alert" style={{
+                display: 'flex', gap: '8px', alignItems: 'flex-start',
+                background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: '6px',
+                padding: '10px 12px', marginBottom: '12px',
+                fontSize: '12.5px', lineHeight: 1.55, color: '#92400e',
+              }}>
+                <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
+                <span>{text}</span>
+              </div>
+            );
+          })()}
           {(() => {
             // Overview now uses the same CompactCaseBar as other tabs (no more full sidebar).
             // This keeps the page narrow and matches user expectation from every other tab.
@@ -17968,22 +18175,22 @@ export default function App() {
               {/* 访客进个人页：渲染固定的示例案件（SAMPLE_CASE，不是 userCase——
                   默认种子不能冒充访客自己的案子），顶上一条横条标明「示例」 */}
               {tab === 'overview' && (hasOnboarded
-                ? <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} greenCardInfo={greenCardInfo} setGreenCardInfo={setGreenCardInfo} travelRecords={travelRecords} setTravelRecords={setTravelRecords} i485ServiceCenter={i485ServiceCenter} setI485ServiceCenter={setI485ServiceCenter} stepActualDates={stepActualDates} setStepActualDates={setStepActualDates} />
+                ? <Overview userCase={userCase} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} greenCardInfo={greenCardInfo} setGreenCardInfo={setGreenCardInfo} travelRecords={travelRecords} setTravelRecords={setTravelRecords} i485ServiceCenter={i485ServiceCenter} setI485ServiceCenter={setI485ServiceCenter} stepActualDates={stepActualDates} setStepActualDates={setStepActualDates} />
                 : (
                   <>
                     {sampleBanner}
-                    <Overview userCase={SAMPLE_CASE} setTab={handleTabChange} />
+                    <Overview userCase={SAMPLE_CASE} chartsSel={chartsSel} setTab={handleTabChange} />
                   </>
                 ))}
-              {tab === 'dashboard' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
+              {tab === 'dashboard' && <Overview userCase={userCase} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {/* 预测 tab — id is 'trends' per navigation config (line 11527).
                   MUST pass i485ServiceCenter + completedI485Steps so TrendChart's
                   approval forecast syncs with Overview. The 'forecast' branch
                   below is dead code kept for backward compat. */}
               {tab === 'trends' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
-              {tab === 'update' && <MonthlyUpdate userCase={userCase} hasCase={hasOnboarded} />}
+              {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} />}
               {tab === 'forecast' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
-              {tab === 'i485' && <Overview userCase={userCase} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
+              {tab === 'i485' && <Overview userCase={userCase} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
               {tab === 'bulletin' && <BulletinTab userCase={userCase} />}
               {tab === 'about' && <AboutTab />}
