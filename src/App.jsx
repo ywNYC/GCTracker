@@ -2124,7 +2124,7 @@ const InputPanel = ({ userCase, setUserCase }) => {
                 borderRadius: '3px',
                 transition: 'all 120ms',
               }}>
-              {userCase.inUS ? (lang === 'en' ? 'YES' : '是') : (lang === 'en' ? 'NO' : '否')}
+              {userCase.inUS == null ? (lang === 'en' ? 'N/A' : '未填') : userCase.inUS ? (lang === 'en' ? 'YES' : '是') : (lang === 'en' ? 'NO' : '否')}
             </button>
           </div>
         </div>
@@ -3397,7 +3397,11 @@ const AC_MILESTONES = [
 
 const ActionCenter = ({ userCase }) => {
   const { lang } = useLang();
-  const inUS = !!userCase.inUS;
+  // inUS 三态（UI-28）：null = 未填。未填时先按境内（I-485）显示并在顶部挂
+  // 明示条——此前 !!null 折叠成 false，整块按领事馆口径呈现，等于替用户
+  // 把没答的问题答了。境内也是产品默认种子（inUS: true）的口径。
+  const inUSKnown = userCase.inUS != null;
+  const inUS = inUSKnown ? !!userCase.inUS : true;
   const isEB = !userCase.category?.startsWith('F');
   const [openList, setOpenList] = useState(false);
   const [roadmapOpen, setRoadmapOpen] = useState(false);
@@ -3557,6 +3561,14 @@ const ActionCenter = ({ userCase }) => {
 
   return (
     <>
+      {/* 未填在美与否：路线与清单是暂按境内显示的，先把这件事说在明处 */}
+      {!inUSKnown && (
+        <div style={{ ...card, padding: '9px 12px', fontSize: '11.5px', lineHeight: 1.6, color: 'var(--gc-ink-soft)' }}>
+          {L('你还没填是否在美国——下面的路线与清单先按境内递件（I-485）显示；在个人页补填后会自动按你的情况切换。',
+             '你還沒填是否在美國——下面的路線與清單先按境內遞件（I-485）顯示；在個人頁補填後會自動按你的情況切換。',
+             "You haven't told us whether you're in the US — the route and checklist below assume in-US filing (I-485) for now. Add it on your page and this switches to match.")}
+        </div>
+      )}
       {/* ① Don't-miss-the-window banner */}
       <div style={{ ...card, borderLeft: '3px solid var(--gc-green)', background: 'var(--gc-green-soft)' }}>
         <div style={{ padding: '12px 14px' }}>
@@ -4574,7 +4586,7 @@ function buildChartFooterNote(lang, sel) {
       : `${ml}：USCIS 对职业移民递件使用${chartNameFor(sel.employment, lang)}，对亲属移民使用${chartNameFor(sel.family, lang)}。系统会根据你的类别自动选用正确的表。`;
 }
 
-const Overview = ({ userCase, chartsSel = null, setTab = () => {}, completedI485Steps = [], setCompletedI485Steps = () => {}, greenCardInfo = { approvalDate: null, isConditional: false, celebrated: false }, setGreenCardInfo = () => {}, travelRecords = [], setTravelRecords = () => {}, i485ServiceCenter = 'average', setI485ServiceCenter = () => {}, stepActualDates = {}, setStepActualDates = () => {} }) => {
+const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = () => {}, completedI485Steps = [], setCompletedI485Steps = () => {}, greenCardInfo = { approvalDate: null, isConditional: false, celebrated: false }, setGreenCardInfo = () => {}, travelRecords = [], setTravelRecords = () => {}, i485ServiceCenter = 'average', setI485ServiceCenter = () => {}, stepActualDates = {}, setStepActualDates = () => {} }) => {
   const isSubscribedOv = useSubscribed();
   const { t, lang } = useLang();
   const country = resolveCountry(userCase.country);
@@ -4642,6 +4654,23 @@ const Overview = ({ userCase, chartsSel = null, setTab = () => {}, completedI485
 
   return (
     <div className="space-y-2">
+
+      {/* 让预测更准（UI-28）：快速开始的案子可能缺在美与否/出生年月——给一条
+          不拦路的补充入口，点开走编辑模式补填；两项齐了这条自动消失。 */}
+      {onRefineCase && (userCase.inUS == null || !userCase.birthYearMonth) && (
+        <button type="button" onClick={onRefineCase}
+          style={{
+            width: '100%', textAlign: 'left', padding: '9px 12px', cursor: 'pointer',
+            background: 'var(--gc-paper-soft)', border: '1px dashed var(--gc-rule)',
+            borderRadius: '4px', fontSize: '11.5px', lineHeight: 1.6, color: 'var(--gc-ink-soft)',
+          }}>
+          <b style={{ color: 'var(--gc-green-ink)' }}>{lang === 'en' ? 'Sharpen your forecast →' : lang === 'tw' ? '讓預測更準 →' : '让预测更准 →'}</b>{' '}
+          {[
+            userCase.inUS == null ? (lang === 'en' ? 'in-US status (sets your filing route)' : lang === 'tw' ? '是否在美（定遞件路徑）' : '是否在美（定递件路径）') : null,
+            !userCase.birthYearMonth ? (lang === 'en' ? 'birth year & month (child age-out alerts)' : lang === 'tw' ? '出生年月（子女超齡提醒）' : '出生年月（子女超龄提醒）') : null,
+          ].filter(Boolean).join(lang === 'en' ? ' · ' : '、')}
+        </button>
+      )}
 
       {/* Suspicious PD warning */}
       {(finalActionStatus.status === 'suspicious' || filingStatus.status === 'suspicious') && (
@@ -7306,6 +7335,7 @@ const BulletinTrend = ({ lang, chartKey, catGroup, userCountry, initialCat, onCh
 // ============================================================
 const BulletinTalk = ({ lang }) => {
   const [sortTab, setSortTab] = useState('new'); // 'new' | 'hot'
+  const [talkExpanded, setTalkExpanded] = useState(false); // UI-29：默认折叠，只亮精选一条
   const [data, setData] = useState(null);
   const [msg, setMsg] = useState('');
   const [posting, setPosting] = useState(false);
@@ -7419,6 +7449,13 @@ const BulletinTalk = ({ lang }) => {
   const items = allComments.filter((c) => !c.parentId);
   if (sortTab === 'hot') items.sort((a, b) => (b.likes || 0) - (a.likes || 0) || (b.ts || '').localeCompare(a.ts || ''));
 
+  // UI-29 精选一条：点赞最高，并列取最新；全无赞时排序自然落到最新一条。
+  // 折叠态只把这一条喂给原有渲染（过滤在 map 之前，未选中的根本不进 DOM）。
+  const featured = items.length
+    ? items.slice().sort((a, b) => (b.likes || 0) - (a.likes || 0) || (b.ts || '').localeCompare(a.ts || ''))[0]
+    : null;
+  const visibleItems = talkExpanded || !featured ? items : items.filter((c) => c.id === featured.id);
+
   const replyBox = (targetId, targetName) => (
     <div style={{ marginTop: '5px' }}>
       <textarea value={replyMsg} maxLength={300} rows={2} autoFocus
@@ -7459,6 +7496,13 @@ const BulletinTalk = ({ lang }) => {
             </span>
           )}
         </span>
+        {talkExpanded && items.length > 0 && (
+          <button type="button" onClick={() => setTalkExpanded(false)}
+            style={{ fontSize: '10px', fontWeight: 700, padding: '3px 10px', border: '1px solid var(--gc-rule)', borderRadius: '999px', background: 'var(--gc-surface)', color: 'var(--gc-muted)', cursor: 'pointer' }}>
+            {lang === 'en' ? 'Collapse ▴' : '收起 ▴'}
+          </button>
+        )}
+        {talkExpanded && (
         <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '999px', overflow: 'hidden' }}>
           {[['new', lang === 'en' ? 'Latest' : '最新'], ['hot', lang === 'en' ? 'Top' : '最热']].map(([id, label], i) => (
             <button key={id} type="button" onClick={() => setSortTab(id)}
@@ -7470,9 +7514,13 @@ const BulletinTalk = ({ lang }) => {
               }}>{label}</button>
           ))}
         </span>
+        )}
       </div>
 
-      {/* 发帖框 */}
+      {/* 发帖框 — 只在展开态出现（还没有评论时也出现，让第一条能发）；
+          规则条与拒收报错都在框内，折叠不影响 UI-10 的成果 */}
+      {(talkExpanded || items.length === 0) && (
+      <>
       <div style={{ border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)', background: 'var(--gc-paper-soft)', padding: '8px' }}>
         <div className="flex items-center gap-2 mb-1.5">
           <span style={{
@@ -7532,6 +7580,8 @@ const BulletinTalk = ({ lang }) => {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* 评论列表 */}
       {items.length === 0 ? (
@@ -7540,7 +7590,7 @@ const BulletinTalk = ({ lang }) => {
             ? (lang === 'en' ? 'Loading…' : '加载中…')
             : (lang === 'en' ? 'No posts yet — be the first.' : '还没有评论——来抢个沙发')}
         </div>
-      ) : items.map((c) => (
+      ) : visibleItems.map((c) => (
         <div key={c.id} className="flex gap-2" style={{ padding: '10px 2px 8px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
           <span style={{
             width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0, marginTop: '1px',
@@ -7600,6 +7650,28 @@ const BulletinTalk = ({ lang }) => {
             }}>👍 {c.likes || 0}</button>
         </div>
       ))}
+
+      {/* UI-29 展开/收起行：N = 顶层评论数 */}
+      {!talkExpanded && items.length > 0 && (
+        <button type="button" onClick={() => setTalkExpanded(true)}
+          style={{
+            width: '100%', marginTop: '8px', padding: '8px', fontSize: '11.5px', fontWeight: 700,
+            color: 'var(--gc-green-ink)', background: 'var(--gc-paper-soft)',
+            border: '1px solid var(--gc-rule-soft)', borderRadius: 'var(--gc-radius-sm)', cursor: 'pointer',
+          }}>
+          {lang === 'en' ? `${items.length} comments in total · Show all` : lang === 'tw' ? `共 ${items.length} 條評論 · 展開全部` : `共 ${items.length} 条评论 · 展开全部`} ▾
+        </button>
+      )}
+      {talkExpanded && items.length > 1 && (
+        <button type="button" onClick={() => setTalkExpanded(false)}
+          style={{
+            width: '100%', marginTop: '8px', padding: '8px', fontSize: '11.5px', fontWeight: 700,
+            color: 'var(--gc-muted)', background: 'transparent',
+            border: '1px solid var(--gc-rule-soft)', borderRadius: 'var(--gc-radius-sm)', cursor: 'pointer',
+          }}>
+          {lang === 'en' ? 'Collapse ▴' : '收起 ▴'}
+        </button>
+      )}
     </div>
   );
 };
@@ -8780,9 +8852,11 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
                 <span className="gc-mono">{formatDate(userCase.priorityDate, lang)}</span>
                 <span style={{ color: 'var(--gc-rule)' }}>·</span>
                 <span style={{ color: 'var(--gc-muted)' }}>
-                  {userCase.inUS
-                    ? (lang === 'en' ? 'In US' : lang === 'tw' ? '在美國' : '在美国')
-                    : (lang === 'en' ? 'Abroad' : lang === 'tw' ? '境外' : '境外')}
+                  {userCase.inUS == null
+                    ? (lang === 'en' ? 'Location not set' : lang === 'tw' ? '未填在美與否' : '未填在美与否')
+                    : userCase.inUS
+                      ? (lang === 'en' ? 'In US' : lang === 'tw' ? '在美國' : '在美国')
+                      : (lang === 'en' ? 'Abroad' : lang === 'tw' ? '境外' : '境外')}
                 </span>
                 {(userCase.category === 'F1' || userCase.category === 'F2A' || userCase.category === 'F2B' || userCase.category === 'F3' || userCase.category === 'F4') && userCase.petitionerStatus && (
                   <>
@@ -14662,15 +14736,20 @@ const HelpCenter = ({ initialSection = 'faq' }) => {
 // ============================================================
 // 被污染存储的自愈：此前 userCase 持久化不看 hasOnboarded，把内置默认种子
 // （Taiwan EB3 2024-07-15，无生日无身份）写进了访客的 localStorage，刷新后访客
-// 被当成老用户直接放进个人页。真人走向导必填生日+身份，存的案子不可能长成这颗
-// 种子的样子——启动时发现是种子就整套清掉，当没填过。
+// 被当成老用户直接放进个人页。启动时发现是种子就整套清掉，当没填过。
+// 注意（UI-28 后）：快速开始的真案子同样可以无生日无身份，判定种子必须再加
+// 「没有 subtype/proxy 键」——向导落盘的案子恒带这两键，种子对象没有。
 if (typeof window !== 'undefined') {
   try {
     const _raw = window.localStorage.getItem('gc_userCase');
     if (_raw) {
       const _c = JSON.parse(_raw);
       if (_c && _c.country === 'Taiwan' && _c.category === 'EB3' && _c.priorityDate === '2024-07-15'
-          && !_c.birthYearMonth && !_c.role) {
+          && !_c.birthYearMonth && !_c.role
+          // UI-28 后「无生日无身份」不再等于种子：快速开始的真案子也长这样。
+          // 区分靠键的存在——向导落盘的案子恒带 subtype/proxy 键（可为 null），
+          // 当年被无条件持久化写下的种子对象没有这两个键。
+          && _c.subtype === undefined && _c.proxy === undefined) {
         window.localStorage.removeItem('gc_userCase');
         window.localStorage.removeItem('gc_hasOnboarded');
       }
@@ -14788,20 +14867,20 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
   // 「找回我的案子」：输入订阅邮箱 → 后端发一封带案子深链的邮件（magic link，无账号）
   const [restoreEmail, setRestoreEmail] = useState('');
   const [restoreState, setRestoreState] = useState('idle'); // idle | sending | sent | fail
-  const [subtypeAttempted, setSubtypeAttempted] = useState(false);
   const [categoryAttempted, setCategoryAttempted] = useState(false);
   const [pdAttempted, setPdAttempted] = useState(false);
-  const [inUSAttempted, setInUSAttempted] = useState(false);
-  const [roleAttempted, setRoleAttempted] = useState(false);
-  const [dobAttempted, setDobAttempted] = useState(false);
+  // UI-28 快速开始：开始键只验类别 + 优先日（出生地预选在手）。出生年月 /
+  // 在美与否 / 身份 / 子类别全部降为选填后补，不再有 attempted 拦截。
+  const isEdit = !!initialForm; // 同一个弹窗兼作编辑入口：initialForm 在手 = 编辑模式
+  const [showMore, setShowMore] = useState(isEdit); // 选填区：编辑默认展开（老值回填可见），新建默认收起
   // 旧数据没有 proxy 字段：已答过 role 的老案子视为「自己的案子」，别让编辑时问题一消失
   const [form, setForm] = useState(initialForm ? { proxy: initialForm.role != null ? false : null, ...initialForm } : {
     country: 'Taiwan',
     category: null, // must be explicitly chosen — no default, see onboarding required-field check on Start
     priorityDate: '', // must be explicitly chosen — no default, see onboarding required-field check on Start
-    birthYearMonth: '', // 'YYYY-MM' — must be explicitly chosen, no default, see Start button check
-    inUS: null, // must be explicitly chosen — no default, see onboarding required-field check on Start
-    role: null, // 'beneficiary' | 'petitioner' — must be explicitly chosen, same as inUS
+    birthYearMonth: '', // 'YYYY-MM' — 选填后补（UI-28）：'' = 未填，下游按未填处理（年龄行不渲染）
+    inUS: null, // 选填后补（UI-28）：null = 未填，与 false（不在美）严格区分，下游不许折叠成 false
+    role: null, // 'beneficiary' | 'petitioner' — 选填后补（UI-28）：null = 未填
     proxy: null, // null=未答 · false=自己的案子 · true=帮朋友/客户跟进；role 永远记录案子本人的身份
     petitionerStatus: 'USC',
     subtype: null,
@@ -14853,6 +14932,8 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       dobProxy: 'Their birth year & month',
       inUSProxy: 'Are they currently in the US?',
       petitioner: 'Petitioner',
+      moreOptional: 'Optional · sharpen the forecast (birth month, in the US?, …)',
+      moreHide: 'Hide optional details',
       start: 'Start →',
       back: '← Back',
       theme: 'Pick a style',
@@ -14892,6 +14973,8 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       dobProxy: 'TA 的出生年月',
       inUSProxy: 'TA 目前在美国境内吗？',
       petitioner: '担保人身份',
+      moreOptional: '选填 · 让预测更准（出生年月、是否在美…）',
+      moreHide: '收起选填项',
       start: '开始使用 →',
       back: '← 返回',
       theme: '选择风格',
@@ -14931,6 +15014,8 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
       dobProxy: 'TA 的出生年月',
       inUSProxy: 'TA 目前在美國境內嗎？',
       petitioner: '擔保人身份',
+      moreOptional: '選填 · 讓預測更準（出生年月、是否在美…）',
+      moreHide: '收起選填項',
       start: '開始使用 →',
       back: '← 返回',
       theme: '選擇風格',
@@ -15236,10 +15321,61 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               </div>
             </div>
 
-            {/* Name (optional) + Date of Birth — side by side. Category moves to its own
-                full-width row below so its subtype chips (up to 3, some with long CJK
-                labels like "雇主担保 PERM") get the full row width instead of wrapping
-                to 3 lines in a half-width column. */}
+            {/* Category — full width, so SubtypeChips lay out on one row.
+                Name + DOB used to sit above this; UI-28 moved them into the
+                optional section below the priority date (neither is asked in
+                quick start — name is never part of userCase anyway). */}
+            <div>
+              <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.category}</div>
+              <CategoryDropdown value={form.category}
+                placeholder={t.categoryPlaceholder}
+                triggerStyle={{
+                  padding: '9px 9px', background: 'var(--gc-paper-soft)',
+                  ...(categoryAttempted && !form.category ? { border: '1px solid var(--gc-red)' } : {}),
+                }}
+                onChange={(newCat) => {
+                  if (newCat === form.category) return;
+                  // petitionerStatus 按类别自动推导（F2A/F2B→LPR、其余 F→USC），
+                  // 不单独发问；选填区里可改。EB 类保持现值/默认。
+                  const isF2C = newCat === 'F2A' || newCat === 'F2B';
+                  const newPetitioner = isF2C ? 'LPR' : 'USC';
+                  setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: defaultSubtype(newCat) });
+                  setCategoryAttempted(false);
+                }} />
+              {/* 子类别随类别自动带出默认值（defaultSubtype），点片可改；不再拦路（UI-28） */}
+              <SubtypeChips userCase={form} setUserCase={setForm} />
+            </div>
+
+            {/* Priority Date — full width. DateDropdown is a pure option picker
+                (year stepper/grid + month grid + day grid, day clamped to the
+                month) — no typing anywhere in the intake flow (UI-29 选项化). */}
+            <div>
+              <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.pd}</div>
+              <DateDropdown value={form.priorityDate} allowEmpty minYear={2010} newestYearFirst
+                triggerStyle={{
+                  padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)',
+                  ...(pdAttempted && !form.priorityDate ? { border: '1px solid var(--gc-red)' } : {}),
+                }}
+                onChange={(pd) => { setForm({ ...form, priorityDate: pd }); setPdAttempted(false); }} />
+            </div>
+
+            {/* 选填区（UI-28）：快速开始到上面三件为止。以下字段（名字/出生年月/
+                身份/在美与否/担保人）全部选填后补——新建默认收起、编辑默认展开，
+                老案子已有值原样回填、保存原样带回，未填以空值/null 入案。 */}
+            <div>
+              <button type="button" onClick={() => setShowMore((v) => !v)}
+                style={{
+                  width: '100%', padding: '8px', fontSize: '11.5px', fontWeight: 600,
+                  background: 'transparent', color: 'var(--gc-muted)',
+                  border: '1px dashed var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)',
+                  cursor: 'pointer',
+                }}>
+                {showMore ? t.moreHide : t.moreOptional} {showMore ? '▴' : '▾'}
+              </button>
+              {showMore && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
+
+            {/* Name (optional) + Date of Birth (optional) — side by side */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div style={{ minWidth: 0 }}>
                 <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.yourName}</div>
@@ -15254,49 +15390,13 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               </div>
               <div style={{ minWidth: 0 }}>
                 <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{form.proxy ? t.dobProxy : t.dob}</div>
-                <YearMonthDropdown value={form.birthYearMonth}
-                  triggerStyle={{
-                    padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)',
-                    ...(dobAttempted && !form.birthYearMonth ? { border: '1px solid var(--gc-red)' } : {}),
-                  }}
-                  onChange={(ym) => { setForm({ ...form, birthYearMonth: ym }); setDobAttempted(false); }} />
+                <YearMonthDropdown value={form.birthYearMonth} allowEmpty
+                  triggerStyle={{ padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)' }}
+                  onChange={(ym) => setForm({ ...form, birthYearMonth: ym })} />
               </div>
             </div>
 
-            {/* Category — full width now, so SubtypeChips lay out on one row */}
-            <div>
-              <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.category}</div>
-              <CategoryDropdown value={form.category}
-                placeholder={t.categoryPlaceholder}
-                triggerStyle={{
-                  padding: '9px 9px', background: 'var(--gc-paper-soft)',
-                  ...(categoryAttempted && !form.category ? { border: '1px solid var(--gc-red)' } : {}),
-                }}
-                onChange={(newCat) => {
-                  if (newCat === form.category) return;
-                  const isF2C = newCat === 'F2A' || newCat === 'F2B';
-                  const newPetitioner = isF2C ? 'LPR' : 'USC';
-                  setForm({ ...form, category: newCat, petitionerStatus: newCat.startsWith('F') ? newPetitioner : form.petitionerStatus, subtype: defaultSubtype(newCat) });
-                  setSubtypeAttempted(false);
-                  setCategoryAttempted(false);
-                }} />
-              <SubtypeChips userCase={form} setUserCase={setForm}
-                required={!!CATEGORY_SUBTYPES[form.category]}
-                error={subtypeAttempted && !!CATEGORY_SUBTYPES[form.category] && !form.subtype} />
-            </div>
-
-            {/* Priority Date — full width, alone now that DOB moved up next to name */}
-            <div>
-              <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.pd}</div>
-              <DateDropdown value={form.priorityDate} allowEmpty minYear={2010} newestYearFirst
-                triggerStyle={{
-                  padding: '8px 10px', fontSize: '13px', background: 'var(--gc-paper-soft)',
-                  ...(pdAttempted && !form.priorityDate ? { border: '1px solid var(--gc-red)' } : {}),
-                }}
-                onChange={(pd) => { setForm({ ...form, priorityDate: pd }); setPdAttempted(false); }} />
-            </div>
-
-            {/* Role — required, no default; both options start unselected */}
+            {/* Role — optional since UI-28; both options start unselected */}
             <div>
               <div style={{ marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{t.role}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
@@ -15305,19 +15405,17 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                   { pv: true, label: t.roleHelper },
                 ].map((o) => {
                   const active = form.proxy === o.pv;
-                  const showError = roleAttempted && form.proxy === null;
                   return (
                     <button key={String(o.pv)} type="button"
                       onClick={() => {
                         // 切换视角就清掉已选的 role，逼着第二问在正确的人称下重答
                         setForm(form.proxy === o.pv ? form : { ...form, proxy: o.pv, role: null });
-                        setRoleAttempted(false);
                       }}
                       style={{
                         padding: '9px 8px', fontSize: '12px', fontWeight: active ? 700 : 500,
                         background: active ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
                         color: active ? 'var(--gc-paper)' : 'var(--gc-ink)',
-                        border: `1px solid ${active ? 'var(--gc-green)' : showError ? 'var(--gc-red)' : 'var(--gc-rule)'}`,
+                        border: `1px solid ${active ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
                         borderRadius: 'var(--gc-radius-sm)',
                         cursor: 'pointer', transition: 'all 120ms',
                       }}>
@@ -15336,15 +15434,14 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
                       : [{ v: 'beneficiary', label: t.roleBeneficiary }, { v: 'petitioner', label: t.rolePetitioner }]
                     ).map((o) => {
                       const active = form.role === o.v;
-                      const showError = roleAttempted && form.role === null;
                       return (
                         <button key={o.v} type="button"
-                          onClick={() => { setForm({ ...form, role: o.v }); setRoleAttempted(false); }}
+                          onClick={() => { setForm({ ...form, role: o.v }); }}
                           style={{
                             padding: '9px 8px', fontSize: '12px', fontWeight: active ? 700 : 500,
                             background: active ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
                             color: active ? 'var(--gc-paper)' : 'var(--gc-ink)',
-                            border: `1px solid ${active ? 'var(--gc-green)' : showError ? 'var(--gc-red)' : 'var(--gc-rule)'}`,
+                            border: `1px solid ${active ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
                             borderRadius: 'var(--gc-radius-sm)',
                             cursor: 'pointer', transition: 'all 120ms',
                           }}>
@@ -15357,22 +15454,22 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               )}
             </div>
 
-            {/* In US — 第三问：答了身份才出现（层层递进），人称跟视角走 */}
-            {form.role !== null && (
+            {/* In US — 新建时是第三问（答了身份才出现，层层递进）；编辑模式直接
+                显示，方便从个人页「让预测更准」进来的人单独补这一项（UI-28） */}
+            {(isEdit || form.role !== null) && (
             <div>
               <div style={{ marginBottom: '6px', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>{form.proxy ? t.inUSProxy : t.inUS}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
                 {[{ v: true, label: t.inUSYes }, { v: false, label: t.inUSNo }].map((o) => {
                   const active = form.inUS === o.v;
-                  const showError = inUSAttempted && form.inUS === null;
                   return (
                     <button key={String(o.v)} type="button"
-                      onClick={() => { setForm({ ...form, inUS: o.v }); setInUSAttempted(false); }}
+                      onClick={() => { setForm({ ...form, inUS: o.v }); }}
                       style={{
                         padding: '9px 8px', fontSize: '12px', fontWeight: active ? 700 : 500,
                         background: active ? 'var(--gc-green)' : 'var(--gc-paper-soft)',
                         color: active ? 'var(--gc-paper)' : 'var(--gc-ink)',
-                        border: `1px solid ${active ? 'var(--gc-green)' : showError ? 'var(--gc-red)' : 'var(--gc-rule)'}`,
+                        border: `1px solid ${active ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
                         borderRadius: 'var(--gc-radius-sm)',
                         cursor: 'pointer', transition: 'all 120ms',
                       }}>
@@ -15384,7 +15481,8 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
             </div>
             )}
 
-            {/* Petitioner — only for F categories */}
+            {/* Petitioner — only for F categories. 值在选类别时已自动推导，
+                这里只是选填区里的可改入口，不再单独发问（UI-28） */}
             {isF && (
               <div>
                 <div className="gc-eyebrow" style={{ marginBottom: '6px' }}>{t.petitioner}</div>
@@ -15410,6 +15508,10 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               </div>
             )}
 
+              </div>
+              )}
+            </div>
+
             {/* Actions */}
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
               <button
@@ -15424,28 +15526,15 @@ const OnboardingModal = ({ lang, theme = 'passport', initialMode = 'choose', ini
               </button>
               <button
                 onClick={() => {
+                  // UI-28 快速开始：只验类别 + 优先日（出生地有预选值恒在）。
+                  // 子类别/身份/在美与否/出生年月一律不拦——未填的以空值入案，
+                  // 个人页有「让预测更准」补充入口，订阅流也会按需收集。
                   if (!form.category) {
                     setCategoryAttempted(true);
                     return;
                   }
-                  if (CATEGORY_SUBTYPES[form.category] && !form.subtype) {
-                    setSubtypeAttempted(true);
-                    return;
-                  }
                   if (!form.priorityDate) {
                     setPdAttempted(true);
-                    return;
-                  }
-                  if (form.proxy === null || form.role === null) {
-                    setRoleAttempted(true);
-                    return;
-                  }
-                  if (form.inUS === null) {
-                    setInUSAttempted(true);
-                    return;
-                  }
-                  if (!form.birthYearMonth) {
-                    setDobAttempted(true);
                     return;
                   }
                   // Name lives in gc_nickname (same store SubscribeModal's nickname field and
@@ -16663,7 +16752,9 @@ export default function App() {
       category: c,
       country: ct,
       priorityDate: pd,
-      inUS: params.get('in') !== '0',
+      // 'in': '0' = 不在美；'u' = 未填（UI-28 快速开始）；缺省 = 在美（老链接
+      // 语义不变——旧写入端对 inUS=true 就是不写这个参数）。
+      inUS: params.get('in') === '0' ? false : params.get('in') === 'u' ? null : true,
       petitionerStatus: params.get('ps') || (c.startsWith('F') && (c === 'F2A' || c === 'F2B') ? 'LPR' : 'USC'),
       subtype: params.get('st') || null,
     };
@@ -16685,7 +16776,8 @@ export default function App() {
     params.set('c', uc.category);
     params.set('ct', uc.country);
     params.set('pd', uc.priorityDate);
-    if (!uc.inUS) params.set('in', '0');
+    if (uc.inUS === false) params.set('in', '0');
+    else if (uc.inUS == null) params.set('in', 'u'); // 未填必须显式写 'u'，否则往返会被读成「不在美」
     if (uc.petitionerStatus) params.set('ps', uc.petitionerStatus);
     // Was omitted, which is how this URL (rewritten on every case change, then winning
     // over localStorage on the next load) silently dropped subtype from your own case.
@@ -16754,9 +16846,11 @@ export default function App() {
         const raw = window.localStorage.getItem('gc_userCase');
         if (raw) {
           const parsed = JSON.parse(raw);
-          // Sanity check — must have all required fields
+          // Sanity check — must have all required fields. inUS may legitimately
+          // be null since UI-28 (quick start leaves it unfilled) — requiring a
+          // boolean here would silently discard every quick-start case on reload.
           if (parsed && parsed.country && parsed.category && parsed.priorityDate
-              && typeof parsed.inUS === 'boolean' && parsed.petitionerStatus) {
+              && (typeof parsed.inUS === 'boolean' || parsed.inUS == null) && parsed.petitionerStatus) {
             saved = parsed;
           }
         }
@@ -17894,14 +17988,14 @@ export default function App() {
               {/* 访客进个人页：渲染固定的示例案件（SAMPLE_CASE，不是 userCase——
                   默认种子不能冒充访客自己的案子），顶上一条横条标明「示例」 */}
               {tab === 'overview' && (hasOnboarded
-                ? <Overview userCase={userCase} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} greenCardInfo={greenCardInfo} setGreenCardInfo={setGreenCardInfo} travelRecords={travelRecords} setTravelRecords={setTravelRecords} i485ServiceCenter={i485ServiceCenter} setI485ServiceCenter={setI485ServiceCenter} stepActualDates={stepActualDates} setStepActualDates={setStepActualDates} />
+                ? <Overview userCase={userCase} onRefineCase={() => { setOnboardingInitialMode('form'); setShowWizard(true); }} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} greenCardInfo={greenCardInfo} setGreenCardInfo={setGreenCardInfo} travelRecords={travelRecords} setTravelRecords={setTravelRecords} i485ServiceCenter={i485ServiceCenter} setI485ServiceCenter={setI485ServiceCenter} stepActualDates={stepActualDates} setStepActualDates={setStepActualDates} />
                 : (
                   <>
                     {sampleBanner}
                     <Overview userCase={SAMPLE_CASE} chartsSel={chartsSel} setTab={handleTabChange} />
                   </>
                 ))}
-              {tab === 'dashboard' && <Overview userCase={userCase} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
+              {tab === 'dashboard' && <Overview userCase={userCase} onRefineCase={() => { setOnboardingInitialMode('form'); setShowWizard(true); }} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {/* 预测 tab — id is 'trends' per navigation config (line 11527).
                   MUST pass i485ServiceCenter + completedI485Steps so TrendChart's
                   approval forecast syncs with Overview. (UI-05: the duplicate
@@ -17910,7 +18004,7 @@ export default function App() {
                   has been removed.) */}
               {tab === 'trends' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
               {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} setTab={handleTabChange} />}
-              {tab === 'i485' && <Overview userCase={userCase} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
+              {tab === 'i485' && <Overview userCase={userCase} onRefineCase={() => { setOnboardingInitialMode('form'); setShowWizard(true); }} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
               {tab === 'bulletin' && <BulletinTab userCase={userCase} />}
               {tab === 'about' && <AboutTab />}
