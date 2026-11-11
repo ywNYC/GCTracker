@@ -4529,8 +4529,11 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
             </div>
 
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
-                {L('关于排期，你最想搞懂什么？', '關於排期，你最想搞懂什麼？', 'What do you most want explained?')}
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '3px' }}>
+                {L('给站长的选题箱', '給站長的選題箱', 'Topic box for the site owner')}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.55, marginBottom: '6px' }}>
+                {L('仅站主可见；好问题会做成内容，不承诺逐条回复。', '僅站主可見；好問題會做成內容，不承諾逐條回覆。', "Only the site owner sees these. Good questions become content — we can't promise a reply to each one.")}
               </div>
               {!qDone ? (
                 <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
