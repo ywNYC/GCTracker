@@ -65,6 +65,22 @@ async function verifySvix(secret, headers, body) {
   });
 }
 
+// Read-only status probe (UI-14 diagnosis aid): a GET confirms the endpoint is
+// deployed and whether the signing secret is present in the environment — as a
+// boolean only, the value never leaves the server. If this returns 404, the
+// function isn't deployed; if secretConfigured is false, real events (once the
+// endpoint is registered in Resend) would still be recorded but flagged
+// verified:false. Registration itself happens in the Resend dashboard and
+// cannot be done from code — see the setup notes at the top of this file.
+export async function onRequestGet(context) {
+  const { env } = context;
+  return new Response(JSON.stringify({
+    ok: true,
+    endpoint: 'resend-webhook',
+    secretConfigured: !!env.RESEND_WEBHOOK_SECRET,
+  }), { headers: { 'Content-Type': 'application/json' } });
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
