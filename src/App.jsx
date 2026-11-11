@@ -3813,7 +3813,7 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
   const { lang } = useLang();
   const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
   const isEB = !userCase.category?.startsWith('F');
-  const [tab, setTab] = useState('poll'); // null = collapsed | poll | wall | survey —— 默认展开投票，别让整块只剩一行小按钮
+  const [tab, setTab] = useState(null); // null = collapsed | poll | wall | survey —— UI-08：投票不再默认展开，默认全收起（标题行见下方折叠态渲染）
   const [busy, setBusy] = useState('');
 
   const post = async (payload, doneKey) => {
@@ -3842,6 +3842,12 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
       fetch(`${API_BASE}/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json()).then(setPollAgg).catch(() => {});
     }
   }, [tab, voted]); // eslint-disable-line react-hooks/exhaustive-deps
+  // UI-08：折叠态标题行要显示本题总票数，挂载时先把聚合拉回来（只读，不代表已投票）
+  useEffect(() => {
+    if (!pollAgg) {
+      fetch(`${API_BASE}/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json()).then(setPollAgg).catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const vote = async (choice) => {
     if (await post({ type: 'poll', pollId: pollKey, choice }, pollKey)) {
       setVoted(true);
@@ -3935,7 +3941,26 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
         </span>
       </div>
 
-      {tab === null && <div style={{ height: '11px' }} />}
+      {tab === null && (
+        <button type="button" onClick={() => setTab('poll')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left',
+            background: 'transparent', border: 'none', cursor: 'pointer', padding: '9px 14px 11px',
+          }}>
+          <span style={{
+            fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', flex: 1, minWidth: 0,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {CURRENT_POLL.q[lang] || CURRENT_POLL.q.zh}
+          </span>
+          <span style={{ fontSize: '12px', color: 'var(--gc-muted)', flexShrink: 0 }}>
+            {pollAgg ? L(`已投 ${pollAgg.total} 票`, `已投 ${pollAgg.total} 票`, `${pollAgg.total} votes`) : ''}
+            {voted
+              ? L(' · 已投票，看结果 →', ' · 已投票，看結果 →', ' · voted — results →')
+              : L(' · 点开投票 →', ' · 點開投票 →', ' · tap to vote →')}
+          </span>
+        </button>
+      )}
       {tab !== null && (
       <div style={{ padding: '10px 14px 13px' }}>
         {tab === 'poll' && (
@@ -3993,6 +4018,17 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
                 </button>
               </div>
             ) : doneNote(L('已打卡 ✓', '已打卡 ✓', 'Checked in ✓'))}
+            {/* 规则条（UI-10 补齐）：打卡墙与讨论区同后端同为公开自由文本，
+                第一批只给 BulletinTalk 加了个资规则条，这里补上同一行。 */}
+            <div style={{
+              fontSize: '10.5px', lineHeight: 1.5, color: '#92400e',
+              background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--gc-radius-sm)',
+              padding: '5px 8px', marginTop: '7px',
+            }}>
+              {L('请勿发布案号、收据号、全名、电话等个人信息；他人经验不构成个案建议。',
+                '請勿發布案號、收據號、全名、電話等個資；他人經驗不構成個案建議。',
+                "Please don't post case or receipt numbers, full names, or phone numbers. Others' experiences are not advice for your case.")}
+            </div>
             <div style={{ marginTop: '9px', paddingTop: '8px', borderTop: '1px solid var(--gc-rule-soft)' }}>
               {wall === null ? (
                 <div style={{ fontSize: '12px', color: 'var(--gc-muted)' }}>…</div>
@@ -4026,10 +4062,17 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
         {tab === 'survey' && (
           <div>
             {isEB && (
-              <div style={{ marginBottom: '11px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
+              <details style={{ marginBottom: '11px' }}>
+                {/* UI-07：switch 调查三个月仅 1 条，入口默认收起（数据与端点保留，
+                    展开即恢复原表单/结果）。 */}
+                <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', listStyle: 'revert', marginBottom: '5px' }}>
                   {L('你为缩短等待做过什么？', '你為縮短等待做過什麼？', 'Have you tried to shorten the wait?')}
-                </div>
+                  <span style={{ fontWeight: 400, color: 'var(--gc-muted)', fontSize: '12px' }}>
+                    {swDone
+                      ? L(' · 已提交，展开看结果', ' · 已提交，展開看結果', ' · submitted — tap for results')
+                      : L(' · 展开填（换类别/换雇主/加急）', ' · 展開填（換類別/換雇主/加急）', ' · tap to answer')}
+                  </span>
+                </summary>
                 {!swDone ? (
                   <>
                     <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '5px' }}>
@@ -4087,7 +4130,7 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
                     )}
                   </div>
                 )}
-              </div>
+              </details>
             )}
 
             <div style={{ marginBottom: '11px' }}>
@@ -6012,11 +6055,12 @@ const Overview = ({ userCase, chartsSel = null, setTab = () => {}, completedI485
                           } catch { /* noop */ }
                         };
                         return (
-                          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
-                            <div className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', letterSpacing: '0.12em', marginBottom: '6px' }}>
-                              {lang === 'en' ? 'NEXT 12 MONTHS (ANONYMOUS)' : lang === 'tw' ? '接下來 12 個月（匿名）' : '接下来 12 个月（匿名）'}
-                            </div>
-                            <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
+                          <details style={{ padding: '10px 14px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
+                            {/* UI-07：postgc 三个月仅 2 条，入口默认收起（数据与端点保留，展开即答）。 */}
+                            <summary className="gc-eyebrow" style={{ fontSize: '8.5px', color: 'var(--gc-muted)', letterSpacing: '0.12em', cursor: 'pointer', listStyle: 'revert' }}>
+                              {lang === 'en' ? 'NEXT 12 MONTHS (ANONYMOUS) — TAP TO ANSWER' : lang === 'tw' ? '接下來 12 個月（匿名）— 點開選一個' : '接下来 12 个月（匿名）— 点开选一个'}
+                            </summary>
+                            <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
                               {[['buy-home', lang === 'en' ? 'Buy a home' : lang === 'tw' ? '買房' : '买房'],
                                 ['change-job', lang === 'en' ? 'Change job' : lang === 'tw' ? '換工作' : '换工作'],
                                 ['move-state', lang === 'en' ? 'Move states' : lang === 'tw' ? '搬州' : '搬州'],
@@ -6028,7 +6072,7 @@ const Overview = ({ userCase, chartsSel = null, setTab = () => {}, completedI485
                                 </button>
                               ))}
                             </div>
-                          </div>
+                          </details>
                         );
                       })()}
 
@@ -7560,10 +7604,52 @@ const BulletinTalk = ({ lang }) => {
   );
 };
 
+// ============================================================
+// CommunityTeaser — 最新页底部的社区摘要入口（UI-04）。
+// BulletinTalk / CommunityHub / CompareHub 此前在最新页与社区页各挂一份，
+// 同一评论流与发帖框全站出现两遍。现在社区页是唯一挂载点，最新页只留
+// 这一行摘要：讨论条数 + 最近一条动态的开头，点整行去社区页。
+// ============================================================
+const CommunityTeaser = ({ lang, onGo }) => {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/community?type=comment`).then((r) => r.json()).then(setData).catch(() => {});
+  }, []);
+  const comments = data?.comments || [];
+  const latest = comments.filter((c) => !c.parentId)
+    .slice().sort((a, b) => (b.ts || '').localeCompare(a.ts || ''))[0];
+  const snippet = latest?.message
+    ? (latest.message.length > 42 ? `${latest.message.slice(0, 42)}…` : latest.message)
+    : null;
+  return (
+    <button type="button" onClick={onGo} className="mt-2.5"
+      style={{
+        display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left',
+        border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)',
+        padding: '10px 12px', cursor: 'pointer',
+      }}>
+      <Users size={15} style={{ color: 'var(--gc-green)', flexShrink: 0 }} />
+      <span style={{
+        fontSize: '12.5px', color: 'var(--gc-ink-soft)', flex: 1, minWidth: 0,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        <b style={{ color: 'var(--gc-ink)' }}>{lang === 'en' ? 'Community' : lang === 'tw' ? '社區' : '社区'}</b>
+        {comments.length > 0 && (
+          <span>{lang === 'en' ? ` · ${comments.length} posts` : ` · ${comments.length} 条动态`}</span>
+        )}
+        {snippet && <span style={{ color: 'var(--gc-muted)' }}> · {snippet}</span>}
+      </span>
+      <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--gc-green)', flexShrink: 0 }}>
+        {lang === 'en' ? 'Join in →' : '去社区 →'}
+      </span>
+    </button>
+  );
+};
+
 // 访客在个人页看到的示例案件（只读展示，不写进 localStorage）
 const SAMPLE_CASE = { country: 'Taiwan', category: 'EB3', priorityDate: '2024-07-15', inUS: true, petitionerStatus: 'USC', birthYearMonth: '' };
 
-const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true }) => {
+const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = () => {} }) => {
   // 访客（没填案子）看通用视角：默认中国大陆列 + 亲属组，不渲染「你的类别」个人行，
   // category=null 让所有「我的」高亮自然失效——不能拿默认的 Taiwan EB3 冒充访客的案子
   if (!hasCase) userCase = { country: 'China', category: null, priorityDate: null };
@@ -8008,23 +8094,10 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true }) => {
       <BulletinTrend lang={lang} chartKey={chartKey} catGroup={catGroup} userCountry={userCountry}
         onChartKey={(k) => setUpdChart(k === 'filing' ? 'B' : 'A')} onCatGroup={setCatGroup}
         initialCat={hasCase ? userCase.category : null} />
-      <BulletinTalk lang={lang} />
 
-      {/* 社区小组件（每月一题/打卡墙/调查·提问 + 换类别对比）镜像到最新页底部——
-          这些都要案子才有意义，访客不渲染（他们有上面的讨论区可玩） */}
-      {hasCase && (
-        <>
-          <div className="mt-2.5"><CommunityHub userCase={userCase} /></div>
-          <details className="mt-2.5" style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '8px 10px' }}>
-            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
-              {lang === 'en' ? 'What if I switch category or status?' : '如果换类别、换身份会更快吗'}
-              <span style={{ fontWeight: 400, color: 'var(--gc-muted)' }}>{lang === 'en' ? ' · tap for the auto-computed comparison' : ' · 展开看自动算好的对比'}</span>
-            </summary>
-            <div style={{ height: '8px' }} />
-            <CompareHub userCase={userCase} />
-          </details>
-        </>
-      )}
+      {/* UI-04：讨论区/社区小组件/换类别对比此前在最新页与社区页各挂一份，
+          现已撤下镜像——社区页是唯一挂载点，最新页只留一行摘要入口。 */}
+      <CommunityTeaser lang={lang} onGo={() => setTab('compare')} />
 
     </div>
 
@@ -8329,332 +8402,6 @@ const DataSource = () => {
   );
 };
 
-// ============================================================
-// Comparison
-// ============================================================
-const CompareByCountry = ({ userCase }) => {
-  const { t, lang } = useLang();
-  const [compareCat, setCompareCat] = useState(userCase.category);
-  const [comparePD, setComparePD] = useState(userCase.priorityDate);
-  // Default: user's country (resolved) vs China (or India if user is China)
-  const userResolved = resolveCountry(userCase.country);
-  const [countryA, setCountryA] = useState(userResolved === 'China' ? 'India' : 'China');
-  const [countryB, setCountryB] = useState(userResolved);
-
-  const allCountries = [
-    { v: 'Other', label: lang === 'en' ? 'Global/Taiwan' : '全球/港澳台', flag: '' },
-    { v: 'China', label: lang === 'tw' ? '中國大陸' : '中国大陆', flag: '🇨🇳' },
-    { v: 'India', label: lang === 'en' ? 'India' : '印度', flag: '🇮🇳' },
-    { v: 'Mexico', label: lang === 'en' ? 'Mexico' : '墨西哥', flag: '🇲🇽' },
-    { v: 'Philippines', label: lang === 'en' ? 'Philippines' : (lang === 'tw' ? '菲律賓' : '菲律宾'), flag: '🇵🇭' },
-  ];
-
-  const categories = [
-    { v: 'EB1', label: t.eb1 }, { v: 'EB2', label: t.eb2 }, { v: 'EB3', label: t.eb3 },
-    { v: 'EW', label: t.ew },
-    { v: 'EB4', label: t.eb4 }, { v: 'SR', label: t.sr }, { v: 'EB5', label: t.eb5 },
-    { v: 'EB5R', label: t.eb5r }, { v: 'EB5H', label: t.eb5h }, { v: 'EB5I', label: t.eb5i },
-    { v: 'F1', label: t.f1 }, { v: 'F2A', label: t.f2a }, { v: 'F2B', label: t.f2b },
-    { v: 'F3', label: t.f3 }, { v: 'F4', label: t.f4 },
-  ];
-
-  // Resolve country for bulletin lookup (Mexico/Philippines/Taiwan → Other)
-  const resolveForLookup = (c) => (c === 'China' || c === 'India') ? c : 'Other';
-
-  const cutoffA = bulletinCurrent.finalAction[compareCat]?.[resolveForLookup(countryA)];
-  const cutoffB = bulletinCurrent.finalAction[compareCat]?.[resolveForLookup(countryB)];
-  const statusA = computeStatus(comparePD, cutoffA);
-  const statusB = computeStatus(comparePD, cutoffB);
-
-  const countryALabel = allCountries.find(c => c.v === countryA)?.label || countryA;
-  const countryBLabel = allCountries.find(c => c.v === countryB)?.label || countryB;
-  const countryAFlag = allCountries.find(c => c.v === countryA)?.flag || '';
-  const countryBFlag = allCountries.find(c => c.v === countryB)?.flag || '';
-
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">
-      {/* Category & PD selectors */}
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        <div style={{ minWidth: 0 }}>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-            {t.compareCategory}
-          </label>
-          <select value={compareCat} onChange={(e) => setCompareCat(e.target.value)}
-            style={{ boxSizing: 'border-box', width: '100%', maxWidth: '100%' }}
-            className="px-2 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900">
-            {categories.map(c => <option key={c.v} value={c.v}>{c.label}</option>)}
-          </select>
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-            {t.comparePD}
-          </label>
-          <DateDropdown value={comparePD} onChange={(v) => setComparePD(v)}
-            triggerStyle={{ padding: '7px 9px', fontSize: '12px' }} />
-        </div>
-      </div>
-
-      {/* Country A selector */}
-      <div className="mb-2">
-        <label className="gc-eyebrow block mb-1.5" style={{ fontSize: '9px' }}>
-          {lang === 'en' ? 'Country A' : '国家 A'}
-          <span style={{
-            display: 'inline-block',
-            width: '6px', height: '6px', borderRadius: '50%',
-            background: 'var(--gc-ink)', marginLeft: '6px', verticalAlign: 'middle'
-          }}></span>
-        </label>
-        <div className="grid grid-cols-5" style={{
-          border: '1px solid var(--gc-rule)',
-          borderRadius: '3px',
-          overflow: 'hidden',
-          width: '100%',
-        }}>
-          {allCountries.map((c, i) => {
-            const selected = countryA === c.v;
-            return (
-              <button key={c.v} onClick={() => setCountryA(c.v)}
-                style={{
-                  boxSizing: 'border-box',
-                  minWidth: 0,
-                  padding: '6px 2px',
-                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                  background: 'var(--gc-surface)',
-                  color: selected ? 'var(--gc-ink)' : 'var(--gc-ink-soft)',
-                  boxShadow: selected ? 'inset 0 0 0 2px var(--gc-ink)' : 'none',
-                  transition: 'all 120ms',
-                }}
-                className="flex flex-col items-center gap-0.5 justify-center">
-                <CountryFlag country={c.v} size={14} />
-                <span className="gc-mono" style={{ fontSize: '9px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
-                  {countryShortLabel(c.v, lang)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Country B selector */}
-      <div className="mb-3">
-        <label className="gc-eyebrow block mb-1.5" style={{ fontSize: '9px' }}>
-          {lang === 'en' ? 'Country B' : '国家 B'}
-          <span style={{
-            display: 'inline-block',
-            width: '6px', height: '6px', borderRadius: '50%',
-            background: 'var(--gc-muted)', marginLeft: '6px', verticalAlign: 'middle',
-            border: '1px solid var(--gc-ink)',
-          }}></span>
-        </label>
-        <div className="grid grid-cols-5" style={{
-          border: '1px solid var(--gc-rule)',
-          borderRadius: '3px',
-          overflow: 'hidden',
-          width: '100%',
-        }}>
-          {allCountries.map((c, i) => {
-            const selected = countryB === c.v;
-            return (
-              <button key={c.v} onClick={() => setCountryB(c.v)}
-                style={{
-                  boxSizing: 'border-box',
-                  minWidth: 0,
-                  padding: '6px 2px',
-                  borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                  background: selected ? 'var(--gc-surface)' : 'var(--gc-surface)',
-                  color: selected ? 'var(--gc-ink)' : 'var(--gc-ink-soft)',
-                  boxShadow: selected ? 'inset 0 0 0 2px var(--gc-ink)' : 'none',
-                  transition: 'all 120ms',
-                }}
-                className="flex flex-col items-center gap-0.5 justify-center">
-                <CountryFlag country={c.v} size={14} />
-                <span className="gc-mono" style={{ fontSize: '9px', fontWeight: 700, lineHeight: 1, letterSpacing: '0.08em' }}>
-                  {countryShortLabel(c.v, lang)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {(() => {
-        const pdDate = parseDate(comparePD);
-        const today = new Date();
-        const coA = cutoffA === 'C' ? today : parseDate(cutoffA);
-        const coB = cutoffB === 'C' ? today : parseDate(cutoffB);
-        const candidates = [pdDate, coA, coB, today].filter(Boolean);
-        const sharedStart = new Date(Math.min(...candidates.map(d => d.getTime())));
-        const sharedEnd = new Date(Math.max(...candidates.map(d => d.getTime())));
-        const scale = { start: sharedStart, end: sharedEnd };
-
-        // Calculate gap between A and B
-        let gapLabel = null;
-        if (cutoffA !== 'C' && cutoffB !== 'C' && cutoffA && cutoffB && coA && coB) {
-          const gapDays = daysBetween(coA, coB);
-          const absDays = Math.abs(gapDays);
-          const gapYears = Math.floor(absDays / 365);
-          const gapMonths = Math.round((absDays % 365) / 30);
-          const faster = gapDays > 0 ? countryALabel : countryBLabel; // More recent = faster
-          const timeStr = gapYears > 0 ? `${gapYears}年${gapMonths}月` : `${gapMonths}月`;
-          gapLabel = lang === 'en'
-            ? `${faster} is ~${gapYears > 0 ? gapYears + 'y ' : ''}${gapMonths}m faster`
-            : `${faster} 快约 ${timeStr}`;
-        } else if (cutoffA === 'C' && cutoffB !== 'C') {
-          gapLabel = lang === 'en' ? `${countryALabel} is Current ✓` : `${countryALabel} 无排期 ✓`;
-        } else if (cutoffB === 'C' && cutoffA !== 'C') {
-          gapLabel = lang === 'en' ? `${countryBLabel} is Current ✓` : `${countryBLabel} 无排期 ✓`;
-        } else if (cutoffA === 'C' && cutoffB === 'C') {
-          gapLabel = lang === 'en' ? 'Both Current ✓' : '两个都无排期 ✓';
-        }
-
-        return (
-          <div className="space-y-2">
-            {gapLabel && (
-              <div className="flex items-center gap-1.5 text-xs font-semibold w-fit" style={{
-                padding: '5px 10px',
-                background: 'var(--gc-paper-soft)',
-                color: 'var(--gc-ink-soft)',
-                border: '1px solid var(--gc-rule)',
-                borderRadius: '3px',
-              }}>
-                <TrendingUp size={11} strokeWidth={2} />{gapLabel}
-              </div>
-            )}
-
-            {/* Country A card — neutral surface, left accent strip for identity */}
-            <div style={{
-              padding: '12px',
-              background: 'var(--gc-paper-soft)',
-              border: '1px solid var(--gc-rule)',
-              borderLeft: '3px solid var(--gc-ink)',
-              borderRadius: '3px',
-            }}>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-shrink-0" style={{
-                    padding: '3px 8px',
-                    background: 'var(--gc-ink)',
-                    borderRadius: '3px',
-                  }}>
-                    <CountryFlag country={countryA} size={11} />
-                    <span className="gc-mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-paper)', letterSpacing: '0.06em' }}>
-                      {countryShortLabel(countryA, lang)}
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold" style={{ color: 'var(--gc-ink)' }}>{countryALabel}</div>
-                </div>
-                <StatusBadge status={statusA.status} />
-              </div>
-              {/* Combined date + gap status (same line) */}
-              <div className="flex items-center justify-between gap-2 mb-1 text-xs">
-                <div className="text-slate-600 min-w-0 truncate">
-                  {t.chartFinalAction}: <span className="font-semibold text-slate-900">{formatDate(cutoffA, lang)}</span>
-                </div>
-                {cutoffA !== 'C' && (() => {
-                  const pdD = parseDate(comparePD);
-                  const coD = parseDate(cutoffA);
-                  if (!pdD || !coD) return null;
-                  const reachedA = pdD <= coD;
-                  // When reached, the top-right StatusBadge already says "可以递件".
-                  // Only show the inline indicator when user still needs to wait.
-                  if (reachedA) return null;
-                  const daysA = daysBetween(pdD, coD);
-                  const monthsA = Math.ceil(daysA / 30);
-                  return (
-                    <span className="flex items-center gap-0.5 text-amber-700 font-semibold flex-shrink-0 text-[11px]">
-                      <Clock size={11} strokeWidth={2.5} />
-                      {lang === 'en' ? `${daysA.toLocaleString('en-US')}d (~${monthsA}m)` : `还差${daysA.toLocaleString('en-US')}天(${monthsA}月)`}
-                    </span>
-                  );
-                })()}
-              </div>
-              {/* Progress timeline — skip when PD already reached, since positions collapse
-                  and labels/dots cluster confusingly. StatusBadge covers the "eligible" message. */}
-              {(() => {
-                const pdD = parseDate(comparePD);
-                const coD = cutoffA === 'C' ? new Date() : parseDate(cutoffA);
-                const reached = cutoffA === 'C' || (pdD && coD && pdD <= coD);
-                if (reached) return null;
-                return <ProgressTimeline priorityDate={comparePD} cutoff={cutoffA} chartLabel="" sharedScale={scale} hideStatus={true} />;
-              })()}
-            </div>
-
-            {/* Country B card — neutral surface, muted left accent (distinct from A's solid strip) */}
-            <div style={{
-              padding: '12px',
-              background: 'var(--gc-paper-soft)',
-              border: '1px solid var(--gc-rule)',
-              borderLeft: '3px double var(--gc-muted)',
-              borderRadius: '3px',
-            }}>
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-shrink-0" style={{
-                    padding: '3px 8px',
-                    background: 'var(--gc-surface)',
-                    border: '1px solid var(--gc-ink)',
-                    borderRadius: '3px',
-                  }}>
-                    <CountryFlag country={countryB} size={11} />
-                    <span className="gc-mono" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '0.06em' }}>
-                      {countryShortLabel(countryB, lang)}
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold" style={{ color: 'var(--gc-ink)' }}>{countryBLabel}</div>
-                </div>
-                <StatusBadge status={statusB.status} />
-              </div>
-              {/* Combined date + gap status (same line) */}
-              <div className="flex items-center justify-between gap-2 mb-1 text-xs">
-                <div className="text-slate-600 min-w-0 truncate">
-                  {t.chartFinalAction}: <span className="font-semibold text-slate-900">{formatDate(cutoffB, lang)}</span>
-                </div>
-                {cutoffB !== 'C' && (() => {
-                  const pdD = parseDate(comparePD);
-                  const coD = parseDate(cutoffB);
-                  if (!pdD || !coD) return null;
-                  const reachedB = pdD <= coD;
-                  if (reachedB) return null;
-                  const daysB = daysBetween(pdD, coD);
-                  const monthsB = Math.ceil(daysB / 30);
-                  return (
-                    <span className="flex items-center gap-0.5 text-amber-700 font-semibold flex-shrink-0 text-[11px]">
-                      <Clock size={11} strokeWidth={2.5} />
-                      {lang === 'en' ? `${daysB.toLocaleString('en-US')}d (~${monthsB}m)` : `还差${daysB.toLocaleString('en-US')}天(${monthsB}月)`}
-                    </span>
-                  );
-                })()}
-              </div>
-              {(() => {
-                const pdD = parseDate(comparePD);
-                const coD = cutoffB === 'C' ? new Date() : parseDate(cutoffB);
-                const reached = cutoffB === 'C' || (pdD && coD && pdD <= coD);
-                if (reached) return null;
-                return <ProgressTimeline priorityDate={comparePD} cutoff={cutoffB} chartLabel="" sharedScale={scale} hideStatus={true} />;
-              })()}
-            </div>
-          </div>
-        );
-      })()}
-
-      <div className="mt-2.5 p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
-        <div className="flex items-start gap-2">
-          <AlertCircle size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <div className="text-[11px] font-bold text-amber-900 mb-0.5">
-              {lang === 'en' ? 'Why this matters' : '为什么这个重要'}
-            </div>
-            <p className="text-[11px] text-amber-800 leading-relaxed">
-              {lang === 'en'
-                ? 'Your country of birth (not citizenship) determines which priority date applies. Cross-chargeability rules may allow spouse\'s country to be used.'
-                : '你的出生国（不是国籍）决定了你用哪个排期。通过配偶国籍有时可以使用"交叉归属"规则。'}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ============================================================
 // Which signup-time fields this case is still missing. There are three subscribe
@@ -9405,7 +9152,8 @@ const CompareHub = ({ userCase }) => {
 
   // Zero choices: everything below is auto-computed from the user's own case, on the
   // adopted chart. The three-scenario picker version confused its one real user —
-  // an answer page beats a tool page here. (Comparison component kept, unused.)
+  // an answer page beats a tool page here. (The old Comparison/CompareByCountry
+  // shell was unreachable and was removed in UI-05.)
   const chartSel = FILING_AUTHORIZED[userCase.category] ? 'B' : 'A';
   const chartKey = chartSel === 'B' ? 'filing' : 'finalAction';
 
@@ -9610,35 +9358,6 @@ const CommunityPage = ({ userCase, sample = false, onNeedCase }) => {
         <div style={{ height: '8px' }} />
         <CompareHub userCase={userCase} />
       </details>
-    </div>
-  );
-};
-
-const Comparison = ({ userCase }) => {
-  const { t, lang } = useLang();
-
-  return (
-    <div style={{ padding: '0 12px 12px' }}>
-      {/* Header */}
-      <div style={{ padding: '8px 0 8px', borderBottom: '1px solid var(--gc-rule)' }}>
-        <div className="gc-eyebrow" style={{ color: 'var(--gc-green)' }}>
-          {lang === 'en' ? 'COMPARE' : lang === 'tw' ? '對比' : '对比'}
-        </div>
-        <h2 className="gc-serif" style={{
-          fontSize: '18px', fontWeight: 700, color: 'var(--gc-ink)',
-          margin: '2px 0 3px', letterSpacing: '-0.01em'
-        }}>
-          {lang === 'en' ? 'What if…?' : lang === 'tw' ? '如果⋯會怎樣?' : '如果⋯会怎样?'}
-        </h2>
-        <p style={{ fontSize: '11px', color: 'var(--gc-muted)', margin: 0, lineHeight: 1.35 }}>
-          {t.compareByCountryDesc}
-        </p>
-      </div>
-
-      {/* Content — by country only */}
-      <div style={{ marginTop: '8px' }}>
-        <CompareByCountry userCase={userCase} />
-      </div>
     </div>
   );
 };
@@ -18185,11 +17904,12 @@ export default function App() {
               {tab === 'dashboard' && <Overview userCase={userCase} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {/* 预测 tab — id is 'trends' per navigation config (line 11527).
                   MUST pass i485ServiceCenter + completedI485Steps so TrendChart's
-                  approval forecast syncs with Overview. The 'forecast' branch
-                  below is dead code kept for backward compat. */}
+                  approval forecast syncs with Overview. (UI-05: the duplicate
+                  'forecast' branch that used to sit below was unreachable —
+                  no setTab/deep-link path ever sets tab to 'forecast' — and
+                  has been removed.) */}
               {tab === 'trends' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
-              {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} />}
-              {tab === 'forecast' && <ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} />}
+              {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} setTab={handleTabChange} />}
               {tab === 'i485' && <Overview userCase={userCase} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} />}
               {tab === 'bulletin' && <BulletinTab userCase={userCase} />}
