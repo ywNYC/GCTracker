@@ -22,6 +22,12 @@ import {
 // Web build (Cloudflare Pages) leaves this empty so paths stay relative, unchanged.
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
+// UI-14 funnel telemetry bridges — the dwell beacon in index.html owns the
+// counters (window.gcEv / window.gcSetTab); these wrappers exist so call sites
+// stay one-liners and a missing/blocked beacon script can never break the page.
+const trackEv = (name) => { try { window.gcEv && window.gcEv(name); } catch { /* noop */ } };
+const trackTab = (tabId) => { try { window.gcSetTab && window.gcSetTab(tabId); } catch { /* noop */ } };
+
 // 众包案件进度墙（挂在「动态」tab 内；草稿：数据还是 mock，见 TRACKER-PLAN.md）
 import TrackerPage from './Tracker.jsx';
 
@@ -3380,6 +3386,334 @@ const ShareCardModal = ({ userCase, greenCardInfo, lang, onClose }) => {
 };
 
 // ============================================================
+// StatusShareModal (UI-13) — the waiting-period status card as a shareable image.
+// Same template family as ShareCardModal (SVG → canvas → PNG, 1080×1350,
+// paper + deep-green card, same modal shell) with the StatusShare content spec:
+// brand + bulletin month + category·country + hero wait estimate + ETA +
+// priority date / waited days + domain + "monthly auto-update".
+// When the case hit a milestone this month the headline switches to it —
+// "can file now" is exactly the page's eligible/current condition, and
+// "advanced" is the same computeMovement the countdown chip already renders,
+// so the card can never disagree with the page. Data on the card is only what
+// the user would share themselves (category/country/PD/wait) — never name,
+// email, or subscription state.
+// ============================================================
+const StatusShareModal = ({ userCase, lang, t, country, countryLabel, heroChart, filingAuthorized, filingStatus, finalActionStatus, onClose }) => {
+  const svgRef = useRef(null);
+  const [downloaded, setDownloaded] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const W = 1080;
+  const H = 1350; // 4:5 portrait — same as ShareCardModal, Xiaohongshu friendly
+
+  // Same chart selection as the old inline StatusShare card: the selected chart,
+  // else the adopted one. All numbers below derive from this one status object.
+  const heroSel = heroChart || (filingAuthorized ? 'B' : 'A');
+  const ps = heroSel === 'B' ? filingStatus : finalActionStatus;
+  const chartKey = heroSel === 'B' ? 'filing' : 'finalAction';
+  const canFile = ps.status === 'current' || ps.status === 'eligible' || ps.status === 'overdue';
+  const mv = computeMovement(bulletinCurrent[chartKey][userCase.category]?.[country], bulletinPrevious[chartKey][userCase.category]?.[country]);
+  const advanced = !canFile && mv.type === 'advanced';
+  const paceCal = ps.days ? paceDaysToCalendar(userCase.category, country, ps.days, chartKey) : null;
+  const etaDate = paceCal ? new Date(Date.now() + paceCal * 86400000) : null;
+  const yearsF = paceCal ? paceCal / 365.25 : null;
+  const heroText = paceCal === null ? (lang === 'en' ? 'TBD' : '待定')
+    : yearsF >= 1.5
+      ? (lang === 'en' ? `~${yearsF.toFixed(1)} yrs` : `约 ${yearsF.toFixed(1)} 年`)
+      : (lang === 'en' ? `~${Math.max(Math.round(paceCal / 30.44), 1)} mo` : `约 ${Math.max(Math.round(paceCal / 30.44), 1)} 个月`);
+  const fmtYM = (d) => lang === 'en'
+    ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+    : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+  const pdDate = userCase.priorityDate ? new Date(userCase.priorityDate + 'T00:00:00') : null;
+  const waitedDays = pdDate ? Math.max(0, Math.round((Date.now() - pdDate.getTime()) / 86400000)) : null;
+  const pdStr = pdDate
+    ? (lang === 'en' ? pdDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : `${pdDate.getFullYear()}年${pdDate.getMonth() + 1}月${pdDate.getDate()}日`)
+    : '—';
+  const headline = canFile
+    ? (lang === 'en' ? 'I can file now.' : lang === 'tw' ? '可以遞件了。' : '可以递件了。')
+    : advanced
+      ? (lang === 'en' ? `Advanced ${mv.days} days this month.` : lang === 'tw' ? `本月前進了 ${mv.days} 天。` : `本月前进了 ${mv.days} 天。`)
+      : `${userCase.category} · ${countryLabel}`;
+  const headlineSize = advanced ? 62 : 76;
+  const chartLabel = heroSel === 'B'
+    ? (lang === 'en' ? 'Filing · B' : lang === 'tw' ? '遞件表B' : '递件表B')
+    : (lang === 'en' ? 'Final Action · A' : lang === 'tw' ? '排期表A' : '排期表A');
+  const footerLabel = 'gc.jmjvc.us · ' + (lang === 'en' ? 'monthly auto-update' : lang === 'tw' ? '每月自動更新' : '每月自动更新');
+
+  // PNG export — same serialize → canvas → blob flow ShareCardModal proved out.
+  const handleDownload = async () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, W, H);
+      canvas.toBlob((pngBlob) => {
+        if (!pngBlob) return;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(pngBlob);
+        link.download = `gc-progress-${userCase.category}.png`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        URL.revokeObjectURL(url);
+        setDownloaded(true);
+        setTimeout(() => setDownloaded(false), 2000);
+      }, 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); };
+    img.src = url;
+  };
+
+  // Copy-my-case-link — builds the deep link with the same parameter rules as
+  // writeUserCaseToURL (c/ct/pd + in/ps/st), so the pasted link reopens exactly
+  // this case. The privacy hint below appears on click per Gu Lü: the link
+  // carries the priority date, so it must not go to a public place.
+  const buildCaseLink = () => {
+    const params = new URLSearchParams();
+    params.set('c', userCase.category);
+    params.set('ct', userCase.country);
+    params.set('pd', userCase.priorityDate);
+    if (userCase.inUS === false) params.set('in', '0');
+    else if (userCase.inUS == null) params.set('in', 'u');
+    if (userCase.petitionerStatus) params.set('ps', userCase.petitionerStatus);
+    if (userCase.subtype) params.set('st', userCase.subtype);
+    return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+  };
+  const copyLink = async () => {
+    const url = buildCaseLink();
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+        ok = true;
+      }
+    } catch { /* fall through */ }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch { /* noop */ }
+    }
+    if (ok) {
+      setLinkCopied(true);
+      trackEv('copy_link');
+      setTimeout(() => setLinkCopied(false), 3000);
+    }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px',
+      }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--gc-paper)',
+          borderRadius: '6px',
+          padding: '14px',
+          maxWidth: '360px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          position: 'relative',
+        }}>
+        {/* Close */}
+        <button
+          onClick={onClose}
+          aria-label={lang === 'en' ? 'Close' : '关闭'}
+          style={{
+            position: 'absolute', top: '8px', right: '10px',
+            background: 'transparent', border: 'none',
+            fontSize: '20px', color: 'var(--gc-muted)',
+            cursor: 'pointer', lineHeight: 1, padding: '4px 8px',
+          }}>×</button>
+        <div className="gc-eyebrow" style={{ color: 'var(--gc-green)', marginBottom: '8px', textAlign: 'center' }}>
+          {lang === 'en' ? 'MY PROGRESS CARD' : lang === 'tw' ? '我的進度卡' : '我的进度卡'}
+        </div>
+        {/* SVG preview — scaled to fit modal */}
+        <div style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden', marginBottom: '12px' }}>
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${W} ${H}`}
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ width: '100%', display: 'block' }}>
+            <defs>
+              <linearGradient id="ss-bg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#e8dfce" />
+                <stop offset="100%" stopColor="#d8cdb6" />
+              </linearGradient>
+              <linearGradient id="ss-card" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#0e4d2e" />
+                <stop offset="100%" stopColor="#082818" />
+              </linearGradient>
+              <pattern id="ss-grain" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+                <rect width="4" height="4" fill="transparent" />
+                <circle cx="1" cy="1" r="0.4" fill="rgba(255,255,255,0.03)" />
+                <circle cx="3" cy="3" r="0.3" fill="rgba(0,0,0,0.02)" />
+              </pattern>
+            </defs>
+            <rect width={W} height={H} fill="url(#ss-bg)" />
+            <rect width={W} height={H} fill="url(#ss-grain)" />
+            {/* Double editorial frame */}
+            <rect x="40" y="40" width={W - 80} height={H - 80} fill="none" stroke="#0e4d2e" strokeWidth="2.5" />
+            <rect x="54" y="54" width={W - 108} height={H - 108} fill="none" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.35" />
+            {/* Eyebrow */}
+            <text x={W / 2} y="148" textAnchor="middle"
+              fontFamily="Georgia, serif" fontSize="24" letterSpacing={lang === 'en' ? 6 : 10}
+              fill="#0e4d2e" fontWeight="700">
+              {lang === 'en' ? 'GREEN CARD TRACKER' : lang === 'tw' ? '綠卡晴雨表' : '绿卡晴雨表'}
+            </text>
+            <line x1={W / 2 - 130} y1="174" x2={W / 2 + 130} y2="174" stroke="#0e4d2e" strokeWidth="1.2" />
+            {/* Bulletin month */}
+            <text x={W / 2} y="228" textAnchor="middle"
+              fontFamily="Arial, sans-serif" fontSize="26" letterSpacing="2"
+              fill="#6d604e">
+              {BULLETIN_CURRENT_MONTH[lang]}
+            </text>
+            {/* Headline — milestone, or category · country */}
+            <text x={W / 2} y="360" textAnchor="middle"
+              fontFamily="Georgia, serif" fontSize={headlineSize} fontWeight="700"
+              fill="#0e4d2e">
+              {headline}
+            </text>
+            {/* Hero — the wait estimate, the number that stops the scroll */}
+            <text x={W / 2} y="580" textAnchor="middle"
+              fontFamily="Georgia, serif" fontSize="150" fontWeight="700"
+              fill="#0e4d2e">
+              {heroText}
+            </text>
+            {/* ETA + days to go — same line the page shows */}
+            <text x={W / 2} y="660" textAnchor="middle"
+              fontFamily="Georgia, serif" fontSize="34" fontWeight="400"
+              fill="#6d604e" fontStyle="italic">
+              {etaDate
+                ? (lang === 'en' ? `est. ${fmtYM(etaDate)}` : `预计 ${fmtYM(etaDate)}`)
+                : ''}
+              {ps.days !== null && ps.days !== undefined && (
+                lang === 'en' ? ` · ${ps.days.toLocaleString('en-US')} days to go` : ` · 还差 ${ps.days.toLocaleString('en-US')} 天`
+              )}
+            </text>
+            {/* Stats row — priority date / waited days / chart */}
+            <g transform="translate(0, 800)">
+              <line x1="110" y1="0" x2={W - 110} y2="0" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.35" />
+              <text x={W * 0.22} y="52" textAnchor="middle" fontFamily="Arial, sans-serif"
+                fontSize="17" letterSpacing="4" fill="#6d604e">{lang === 'en' ? 'PRIORITY DATE' : '优先日'}</text>
+              <text x={W * 0.22} y="118" textAnchor="middle" fontFamily="Georgia, serif"
+                fontSize="34" fontWeight="600" fill="#0e4d2e">{pdStr}</text>
+              <line x1={W * 0.37} y1="26" x2={W * 0.37} y2="128" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.25" />
+              <text x={W / 2} y="52" textAnchor="middle" fontFamily="Arial, sans-serif"
+                fontSize="17" letterSpacing="4" fill="#6d604e">{lang === 'en' ? 'WAITED' : '已等待'}</text>
+              <text x={W / 2} y="118" textAnchor="middle" fontFamily="Georgia, serif"
+                fontSize="56" fontWeight="700" fill="#0e4d2e">
+                {waitedDays !== null ? (lang === 'en' ? `${waitedDays.toLocaleString('en-US')} days` : `${waitedDays.toLocaleString('en-US')} 天`) : '—'}
+              </text>
+              <line x1={W * 0.63} y1="26" x2={W * 0.63} y2="128" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.25" />
+              <text x={W * 0.78} y="52" textAnchor="middle" fontFamily="Arial, sans-serif"
+                fontSize="17" letterSpacing="4" fill="#6d604e">{lang === 'en' ? 'CHART' : '排期表'}</text>
+              <text x={W * 0.78} y="110" textAnchor="middle" fontFamily="Georgia, serif"
+                fontSize="34" fontWeight="600" fill="#0e4d2e">{chartLabel}</text>
+              <line x1="110" y1="160" x2={W - 110} y2="160" stroke="#0e4d2e" strokeWidth="0.6" opacity="0.35" />
+            </g>
+            {/* Case line under stats */}
+            <text x={W / 2} y="1060" textAnchor="middle" fontFamily="Georgia, serif"
+              fontSize="26" fontStyle="italic" fill="#6d604e">
+              {t[userCase.category.toLowerCase()]} · {countryLabel}
+            </text>
+            {/* Footer */}
+            <text x={W / 2} y={H - 84} textAnchor="middle"
+              fontFamily="Courier, monospace" fontSize="22" letterSpacing="3"
+              fill="#6d604e">
+              {footerLabel}
+            </text>
+          </svg>
+        </div>
+
+        {/* Download PNG */}
+        <button
+          onClick={handleDownload}
+          style={{
+            width: '100%', padding: '10px',
+            fontSize: '12px', fontWeight: 700,
+            background: downloaded ? 'var(--gc-green)' : 'var(--gc-ink)',
+            color: 'var(--gc-paper)',
+            border: 'none',
+            borderRadius: '3px',
+            cursor: 'pointer',
+            letterSpacing: '0.02em',
+            transition: 'background 200ms',
+          }}>
+          {downloaded
+            ? (lang === 'en' ? '✓ Downloaded' : '✓ 已下载')
+            : (lang === 'en' ? '↓ Download image' : lang === 'tw' ? '↓ 下載圖片' : '↓ 下载图片')}
+        </button>
+
+        {/* Copy my case link */}
+        <button
+          onClick={copyLink}
+          style={{
+            width: '100%', padding: '10px', marginTop: '8px',
+            fontSize: '12px', fontWeight: 700,
+            background: 'transparent',
+            color: 'var(--gc-green-ink)',
+            border: '1px solid var(--gc-green-border)',
+            borderRadius: '3px',
+            cursor: 'pointer',
+            letterSpacing: '0.02em',
+          }}>
+          {linkCopied
+            ? (lang === 'en' ? '✓ Link copied' : lang === 'tw' ? '✓ 連結已複製' : '✓ 链接已复制')
+            : (lang === 'en' ? 'Copy my case link' : lang === 'tw' ? '複製我的案子連結' : '复制我的案子链接')}
+        </button>
+
+        {/* Privacy hint (Gu Lü) — shown when the link is copied: it carries the
+            priority date, so it must not go to a public place. */}
+        {linkCopied && (
+          <div style={{
+            marginTop: '8px', fontSize: '11px', lineHeight: 1.6, textAlign: 'center',
+            color: 'var(--gc-amber-ink, var(--gc-ink-soft))',
+          }}>
+            {lang === 'en'
+              ? 'This link contains your priority date — don\'t post it in public.'
+              : lang === 'tw'
+                ? '連結含你的優先日，勿發公開場合。'
+                : '链接含你的优先日，勿发公开场合。'}
+          </div>
+        )}
+
+        <div style={{
+          marginTop: '8px',
+          fontSize: '10px', color: 'var(--gc-muted)',
+          textAlign: 'center', lineHeight: 1.5,
+        }}>
+          {lang === 'en'
+            ? '1080×1350 · Perfect for Instagram, Xiaohongshu, WeChat Moments'
+            : lang === 'tw'
+              ? '1080×1350 · 適合小紅書、IG、朋友圈'
+              : '1080×1350 · 适合小红书、IG、朋友圈'}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
 // ActionCenter — everything a person whose date HAS ARRIVED needs next.
 // Rendered ONLY when the case is actionable (current/eligible/overdue/C);
 // the waiting view is untouched by design (owner requirement 2026-08-10).
@@ -4923,10 +5257,11 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                     {waitingTitle}
                   </span>
                 )}
-                <button type="button" onClick={() => setShowStatusShare(true)}
-                  title={lang === 'en' ? 'Share' : '分享'}
-                  style={{ border: '1px solid var(--gc-rule)', background: 'transparent', borderRadius: '2px', padding: '3px 5px', cursor: 'pointer', lineHeight: 0 }}>
-                  <Share2 size={11} style={{ color: 'var(--gc-muted)' }} />
+                <button type="button" onClick={() => { trackEv('share_card'); setShowStatusShare(true); }}
+                  title={lang === 'en' ? 'Create my progress card' : lang === 'tw' ? '生成我的進度卡' : '生成我的进度卡'}
+                  style={{ border: '1px solid var(--gc-green-border)', background: 'var(--gc-green-soft)', borderRadius: '2px', padding: '4px 9px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 700, color: 'var(--gc-green-ink)', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                  <Share2 size={11} style={{ color: 'var(--gc-green)' }} />
+                  {lang === 'en' ? 'My progress card' : lang === 'tw' ? '生成我的進度卡' : '生成我的进度卡'}
                 </button>
                 {!isSubscribedOv && (
                 <button type="button" onClick={() => window.dispatchEvent(new Event('gc-open-subscribe'))}
@@ -6622,57 +6957,23 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
       {/* Community — moved to its own "社区" tab (see CommunityPage), so it no longer
           renders here. Kept CommunityHub itself unchanged; only its mount point moved. */}
 
-      {/* Status share modal (#11) — a self-contained, screenshot-friendly card:
-          brand + month + case + hero estimate. No canvas export; the card IS the
-          shareable artifact, sized to screenshot cleanly. */}
-      {showStatusShare && (() => {
-        const heroSel2 = heroChart || (filingAuthorized ? 'B' : 'A');
-        const ps2 = heroSel2 === 'B' ? filingStatus : finalActionStatus;
-        const paceCal = ps2.days ? paceDaysToCalendar(userCase.category, country, ps2.days, heroSel2 === 'B' ? 'filing' : 'finalAction') : null;
-        const etaDate = paceCal ? new Date(Date.now() + paceCal * 86400000) : null;
-        const yearsF = paceCal ? paceCal / 365.25 : null;
-        const heroText = paceCal === null ? (lang === 'en' ? 'TBD' : '待定')
-          : yearsF >= 1.5
-            ? (lang === 'en' ? `~${yearsF.toFixed(1)} yrs` : `约 ${yearsF.toFixed(1)} 年`)
-            : (lang === 'en' ? `~${Math.max(Math.round(paceCal / 30.44), 1)} mo` : `约 ${Math.max(Math.round(paceCal / 30.44), 1)} 个月`);
-        const fmtYM = (d) => lang === 'en'
-          ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
-          : `${d.getFullYear()}年${d.getMonth() + 1}月`;
-        return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(15,20,25,0.55)' }}
-               onClick={() => setShowStatusShare(false)}>
-            <div onClick={(e) => e.stopPropagation()} style={{
-              background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderTop: '3px solid var(--gc-green)',
-              borderRadius: '6px', maxWidth: '340px', width: '100%', padding: '20px 18px 14px',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-            }}>
-              <div className="flex items-center justify-between" style={{ marginBottom: '12px' }}>
-                <span className="gc-serif" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gc-ink)' }}>
-                  {lang === 'en' ? 'Green Card Tracker' : '绿卡晴雨表'}
-                </span>
-                <span className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{BULLETIN_CURRENT_MONTH[lang]}</span>
-              </div>
-              <div className="gc-eyebrow" style={{ fontSize: '9px', color: 'var(--gc-muted)', marginBottom: '3px' }}>
-                {t[userCase.category.toLowerCase()]} · {countryLabel}
-              </div>
-              <div className="gc-serif" style={{ fontSize: '36px', fontWeight: 700, color: 'var(--gc-ink)', letterSpacing: '-0.02em', lineHeight: 1.05 }}>
-                {heroText}
-              </div>
-              <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-ink-soft)', marginTop: '6px' }}>
-                {etaDate ? (lang === 'en' ? `est. ${fmtYM(etaDate)}` : `预计 ${fmtYM(etaDate)}`) : ''}
-                {ps2.days !== null && <span> · {lang === 'en' ? `${ps2.days.toLocaleString('en-US')} days to go` : `还差 ${ps2.days.toLocaleString('en-US')} 天`}</span>}
-              </div>
-              <div className="gc-mono" style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid var(--gc-rule-soft)', display: 'flex', justifyContent: 'space-between' }}>
-                <span>gc.jmjvc.us</span>
-                <span>{lang === 'en' ? 'monthly auto-update' : '每月自动更新'}</span>
-              </div>
-              <div style={{ fontSize: '10px', color: 'var(--gc-muted)', marginTop: '10px', textAlign: 'center' }}>
-                {lang === 'en' ? 'Screenshot this card to share · tap outside to close' : '截图这张卡分享给同路人 · 点外部关闭'}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Status share modal (UI-13) — StatusShareModal: brand + month + case +
+          hero estimate, now exportable as PNG with a copy-my-case-link action.
+          Same content spec as the old screenshot-only card it replaces. */}
+      {showStatusShare && (
+        <StatusShareModal
+          userCase={userCase}
+          lang={lang}
+          t={t}
+          country={country}
+          countryLabel={countryLabel}
+          heroChart={heroChart}
+          filingAuthorized={filingAuthorized}
+          filingStatus={filingStatus}
+          finalActionStatus={finalActionStatus}
+          onClose={() => setShowStatusShare(false)}
+        />
+      )}
 
       {/* Share card modal — shown when user clicks "分享喜讯" in the celebration panel */}
       {showShareCard && (
@@ -8585,6 +8886,7 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
         // the whole point of the "already a subscriber? update here" path below.
         try { window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase()); } catch {}
         announceSubscribed();
+        trackEv('subscribe_done');
         if (result.confirmed) {
           // Re-submitting the email of an already-confirmed subscriber (the "update
           // my subscription" path, e.g. from a browser/device with no local flag) —
@@ -15624,6 +15926,12 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
   useEffect(() => {
     if (show && prefillEmail) setEmail(prefillEmail);
   }, [show, prefillEmail]);
+  // UI-14 funnel: the modal opening IS the subscribe click-through — every entry
+  // point (header button, case-card mail icon, inline CTAs) funnels through
+  // this `show` flag, so one hook here counts them all.
+  useEffect(() => {
+    if (show) trackEv('subscribe_click');
+  }, [show]);
   const [subLang, setSubLang] = useState(lang);
   const [alerts, setAlerts] = useState({ whenCurrent: true, whenEligible: true, monthlyUpdates: true, retrogression: true });
   const [status, setStatus] = useState(''); // '' | 'loading' | 'sent' | 'updated' | 'error' | 'invalid'
@@ -15754,6 +16062,7 @@ const SubscribeModal = ({ show, onClose, userCase, setUserCase, theme = 'passpor
           if (finalName) window.localStorage.setItem('gc_nickname', finalName);
         } catch { /* noop */ }
         announceSubscribed();
+        trackEv('subscribe_done');
         // Updating an already-confirmed subscriber sends no confirmation mail — saying
         // "check your inbox" here would be wrong, so it gets its own status/copy.
         setStatus(result.confirmed ? 'updated' : 'sent');
@@ -16226,6 +16535,7 @@ const InlineSubscribeCTA = ({ userCase, label }) => {
         markTouched();
         try { window.localStorage.setItem('gc_subscribedEmail', email.trim().toLowerCase()); } catch { /* noop */ }
         announceSubscribed();
+        trackEv('subscribe_done');
       } else {
         setStatus('error');
         setTimeout(() => setStatus(''), 3000);
@@ -16317,6 +16627,9 @@ export default function App() {
     // 向导填完（onComplete 里 setTab('overview')）才进；?tab= 深链仍优先。
     return 'update';
   });
+  // UI-14: report the current page to the dwell beacon (initial landing + every
+  // switch), so admin analytics can split sessions by tab.
+  useEffect(() => { trackTab(tab); }, [tab]);
   // Track the tab the user came from, for the "← back" button in The Index
   const [previousTab, setPreviousTab] = useState('overview');
 
