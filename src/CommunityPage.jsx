@@ -4,7 +4,7 @@
 import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { CheckCircle2, Users, RefreshCw, Lock } from 'lucide-react';
 import { FILING_AUTHORIZED, resolveCountry, computeStatus } from '../functions/api/_gcMath.js';
-import { API_BASE, useLang, bulletinCurrent, paceDaysToCalendar, InlineSubscribeCTA } from './App.jsx';
+import { API_BASE, CrowdReportForms, useLang, bulletinCurrent, paceDaysToCalendar, InlineSubscribeCTA } from './App.jsx';
 const TrackerPage = lazy(() => import('./Tracker.jsx'));
 const ChunkFallback = () => (
   <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--gc-muted)', fontSize: '13px', letterSpacing: '0.3em' }}>···</div>
@@ -30,13 +30,23 @@ const CURRENT_POLL = (() => {
   };
 })();
 
-const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
-  const { lang } = useLang();
-  const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
-  const isEB = !userCase.category?.startsWith('F');
-  const [tab, setTab] = useState(null); // null = collapsed | poll | wall | survey —— UI-08：投票不再默认展开，默认全收起（标题行见下方折叠态渲染）
+// ============================================================
+// UI-16: 社区页「一门三段」。原 CommunityHub（一卡三子标签：poll/wall/
+// survey）按三段拆开，与 Tracker、BulletinTalk 一起由 CommunityPage
+// 组装：
+//   段1 同路人进度 — Tracker 置顶 + 「报一条你的数据」卡组
+//      （CrowdReportForms=时间线/RFE，从个人页迁入，定义在 App.jsx；
+//       ReportSurveys=换类别/费用调查）
+//   段2 聊聊 — BulletinTalk 评论 + 打卡墙 WallBlock，两块分开、不并流
+//   段3 每月一题 — PollBlock（poll + 选题箱）
+// 拆分纪律：post() 的端点与 body（自动带 cat/country）、localStorage
+// 已报键（gc_cd_<key>）、poll 的乐观更新、wall 的首 5 条+展开、switch
+// 的 <details> 默认收起（UI-07）、poll 的折叠标题行（UI-08）全部与
+// 拆分前逐项一致，只变入口位置。useCommunityPost 把原 hub 内共享的
+// post/done/busy 原样抽成 hook 供三块共用。
+// ============================================================
+const useCommunityPost = (userCase, sample, onNeedCase) => {
   const [busy, setBusy] = useState('');
-
   const post = async (payload, doneKey) => {
     // 示例模式下不投票不发帖（否则会带着示例的类别写进真实数据），改成引导去填案子
     if (sample) { onNeedCase?.(); return false; }
@@ -53,16 +63,314 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
     } catch { setBusy(''); return false; }
   };
   const done = (k) => { try { return !!window.localStorage.getItem(`gc_cd_${k}`); } catch { return false; } };
+  return { post, done, busy };
+};
+const chipStyle = (active) => ({
+  fontSize: '12px', fontWeight: 700, padding: '8px 12px', border: `1px solid ${active ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
+  borderRadius: '3px', cursor: 'pointer', background: active ? 'var(--gc-green)' : 'var(--gc-surface)',
+  color: active ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
+});
+const submitBtnStyle = { fontSize: '12.5px', fontWeight: 700, padding: '6px 14px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-green)', color: 'var(--gc-paper)' };
+const DoneNote = ({ children }) => (
+  <div style={{ fontSize: '12.5px', color: 'var(--gc-green-ink)', fontWeight: 600 }}>{children}</div>
+);
+const SUBSCRIBE_LABEL = {
+  zh: '这批社区数据的完整分析，每月随排期邮件发出',
+  tw: '這批社區數據的完整分析，每月隨排期郵件發出',
+  en: 'Full analysis of this data ships with the monthly email',
+};
 
-  // poll
+// Segment header for the three-part 社区 page.
+const SectionHead = ({ zh, tw, en }) => {
+  const { lang } = useLang();
+  return (
+    <div style={{ margin: '10px 0 2px' }}>
+      <div className="gc-eyebrow" style={{ color: 'var(--gc-green)', fontSize: '11px' }}>
+        {lang === 'en' ? en : lang === 'tw' ? tw : zh}
+      </div>
+    </div>
+  );
+};
+
+// —— 段1 卡组（社区侧）：换类别调查 + 费用调查（拆分前在 hub 的
+// survey 子标签内）。提交与聚合公式逐字保留。——
+const ReportSurveys = ({ userCase, sample = false, onNeedCase }) => {
+  const { lang } = useLang();
+  const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
+  const isEB = !userCase.category?.startsWith('F');
+  const { post, done, busy } = useCommunityPost(userCase, sample, onNeedCase);
+
+  // surveys
+  const [swAction, setSwAction] = useState(null);
+  const [swAgg, setSwAgg] = useState(null);
+  const [swOutcome, setSwOutcome] = useState(null);
+  const [swDone, setSwDone] = useState(() => done('switch'));
+  useEffect(() => {
+    if (swDone && !swAgg) {
+      fetch(`${API_BASE}/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json()).then(setSwAgg).catch(() => {});
+    }
+  }, [swDone]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [costDone, setCostDone] = useState(() => done('cost'));
+  const [costAgg, setCostAgg] = useState(null);
+  useEffect(() => {
+    if (costDone && !costAgg) {
+      fetch(`${API_BASE}/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json()).then(setCostAgg).catch(() => {});
+    }
+  }, [costDone]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The "switched category" option only makes sense worded toward whatever direction
+  // is actually reachable from THIS user's category (EB2 goes down to EB-3, EB3 goes
+  // up to EB-2) — a fixed "降级 EB-3" label was nonsensical for an EB-2 or EB-1 reader.
+  const switchOpt = {
+    EB2: { id: 'downgrade', label: L('降级到 EB-3', '降級到 EB-3', 'Downgraded to EB-3') },
+    EB3: { id: 'upgrade', label: L('升级到 EB-2', '升級到 EB-2', 'Upgraded to EB-2') },
+  }[userCase.category] || { id: 'switched', label: L('换过类别', '換過類別', 'Switched category') };
+
+  const surveyCard = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '12px 14px', marginBottom: '8px' };
+
+  return (
+    <div>
+      {isEB && (
+        <details style={surveyCard}>
+          {/* UI-07：switch 调查三个月仅 1 条，入口默认收起（数据与端点保留，
+              展开即恢复原表单/结果）。UI-16 后此 <details> 成为段1 卡组
+              的一张子卡，收起行为不变。 */}
+          <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', listStyle: 'revert' }}>
+            {L('你为缩短等待做过什么？', '你為縮短等待做過什麼？', 'Have you tried to shorten the wait?')}
+            <span style={{ fontWeight: 400, color: 'var(--gc-muted)', fontSize: '12px' }}>
+              {swDone
+                ? L(' · 已提交，展开看结果', ' · 已提交，展開看結果', ' · submitted — tap for results')
+                : L(' · 展开填（换类别/换雇主/加急）', ' · 展開填（換類別/換雇主/加急）', ' · tap to answer')}
+            </span>
+          </summary>
+          <div style={{ marginTop: '5px' }}>
+          {!swDone ? (
+            <>
+              <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '5px' }}>
+                {[[switchOpt.id, switchOpt.label], ['porting', L('换雇主', '換雇主', 'Changed employer')], ['premium', L('用过加急', '用過加急', 'Premium processing')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => (
+                  <button key={id} type="button" onClick={() => { setSwAction(id); if (id === 'none') setSwOutcome(null); }} style={chipStyle(swAction === id)}>{label}</button>
+                ))}
+              </div>
+              {swAction && swAction !== 'none' && (
+                <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '5px' }}>
+                  {[['faster', L('确实快了', '確實快了', 'Faster')], ['same', L('差不多', '差不多', 'Same')], ['regret', L('后悔了', '後悔了', 'Regret it')], ['pending', L('还在等结果', '還在等結果', 'Pending')]].map(([id, label]) => (
+                    <button key={id} type="button" onClick={() => setSwOutcome(id)} style={chipStyle(swOutcome === id)}>{label}</button>
+                  ))}
+                </div>
+              )}
+              {swAction && (swAction === 'none' || swOutcome) && (
+                <button type="button" style={submitBtnStyle} disabled={busy === 'switch'}
+                  onClick={async () => {
+                    if (await post({ type: 'switch', action: swAction, outcome: swOutcome }, 'switch')) {
+                      setSwDone(true);
+                      setSwAgg((prev) => {
+                        const base = prev || { total: 0, actions: {} };
+                        return { total: base.total + 1, actions: { ...base.actions, [swAction]: (base.actions[swAction] || 0) + 1 } };
+                      });
+                      fetch(`${API_BASE}/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json())
+                        .then((data) => setSwAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
+                        .catch(() => {});
+                    }
+                  }}>
+                  {L('匿名提交', '匿名提交', 'Submit')}
+                </button>
+              )}
+            </>
+          ) : (
+            <div>
+              <DoneNote>{L('已提交 ✓', '已提交 ✓', 'Submitted ✓')}</DoneNote>
+              {swAgg && swAgg.total > 0 && (
+                <div style={{ marginTop: '5px' }}>
+                  {[[switchOpt.id, switchOpt.label], ['porting', L('换雇主', '換雇主', 'Port')], ['premium', L('加急', '加急', 'Premium')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => {
+                    const n = swAgg.actions?.[id] || 0;
+                    const pct = swAgg.total ? Math.round((n / swAgg.total) * 100) : 0;
+                    return (
+                      <div key={id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
+                        <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
+                        </span>
+                        <span className="gc-mono" style={{ fontSize: '12px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '3px' }}>
+                    {L(`${swAgg.total} 份 · 匿名`, `${swAgg.total} 份 · 匿名`, `${swAgg.total} responses`)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          </div>
+        </details>
+      )}
+
+      <div style={surveyCard}>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
+          {L('整个流程的律师费＋官费，大概花了多少？', '整個流程的律師費＋官費，大概花了多少？', 'Total attorney + filing fees so far?')}
+        </div>
+        {!costDone ? (
+          <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
+            {[['lt5k', '< $5k'], ['b5to10k', '$5-10k'], ['b10to15k', '$10-15k'], ['gt15k', '> $15k']].map(([id, label]) => (
+              <button key={id} type="button" disabled={busy === 'cost'} style={chipStyle(false)}
+                onClick={async () => {
+                  if (await post({ type: 'cost', bracket: id }, 'cost')) {
+                    setCostDone(true);
+                    setCostAgg((prev) => {
+                      const base = prev || { total: 0, brackets: {} };
+                      return { total: base.total + 1, brackets: { ...base.brackets, [id]: (base.brackets[id] || 0) + 1 } };
+                    });
+                    fetch(`${API_BASE}/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json())
+                      .then((data) => setCostAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
+                      .catch(() => {});
+                  }
+                }}>{label}</button>
+            ))}
+          </div>
+        ) : (
+          <div>
+            <DoneNote>{L('已提交 ✓ 谢谢', '已提交 ✓ 謝謝', 'Submitted ✓')}</DoneNote>
+            {costAgg && costAgg.total > 0 && (
+              <div style={{ marginTop: '5px' }}>
+                {[['lt5k', '< $5k'], ['b5to10k', '$5-10k'], ['b10to15k', '$10-15k'], ['gt15k', '> $15k']].map(([id, label]) => {
+                  const n = costAgg.brackets?.[id] || 0;
+                  const pct = costAgg.total ? Math.round((n / costAgg.total) * 100) : 0;
+                  return (
+                    <div key={id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
+                      <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
+                      </span>
+                      <span className="gc-mono" style={{ fontSize: '12px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '3px' }}>
+                  {L(`${costAgg.total} 份 · 匿名`, `${costAgg.total} 份 · 匿名`, `${costAgg.total} responses`)}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {(swDone || costDone) && (
+        <InlineSubscribeCTA userCase={userCase} label={SUBSCRIBE_LABEL[lang] || SUBSCRIBE_LABEL.zh} />
+      )}
+    </div>
+  );
+};
+
+// —— 段2：打卡墙（拆分前在 hub 的 wall 子标签内，现为独立块，与
+// BulletinTalk 评论分开呈现、不并流）。条目列表、首 5 条+展开、
+// 个资规则条（UI-10）逐项保留；唯一的挂载变化：本块一出现就拉条目
+// （拆分前要先点开 wall 子标签才拉）。——
+const WallBlock = ({ userCase, sample = false, onNeedCase }) => {
+  const { lang } = useLang();
+  const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
+  const { post, done, busy } = useCommunityPost(userCase, sample, onNeedCase);
+  const pdD2 = userCase.priorityDate ? new Date(userCase.priorityDate + 'T00:00:00') : null;
+  const myDays = pdD2 ? Math.max(0, Math.round((Date.now() - pdD2.getTime()) / 86400000)) : null;
+  const [wallMsg, setWallMsg] = useState('');
+  const [wall, setWall] = useState(null);
+  const [walled, setWalled] = useState(() => done('wall'));
+  const [wallExpanded, setWallExpanded] = useState(false); // 默认只显示前 5 条，别把页面撑太长
+  useEffect(() => {
+    fetch(`${API_BASE}/api/community?type=wall`).then((r) => r.json()).then(setWall).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const checkIn = async () => {
+    if (myDays === null) return;
+    if (await post({ type: 'wall', days: myDays, message: wallMsg }, 'wall')) {
+      setWalled(true);
+      setWall(null);
+      fetch(`${API_BASE}/api/community?type=wall`).then((r) => r.json()).then(setWall).catch(() => {});
+    }
+  };
+  return (
+    <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', padding: '12px 14px' }}>
+      <div className="gc-eyebrow" style={{ fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-muted)', marginBottom: '7px' }}>
+        {L('打卡墙', '打卡牆', 'CHECK-IN WALL')}
+      </div>
+      {myDays !== null && (
+        <div style={{ fontSize: '13px', color: 'var(--gc-ink-soft)', marginBottom: '7px' }}>
+          {L(`你已等待 `, `你已等待 `, `You've waited `)}
+          <b className="gc-mono" style={{ color: 'var(--gc-green-ink)' }}>{myDays.toLocaleString('en-US')}</b>
+          {L(' 天', ' 天', ' days')}
+        </div>
+      )}
+      {!walled ? (
+        <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
+          <input value={wallMsg} onChange={(e) => setWallMsg(e.target.value.slice(0, 40))}
+            placeholder={L('说一句（可留空，40 字内）', '說一句（可留空）', 'One line (optional)')}
+            style={{ flex: '1 1 180px', minWidth: 0, fontSize: '13px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
+          <button type="button" onClick={checkIn} disabled={busy === 'wall' || myDays === null} style={submitBtnStyle}>
+            {L('打卡', '打卡', 'Check in')}
+          </button>
+        </div>
+      ) : <DoneNote>{L('已打卡 ✓', '已打卡 ✓', 'Checked in ✓')}</DoneNote>}
+      {/* 规则条（UI-10 补齐）：打卡墙与讨论区同后端同为公开自由文本，
+          与拆分前同一行，位置随本块走。 */}
+      <div style={{
+        fontSize: '10.5px', lineHeight: 1.5, color: '#92400e',
+        background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--gc-radius-sm)',
+        padding: '5px 8px', marginTop: '7px',
+      }}>
+        {L('请勿发布案号、收据号、全名、电话等个人信息；他人经验不构成个案建议。',
+          '請勿發布案號、收據號、全名、電話等個資；他人經驗不構成個案建議。',
+          "Please don't post case or receipt numbers, full names, or phone numbers. Others' experiences are not advice for your case.")}
+      </div>
+      <div style={{ marginTop: '9px', paddingTop: '8px', borderTop: '1px solid var(--gc-rule-soft)' }}>
+        {wall === null ? (
+          <div style={{ fontSize: '12px', color: 'var(--gc-muted)' }}>…</div>
+        ) : wall.entries?.length ? (
+          <>
+            {(wallExpanded ? wall.entries : wall.entries.slice(0, 5)).map((e, i, arr) => (
+              <div key={i} className="flex items-baseline" style={{ gap: '8px', padding: '3px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none' }}>
+                <span className="gc-mono" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-green-ink)', flexShrink: 0 }}>
+                  {Number(e.days).toLocaleString('en-US')}{L('天', '天', 'd')}
+                </span>
+                {e.cat && <span className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', flexShrink: 0 }}>{e.cat}</span>}
+                <span style={{ fontSize: '12.5px', color: 'var(--gc-ink-soft)', minWidth: 0 }}>{e.message || <span style={{ color: 'var(--gc-muted)' }}>{L('打了卡', '打了卡', 'checked in')}</span>}</span>
+              </div>
+            ))}
+            {wall.entries.length > 5 && (
+              <button type="button" onClick={() => setWallExpanded((v) => !v)}
+                style={{ border: 'none', background: 'transparent', padding: '6px 0 0', cursor: 'pointer', fontSize: '12px', color: 'var(--gc-green)', fontWeight: 700 }}>
+                {wallExpanded ? L('收起', '收起', 'Collapse') : L(`展开全部 ${wall.entries.length} 条`, `展開全部 ${wall.entries.length} 條`, `Show all ${wall.entries.length}`)}
+              </button>
+            )}
+          </>
+        ) : (
+          <div style={{ fontSize: '12px', color: 'var(--gc-muted)' }}>
+            {L('还没有人打卡——做第一个。', '還沒有人打卡——做第一個。', 'No check-ins yet — be the first.')}
+          </div>
+        )}
+      </div>
+      {walled && (
+        <div style={{ marginTop: '8px' }}>
+          <InlineSubscribeCTA userCase={userCase} label={SUBSCRIBE_LABEL[lang] || SUBSCRIBE_LABEL.zh} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// —— 段3：每月一题（poll）+ 选题箱。poll 的折叠标题行（UI-08）就是
+// 本块的默认态：题面一行 + 总票数 + 投票状态，点开才出选项；投票的
+// 乐观更新与防旧数据覆盖与拆分前逐字一致。——
+const PollBlock = ({ userCase, sample = false, onNeedCase }) => {
+  const { lang } = useLang();
+  const L = (zh, tw, en) => (lang === 'en' ? en : lang === 'tw' ? tw : zh);
+  const { post, done, busy } = useCommunityPost(userCase, sample, onNeedCase);
+  const [open, setOpen] = useState(false);
   const pollKey = CURRENT_POLL.id;
   const [pollAgg, setPollAgg] = useState(null);
   const [voted, setVoted] = useState(() => done(pollKey));
   useEffect(() => {
-    if (tab === 'poll' && voted && !pollAgg) {
+    if (voted && !pollAgg) {
       fetch(`${API_BASE}/api/community?type=poll&pollId=${pollKey}`).then((r) => r.json()).then(setPollAgg).catch(() => {});
     }
-  }, [tab, voted]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [voted]); // eslint-disable-line react-hooks/exhaustive-deps
   // UI-08：折叠态标题行要显示本题总票数，挂载时先把聚合拉回来（只读，不代表已投票）
   useEffect(() => {
     if (!pollAgg) {
@@ -84,115 +392,42 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
     }
   };
 
-  // wall
-  const pdD2 = userCase.priorityDate ? new Date(userCase.priorityDate + 'T00:00:00') : null;
-  const myDays = pdD2 ? Math.max(0, Math.round((Date.now() - pdD2.getTime()) / 86400000)) : null;
-  const [wallMsg, setWallMsg] = useState('');
-  const [wall, setWall] = useState(null);
-  const [walled, setWalled] = useState(() => done('wall'));
-  const [wallExpanded, setWallExpanded] = useState(false); // 默认只显示前 5 条，别把页面撑太长
-  useEffect(() => {
-    if (tab === 'wall' && !wall) {
-      fetch(`${API_BASE}/api/community?type=wall`).then((r) => r.json()).then(setWall).catch(() => {});
-    }
-  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
-  const checkIn = async () => {
-    if (myDays === null) return;
-    if (await post({ type: 'wall', days: myDays, message: wallMsg }, 'wall')) {
-      setWalled(true);
-      setWall(null);
-      fetch(`${API_BASE}/api/community?type=wall`).then((r) => r.json()).then(setWall).catch(() => {});
-    }
-  };
-
-  // surveys
-  const [swAction, setSwAction] = useState(null);
-  const [swAgg, setSwAgg] = useState(null);
-  const [swOutcome, setSwOutcome] = useState(null);
-  const [swDone, setSwDone] = useState(() => done('switch'));
-  useEffect(() => {
-    if (tab === 'survey' && swDone && !swAgg) {
-      fetch(`${API_BASE}/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json()).then(setSwAgg).catch(() => {});
-    }
-  }, [tab, swDone]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [costDone, setCostDone] = useState(() => done('cost'));
-  const [costAgg, setCostAgg] = useState(null);
-  useEffect(() => {
-    if (tab === 'survey' && costDone && !costAgg) {
-      fetch(`${API_BASE}/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json()).then(setCostAgg).catch(() => {});
-    }
-  }, [tab, costDone]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ---- question of the month ----
   const [qText, setQText] = useState('');
   const [qDone, setQDone] = useState(() => done('question'));
 
-  // The "switched category" option only makes sense worded toward whatever direction
-  // is actually reachable from THIS user's category (EB2 goes down to EB-3, EB3 goes
-  // up to EB-2) — a fixed "降级 EB-3" label was nonsensical for an EB-2 or EB-1 reader.
-  const switchOpt = {
-    EB2: { id: 'downgrade', label: L('降级到 EB-3', '降級到 EB-3', 'Downgraded to EB-3') },
-    EB3: { id: 'upgrade', label: L('升级到 EB-2', '升級到 EB-2', 'Upgraded to EB-2') },
-  }[userCase.category] || { id: 'switched', label: L('换过类别', '換過類別', 'Switched category') };
-
-  const chip = (active) => ({
-    fontSize: '12px', fontWeight: 700, padding: '8px 12px', border: `1px solid ${active ? 'var(--gc-green)' : 'var(--gc-rule)'}`,
-    borderRadius: '3px', cursor: 'pointer', background: active ? 'var(--gc-green)' : 'var(--gc-surface)',
-    color: active ? 'var(--gc-paper)' : 'var(--gc-ink-soft)',
-  });
-  const submitBtn = { fontSize: '12.5px', fontWeight: 700, padding: '6px 14px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: 'var(--gc-green)', color: 'var(--gc-paper)' };
-  const doneNote = (txt) => (
-    <div style={{ fontSize: '12.5px', color: 'var(--gc-green-ink)', fontWeight: 600 }}>{txt}</div>
-  );
-
+  const card = { background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' };
   return (
-    <div style={{ background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', overflow: 'hidden' }}>
-      <div className="flex items-center justify-between" style={{ padding: '11px 14px 0' }}>
-        <span className="gc-eyebrow" style={{ fontSize: '11px', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--gc-muted)' }}>
-          {L('投票 · 打卡 · 调查', '投票 · 打卡 · 調查', 'POLL · CHECK-IN · SURVEY')}
-        </span>
-        <span className="inline-flex" style={{ border: '1px solid var(--gc-rule)', borderRadius: '3px', overflow: 'hidden' }}>
-          {[['poll', L('每月一题', '每月一題', 'Poll')], ['wall', L('打卡墙', '打卡牆', 'Wall')], ['survey', L('调查·提问', '調查·提問', 'Surveys')]].map(([id, label], i) => (
-            <button key={id} type="button" onClick={() => setTab(tab === id ? null : id)}
-              style={{
-                fontSize: '12px', fontWeight: 700, padding: '6px 12px', border: 'none', cursor: 'pointer',
-                borderLeft: i === 0 ? 'none' : '1px solid var(--gc-rule-soft)',
-                background: tab === id ? 'var(--gc-green)' : 'var(--gc-surface)',
-                color: tab === id ? 'var(--gc-paper)' : 'var(--gc-muted)',
-              }}>{label}</button>
-          ))}
-        </span>
-      </div>
-
-      {tab === null && (
-        <button type="button" onClick={() => setTab('poll')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left',
-            background: 'transparent', border: 'none', cursor: 'pointer', padding: '9px 14px 11px',
-          }}>
-          <span style={{
-            fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', flex: 1, minWidth: 0,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {CURRENT_POLL.q[lang] || CURRENT_POLL.q.zh}
-          </span>
-          <span style={{ fontSize: '12px', color: 'var(--gc-muted)', flexShrink: 0 }}>
-            {pollAgg ? L(`已投 ${pollAgg.total} 票`, `已投 ${pollAgg.total} 票`, `${pollAgg.total} votes`) : ''}
-            {voted
-              ? L(' · 已投票，看结果 →', ' · 已投票，看結果 →', ' · voted — results →')
-              : L(' · 点开投票 →', ' · 點開投票 →', ' · tap to vote →')}
-          </span>
-        </button>
-      )}
-      {tab !== null && (
-      <div style={{ padding: '10px 14px 13px' }}>
-        {tab === 'poll' && (
-          <div>
+    <div>
+      <div style={{ ...card, marginBottom: '8px' }}>
+        {!open ? (
+          <button type="button" onClick={() => setOpen(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left',
+              background: 'transparent', border: 'none', cursor: 'pointer', padding: '11px 14px',
+            }}>
+            <span style={{
+              fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', flex: 1, minWidth: 0,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {CURRENT_POLL.q[lang] || CURRENT_POLL.q.zh}
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--gc-muted)', flexShrink: 0 }}>
+              {pollAgg ? L(`已投 ${pollAgg.total} 票`, `已投 ${pollAgg.total} 票`, `${pollAgg.total} votes`) : ''}
+              {voted
+                ? L(' · 已投票，看结果 →', ' · 已投票，看結果 →', ' · voted — results →')
+                : L(' · 点开投票 →', ' · 點開投票 →', ' · tap to vote →')}
+            </span>
+          </button>
+        ) : (
+          <div style={{ padding: '12px 14px' }}>
             <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '8px' }}>
               {CURRENT_POLL.q[lang] || CURRENT_POLL.q.zh}
             </div>
             {!voted ? (
               <div className="flex" style={{ gap: '8px', flexWrap: 'wrap' }}>
                 {CURRENT_POLL.options.map((o) => (
-                  <button key={o.id} type="button" disabled={busy === pollKey} onClick={() => vote(o.id)} style={chip(false)}>
+                  <button key={o.id} type="button" disabled={busy === pollKey} onClick={() => vote(o.id)} style={chipStyle(false)}>
                     {o[lang] || o.zh}
                   </button>
                 ))}
@@ -216,221 +451,34 @@ const CommunityHub = ({ userCase, sample = false, onNeedCase }) => {
                   {L(`已投 ${pollAgg.total} 票 · 匿名`, `已投 ${pollAgg.total} 票 · 匿名`, `${pollAgg.total} votes · anonymous`)}
                 </div>
               </div>
-            ) : doneNote(L('已投票 ✓', '已投票 ✓', 'Voted ✓'))}
-          </div>
-        )}
-
-        {tab === 'wall' && (
-          <div>
-            {myDays !== null && (
-              <div style={{ fontSize: '13px', color: 'var(--gc-ink-soft)', marginBottom: '7px' }}>
-                {L(`你已等待 `, `你已等待 `, `You've waited `)}
-                <b className="gc-mono" style={{ color: 'var(--gc-green-ink)' }}>{myDays.toLocaleString('en-US')}</b>
-                {L(' 天', ' 天', ' days')}
-              </div>
-            )}
-            {!walled ? (
-              <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
-                <input value={wallMsg} onChange={(e) => setWallMsg(e.target.value.slice(0, 40))}
-                  placeholder={L('说一句（可留空，40 字内）', '說一句（可留空）', 'One line (optional)')}
-                  style={{ flex: '1 1 180px', minWidth: 0, fontSize: '13px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
-                <button type="button" onClick={checkIn} disabled={busy === 'wall' || myDays === null} style={submitBtn}>
-                  {L('打卡', '打卡', 'Check in')}
-                </button>
-              </div>
-            ) : doneNote(L('已打卡 ✓', '已打卡 ✓', 'Checked in ✓'))}
-            {/* 规则条（UI-10 补齐）：打卡墙与讨论区同后端同为公开自由文本，
-                第一批只给 BulletinTalk 加了个资规则条，这里补上同一行。 */}
-            <div style={{
-              fontSize: '10.5px', lineHeight: 1.5, color: '#92400e',
-              background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--gc-radius-sm)',
-              padding: '5px 8px', marginTop: '7px',
-            }}>
-              {L('请勿发布案号、收据号、全名、电话等个人信息；他人经验不构成个案建议。',
-                '請勿發布案號、收據號、全名、電話等個資；他人經驗不構成個案建議。',
-                "Please don't post case or receipt numbers, full names, or phone numbers. Others' experiences are not advice for your case.")}
-            </div>
-            <div style={{ marginTop: '9px', paddingTop: '8px', borderTop: '1px solid var(--gc-rule-soft)' }}>
-              {wall === null ? (
-                <div style={{ fontSize: '12px', color: 'var(--gc-muted)' }}>…</div>
-              ) : wall.entries?.length ? (
-                <>
-                  {(wallExpanded ? wall.entries : wall.entries.slice(0, 5)).map((e, i, arr) => (
-                    <div key={i} className="flex items-baseline" style={{ gap: '8px', padding: '3px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--gc-rule-soft)' : 'none' }}>
-                      <span className="gc-mono" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-green-ink)', flexShrink: 0 }}>
-                        {Number(e.days).toLocaleString('en-US')}{L('天', '天', 'd')}
-                      </span>
-                      {e.cat && <span className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', flexShrink: 0 }}>{e.cat}</span>}
-                      <span style={{ fontSize: '12.5px', color: 'var(--gc-ink-soft)', minWidth: 0 }}>{e.message || <span style={{ color: 'var(--gc-muted)' }}>{L('打了卡', '打了卡', 'checked in')}</span>}</span>
-                    </div>
-                  ))}
-                  {wall.entries.length > 5 && (
-                    <button type="button" onClick={() => setWallExpanded((v) => !v)}
-                      style={{ border: 'none', background: 'transparent', padding: '6px 0 0', cursor: 'pointer', fontSize: '12px', color: 'var(--gc-green)', fontWeight: 700 }}>
-                      {wallExpanded ? L('收起', '收起', 'Collapse') : L(`展开全部 ${wall.entries.length} 条`, `展開全部 ${wall.entries.length} 條`, `Show all ${wall.entries.length}`)}
-                    </button>
-                  )}
-                </>
-              ) : (
-                <div style={{ fontSize: '12px', color: 'var(--gc-muted)' }}>
-                  {L('还没有人打卡——做第一个。', '還沒有人打卡——做第一個。', 'No check-ins yet — be the first.')}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {tab === 'survey' && (
-          <div>
-            {isEB && (
-              <details style={{ marginBottom: '11px' }}>
-                {/* UI-07：switch 调查三个月仅 1 条，入口默认收起（数据与端点保留，
-                    展开即恢复原表单/结果）。 */}
-                <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', listStyle: 'revert', marginBottom: '5px' }}>
-                  {L('你为缩短等待做过什么？', '你為縮短等待做過什麼？', 'Have you tried to shorten the wait?')}
-                  <span style={{ fontWeight: 400, color: 'var(--gc-muted)', fontSize: '12px' }}>
-                    {swDone
-                      ? L(' · 已提交，展开看结果', ' · 已提交，展開看結果', ' · submitted — tap for results')
-                      : L(' · 展开填（换类别/换雇主/加急）', ' · 展開填（換類別/換雇主/加急）', ' · tap to answer')}
-                  </span>
-                </summary>
-                {!swDone ? (
-                  <>
-                    <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '5px' }}>
-                      {[[switchOpt.id, switchOpt.label], ['porting', L('换雇主', '換雇主', 'Changed employer')], ['premium', L('用过加急', '用過加急', 'Premium processing')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => (
-                        <button key={id} type="button" onClick={() => { setSwAction(id); if (id === 'none') setSwOutcome(null); }} style={chip(swAction === id)}>{label}</button>
-                      ))}
-                    </div>
-                    {swAction && swAction !== 'none' && (
-                      <div className="flex" style={{ gap: '6px', flexWrap: 'wrap', marginBottom: '5px' }}>
-                        {[['faster', L('确实快了', '確實快了', 'Faster')], ['same', L('差不多', '差不多', 'Same')], ['regret', L('后悔了', '後悔了', 'Regret it')], ['pending', L('还在等结果', '還在等結果', 'Pending')]].map(([id, label]) => (
-                          <button key={id} type="button" onClick={() => setSwOutcome(id)} style={chip(swOutcome === id)}>{label}</button>
-                        ))}
-                      </div>
-                    )}
-                    {swAction && (swAction === 'none' || swOutcome) && (
-                      <button type="button" style={submitBtn} disabled={busy === 'switch'}
-                        onClick={async () => {
-                          if (await post({ type: 'switch', action: swAction, outcome: swOutcome }, 'switch')) {
-                            setSwDone(true);
-                            setSwAgg((prev) => {
-                              const base = prev || { total: 0, actions: {} };
-                              return { total: base.total + 1, actions: { ...base.actions, [swAction]: (base.actions[swAction] || 0) + 1 } };
-                            });
-                            fetch(`${API_BASE}/api/community?type=switch&cat=${userCase.category}`).then((r) => r.json())
-                              .then((data) => setSwAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
-                              .catch(() => {});
-                          }
-                        }}>
-                        {L('匿名提交', '匿名提交', 'Submit')}
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <div>
-                    {doneNote(L('已提交 ✓', '已提交 ✓', 'Submitted ✓'))}
-                    {swAgg && swAgg.total > 0 && (
-                      <div style={{ marginTop: '5px' }}>
-                        {[[switchOpt.id, switchOpt.label], ['porting', L('换雇主', '換雇主', 'Port')], ['premium', L('加急', '加急', 'Premium')], ['none', L('都没有', '都沒有', 'None')]].map(([id, label]) => {
-                          const n = swAgg.actions?.[id] || 0;
-                          const pct = swAgg.total ? Math.round((n / swAgg.total) * 100) : 0;
-                          return (
-                            <div key={id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
-                              <span style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
-                              <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
-                                <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
-                              </span>
-                              <span className="gc-mono" style={{ fontSize: '12px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
-                            </div>
-                          );
-                        })}
-                        <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '3px' }}>
-                          {L(`${swAgg.total} 份 · 匿名`, `${swAgg.total} 份 · 匿名`, `${swAgg.total} responses`)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </details>
-            )}
-
-            <div style={{ marginBottom: '11px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '5px' }}>
-                {L('整个流程的律师费＋官费，大概花了多少？', '整個流程的律師費＋官費，大概花了多少？', 'Total attorney + filing fees so far?')}
-              </div>
-              {!costDone ? (
-                <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
-                  {[['lt5k', '< $5k'], ['b5to10k', '$5-10k'], ['b10to15k', '$10-15k'], ['gt15k', '> $15k']].map(([id, label]) => (
-                    <button key={id} type="button" disabled={busy === 'cost'} style={chip(false)}
-                      onClick={async () => {
-                        if (await post({ type: 'cost', bracket: id }, 'cost')) {
-                          setCostDone(true);
-                          setCostAgg((prev) => {
-                            const base = prev || { total: 0, brackets: {} };
-                            return { total: base.total + 1, brackets: { ...base.brackets, [id]: (base.brackets[id] || 0) + 1 } };
-                          });
-                          fetch(`${API_BASE}/api/community?type=cost&cat=${userCase.category}`).then((r) => r.json())
-                            .then((data) => setCostAgg((prev) => (data && data.total >= (prev?.total || 0) ? data : prev)))
-                            .catch(() => {});
-                        }
-                      }}>{label}</button>
-                  ))}
-                </div>
-              ) : (
-                <div>
-                  {doneNote(L('已提交 ✓ 谢谢', '已提交 ✓ 謝謝', 'Submitted ✓'))}
-                  {costAgg && costAgg.total > 0 && (
-                    <div style={{ marginTop: '5px' }}>
-                      {[['lt5k', '< $5k'], ['b5to10k', '$5-10k'], ['b10to15k', '$10-15k'], ['gt15k', '> $15k']].map(([id, label]) => {
-                        const n = costAgg.brackets?.[id] || 0;
-                        const pct = costAgg.total ? Math.round((n / costAgg.total) * 100) : 0;
-                        return (
-                          <div key={id} className="flex items-center" style={{ gap: '8px', padding: '2px 0' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', width: '70px', flexShrink: 0 }}>{label}</span>
-                            <span style={{ flex: 1, height: '7px', background: 'var(--gc-rule-soft)', borderRadius: '3px', overflow: 'hidden' }}>
-                              <span style={{ display: 'block', height: '100%', width: `${pct}%`, background: 'var(--gc-green)' }} />
-                            </span>
-                            <span className="gc-mono" style={{ fontSize: '12px', color: 'var(--gc-muted)', width: '38px', textAlign: 'right' }}>{pct}%</span>
-                          </div>
-                        );
-                      })}
-                      <div style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '3px' }}>
-                        {L(`${costAgg.total} 份 · 匿名`, `${costAgg.total} 份 · 匿名`, `${costAgg.total} responses`)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '3px' }}>
-                {L('给站长的选题箱', '給站長的選題箱', 'Topic box for the site owner')}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.55, marginBottom: '6px' }}>
-                {L('仅站主可见；好问题会做成内容，不承诺逐条回复。', '僅站主可見；好問題會做成內容，不承諾逐條回覆。', "Only the site owner sees these. Good questions become content — we can't promise a reply to each one.")}
-              </div>
-              {!qDone ? (
-                <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
-                  <input value={qText} onChange={(e) => setQText(e.target.value.slice(0, 200))}
-                    placeholder={L('写一句，会变成后续内容选题', '寫一句，會變成後續內容選題', 'One line — it shapes what we write next')}
-                    style={{ flex: '1 1 200px', minWidth: 0, fontSize: '13px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
-                  <button type="button" style={submitBtn} disabled={busy === 'question' || qText.trim().length < 4}
-                    onClick={async () => { if (await post({ type: 'question', text: qText }, 'question')) setQDone(true); }}>
-                    {L('提交', '提交', 'Send')}
-                  </button>
-                </div>
-              ) : doneNote(L('已收到 ✓ 谢谢', '已收到 ✓ 謝謝', 'Received ✓'))}
-            </div>
-          </div>
-        )}
-        {(voted || walled || swDone || costDone || qDone) && (
-          <div style={{ marginTop: '4px' }}>
-            <InlineSubscribeCTA userCase={userCase}
-              label={L('这批社区数据的完整分析，每月随排期邮件发出', '這批社區數據的完整分析，每月隨排期郵件發出', 'Full analysis of this data ships with the monthly email')} />
+            ) : <DoneNote>{L('已投票 ✓', '已投票 ✓', 'Voted ✓')}</DoneNote>}
           </div>
         )}
       </div>
+
+      {/* 选题箱（UI-26 定名与预期说明，原文逐字保留） */}
+      <div style={{ ...card, padding: '12px 14px', marginBottom: '8px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)', marginBottom: '3px' }}>
+          {L('给站长的选题箱', '給站長的選題箱', 'Topic box for the site owner')}
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.55, marginBottom: '6px' }}>
+          {L('仅站主可见；好问题会做成内容，不承诺逐条回复。', '僅站主可見；好問題會做成內容，不承諾逐條回覆。', "Only the site owner sees these. Good questions become content — we can't promise a reply to each one.")}
+        </div>
+        {!qDone ? (
+          <div className="flex" style={{ gap: '6px', flexWrap: 'wrap' }}>
+            <input value={qText} onChange={(e) => setQText(e.target.value.slice(0, 200))}
+              placeholder={L('写一句，会变成后续内容选题', '寫一句，會變成後續內容選題', 'One line — it shapes what we write next')}
+              style={{ flex: '1 1 200px', minWidth: 0, fontSize: '13px', padding: '6px 9px', border: '1px solid var(--gc-rule)', borderRadius: '3px', background: 'var(--gc-paper)', color: 'var(--gc-ink)' }} />
+            <button type="button" style={submitBtnStyle} disabled={busy === 'question' || qText.trim().length < 4}
+              onClick={async () => { if (await post({ type: 'question', text: qText }, 'question')) setQDone(true); }}>
+              {L('提交', '提交', 'Send')}
+            </button>
+          </div>
+        ) : <DoneNote>{L('已收到 ✓ 谢谢', '已收到 ✓ 謝謝', 'Received ✓')}</DoneNote>}
+      </div>
+
+      {(voted || qDone) && (
+        <InlineSubscribeCTA userCase={userCase} label={SUBSCRIBE_LABEL[lang] || SUBSCRIBE_LABEL.zh} />
       )}
     </div>
   );
@@ -1082,15 +1130,14 @@ const CompareHub = ({ userCase }) => {
 };
 
 // ============================================================
-// CommunityPage — 「社区」tab（原「如果」/CompareHub 的位置）。
-// 不新增导航位，是把已有的三块拼到一起：案件进度墙（原挂在「动态」）+
-// 同路人互动（原挂在「总结」页底部，poll/打卡墙/调查全部原样保留）+
-// CompareHub（原「如果」的全部内容，没删，收进默认收起的 <details> 里）。
+// CommunityPage — 「社区」tab。
+// UI-16「一门三段」（取代 2026-09-23 的先人后表排序中 ③④ 两段的组织）：
+//   段1 同路人进度 — Tracker 置顶，其下「报一条你的数据」卡组：
+//      时间线/RFE（CrowdReportForms，自个人页迁入）+ 换类别/费用调查
+//   段2 聊聊 — BulletinTalk 评论 + 打卡墙，两块分开、不并流
+//   段3 每月一题 — PollBlock（poll + 选题箱）
+// CompareHub「如果」仍收在页底默认收起的 <details> 里，未动。
 // ============================================================
-// 社区页排序（2026-09-23 重排）：先人后表。
-//   ① 一行实时人数 → ② 跟你同路的人（三个数，没登记的一键登记）→ ③ 讨论区（跟「最新」页同一串）
-//   → ④ 投票/打卡/调查 → ⑤ 换类别对比（工具，不是社区内容，收在最底）
-// 原来第一屏是 6 个日期框的两步表单，读起来像填调查表；真有人说话的讨论区反而只挂在「最新」页。
 const CommunityPage = ({ userCase, sample = false, onNeedCase }) => {
   const { lang } = useLang();
   const [summary, setSummary] = useState(null);
@@ -1110,11 +1157,28 @@ const CommunityPage = ({ userCase, sample = false, onNeedCase }) => {
         </p>
       </div>
 
+      {/* ——— 段1 同路人进度 ——— */}
+      <SectionHead zh="同路人进度" tw="同路人進度" en="FELLOW APPLICANTS' PROGRESS" />
       <Suspense fallback={<ChunkFallback />}><TrackerPage userCase={userCase} sample={sample} onNeedCase={onNeedCase} onSummary={setSummary} /></Suspense>
+      <div style={{ margin: '2px 0 0' }}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink)' }}>
+          {lang === 'en' ? 'Report your data' : lang === 'tw' ? '報一條你的數據' : '报一条你的数据'}
+        </span>
+        <span style={{ fontSize: '11.5px', color: 'var(--gc-muted)', marginLeft: '8px' }}>
+          {lang === 'en' ? 'the wall and the medians above exist because people report theirs' : lang === 'tw' ? '上面的牆和中位數，就靠大家一條條報出來' : '上面的墙和中位数，就靠大家一条条报出来'}
+        </span>
+      </div>
+      <CrowdReportForms userCase={userCase} sample={sample} onNeedCase={onNeedCase} />
+      <ReportSurveys userCase={userCase} sample={sample} onNeedCase={onNeedCase} />
 
+      {/* ——— 段2 聊聊 ——— */}
+      <SectionHead zh="聊聊" tw="聊聊" en="TALK IT OUT" />
       <BulletinTalk lang={lang} />
+      <WallBlock userCase={userCase} sample={sample} onNeedCase={onNeedCase} />
 
-      <CommunityHub userCase={userCase} sample={sample} onNeedCase={onNeedCase} />
+      {/* ——— 段3 每月一题 ——— */}
+      <SectionHead zh="每月一题" tw="每月一題" en="ONE QUESTION A MONTH" />
+      <PollBlock userCase={userCase} sample={sample} onNeedCase={onNeedCase} />
 
       <details style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '10px 12px' }}>
         <summary style={{ cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: 'var(--gc-ink-soft)', listStyle: 'revert' }}>
