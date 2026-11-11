@@ -55,6 +55,10 @@ const STEPS = [
 const MIN_PD = '2005-01-01';
 const TODAY = new Date().toISOString().slice(0, 10);
 const K_MIN = 5;   // ③ 只用于文案措辞；真正的门槛判断（enough/needMore）来自后端
+// UI-09：深度聚合的展示门槛，与 K_MIN（匿名门槛）是两回事——样本 <20 的聚合
+// 指标（中位/平均等待、阶段分布、各步走过、等待分布）不展示数字，改标
+// 「样本不足（n=×）」。原始计数（总人数、批准数、排名、同路人数）不受影响。
+const AGG_MIN = 20;
 
 const OWNER_KEY = 'gc_tracker_owner_id';
 const getOrCreateOwnerId = () => {
@@ -158,7 +162,9 @@ const ProgressCardSVG = React.forwardRef(({ me, b }, ref) => {
       {b.enough ? (
         <>
           {bigNum(255, b.total, '人', '同批人数', `${b.short} 优先日`)}
-          {bigNum(540, b.medianWait ?? '—', '月', '这批中位等待', '不是平均数')}
+          {b.total >= AGG_MIN
+            ? bigNum(540, b.medianWait ?? '—', '月', '这批中位等待', '不是平均数')
+            : bigNum(540, '—', '', '这批中位等待', `样本不足（n=${b.total}）`)}
           {/* 批准写人数不写百分比：一个都没批时 0% 太难看，人数是 0 人反而正常 */}
           {bigNum(825, b.approvedN, '人', '这批已批准', `${b.total} 人里`)}
           <line x1="397" y1="526" x2="397" y2="620" stroke={C.rule} strokeWidth="1.5" />
@@ -436,7 +442,9 @@ const CardView = ({ me, b, autoJoined, onBack, onBatch }) => {
           <div className="grid grid-cols-3" style={{ gap: '8px' }}>
             {[
               [b.total, '人', '同类别同国家'],
-              [b.medianWait, '个月', '中位已等'],
+              b.total >= AGG_MIN
+                ? [b.medianWait, '个月', '中位已等']
+                : ['—', '', `中位已等 · 样本不足（n=${b.total}）`],
               [b.rank, '位', '你按优先日排第'],
             ].map(([n, unit, cap]) => (
               <div key={cap} style={{ background: 'var(--gc-paper-soft)', borderRadius: '3px', padding: '9px 6px', textAlign: 'center' }}>
@@ -727,16 +735,27 @@ const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
             <>
               <div style={{ ...cardBox, background: 'var(--gc-paper-soft)' }}>
                 <p style={{ fontSize: '14px', color: 'var(--gc-ink)', lineHeight: 1.8 }}>
-                  {rangeLabel}一共 <b>{s.total}</b> 个人，中位已等 <b>{s.medianWait}</b> 个月，平均已等 <b>{s.meanWait}</b> 个月。
+                  {rangeLabel}一共 <b>{s.total}</b> 个人，
+                  {s.total >= AGG_MIN
+                    ? <>中位已等 <b>{s.medianWait}</b> 个月，平均已等 <b>{s.meanWait}</b> 个月。</>
+                    : <>样本不足（n={s.total}），暂不展示中位 / 平均等待。</>}
                 </p>
               </div>
-              <div style={cardBox}>
-                <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>大家等了多久，按{s.stackBy === 'country' ? '国家' : '类别'}分</p>
-                <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 10px', lineHeight: 1.6 }}>
-                  优先日到现在（已批准的算到批准那天），按人数分桶，每根柱子内部再按{s.stackBy === 'country' ? '国家' : '类别'}分段。
-                </p>
-                <StackedBarHistogram hist={s.stackedHist} stackBy={s.stackBy} />
-              </div>
+              {s.total >= AGG_MIN ? (
+                <div style={cardBox}>
+                  <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>大家等了多久，按{s.stackBy === 'country' ? '国家' : '类别'}分</p>
+                  <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 10px', lineHeight: 1.6 }}>
+                    优先日到现在（已批准的算到批准那天），按人数分桶，每根柱子内部再按{s.stackBy === 'country' ? '国家' : '类别'}分段。
+                  </p>
+                  <StackedBarHistogram hist={s.stackedHist} stackBy={s.stackBy} />
+                </div>
+              ) : (
+                <div style={cardBox}>
+                  <p style={{ fontSize: '13px', color: 'var(--gc-muted)', lineHeight: 1.7, margin: 0 }}>
+                    等待时长分布同样等样本够了再出（样本不足，n={s.total}；够 {AGG_MIN} 人自动出现）。
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             <div style={{ ...cardBox, background: 'var(--gc-amber-soft)', borderColor: 'var(--gc-amber-border)' }}>
@@ -763,7 +782,9 @@ const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
           <div style={{ ...cardBox, background: 'var(--gc-paper-soft)' }}>
             <p style={{ fontSize: '14px', color: 'var(--gc-ink)', lineHeight: 1.8 }}>
               同类别同国家一共 <b>{data.total}</b> 个人，
-              中位已等 <b>{data.medianWait}</b> 个月，平均已等 <b>{data.meanWait}</b> 个月。
+              {data.total >= AGG_MIN
+                ? <>中位已等 <b>{data.medianWait}</b> 个月，平均已等 <b>{data.meanWait}</b> 个月。</>
+                : <>样本不足（n={data.total}），暂不展示中位 / 平均等待。</>}
               {data.stageN > 0 && <> 其中 {data.stageN} 个登记过完整进度，<b>{data.approvedN}</b> 个已经批准。</>}
               你排第 <b>{b.rank}</b> 位。
             </p>
@@ -804,12 +825,18 @@ const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
             <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 10px', lineHeight: 1.6 }}>
               优先日到现在（已批准的算到批准那天），按人数分桶。
             </p>
-            <BarHistogram dist={data.waitHist} />
+            {data.total >= AGG_MIN ? (
+              <BarHistogram dist={data.waitHist} />
+            ) : (
+              <p style={{ fontSize: '12.5px', color: 'var(--gc-muted)', margin: 0, lineHeight: 1.7 }}>
+                样本不足（n={data.total}）——分布先不出了，登记的人够 {AGG_MIN} 个就自动出现。
+              </p>
+            )}
           </div>
 
           <div style={cardBox}>
             <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>大家走到哪一步了</p>
-            {data.stageN > 0 ? (
+            {data.stageN >= AGG_MIN ? (
               <>
                 <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 12px', lineHeight: 1.6 }}>
                   只算 {data.stageN} 个登记过完整进度的人（不是全部 {data.total} 人），每人只算最靠后的那一步。
@@ -829,6 +856,10 @@ const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
                   </div>
                 ))}
               </>
+            ) : data.stageN > 0 ? (
+              <p style={{ fontSize: '12.5px', color: 'var(--gc-muted)', margin: '3px 0 0', lineHeight: 1.7 }}>
+                登记过完整进度的只有 {data.stageN} 人，样本不足（n={data.stageN}）——先不算阶段分布，够 {AGG_MIN} 人再出。
+              </p>
             ) : (
               <p style={{ fontSize: '12.5px', color: 'var(--gc-muted)', margin: '3px 0 0', lineHeight: 1.7 }}>
                 这类里还没人登记过逐步进度（多数人只留了类别和优先日）——凑齐第一个人就会出现在这里。
@@ -837,7 +868,7 @@ const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
           </div>
 
           {/* ④ 只到月，不到日——后端已经粗化过了 */}
-          {data.stageN > 0 && (
+          {data.stageN >= AGG_MIN && (
             <div style={cardBox}>
               <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>这类人各步都在什么时候走过</p>
               <p style={{ fontSize: '12px', color: 'var(--gc-muted)', margin: '3px 0 10px', lineHeight: 1.6 }}>
@@ -852,6 +883,14 @@ const BatchView = ({ me, b, catData, scopes, summary, onBack, onFill }) => {
                   </p>
                 );
               })}
+            </div>
+          )}
+          {data.stageN > 0 && data.stageN < AGG_MIN && (
+            <div style={cardBox}>
+              <p className="gc-serif" style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gc-ink)' }}>这类人各步都在什么时候走过</p>
+              <p style={{ fontSize: '12.5px', color: 'var(--gc-muted)', margin: '3px 0 0', lineHeight: 1.7 }}>
+                样本不足（n={data.stageN}）——登记过完整进度的人够 {AGG_MIN} 个再出这张表。
+              </p>
             </div>
           )}
 
