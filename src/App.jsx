@@ -16936,6 +16936,9 @@ export default function App() {
   };
   const [showHelp, setShowHelp] = useState(false);
   const [showTimeMachine, setShowTimeMachine] = useState(false);
+  // UI-25: visitors without a case see the Time Machine collapsed; this flips
+  // once they tap the reveal affordance in the header.
+  const [tmRevealed, setTmRevealed] = useState(false);
   // Shows a mini green-card dashboard popover in the header.
   // Only actually rendered when greenCardInfo.approvalDate is set.
   // Which I-485 steps the user has marked complete. Persisted to localStorage so it
@@ -18001,7 +18004,26 @@ export default function App() {
                   <h1 className="gc-serif truncate" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--gc-ink)', lineHeight: 1.15, letterSpacing: '-0.01em', flexShrink: 1, minWidth: 0 }}>
                     {t.appTitle}
                   </h1>
-                  {/* Time Machine — inline beside the brand (was stacked below it) */}
+                  {/* Time Machine — inline beside the brand (was stacked below it).
+                      UI-25: for visitors without a case the live control starts
+                      collapsed behind a small reveal button; revealing it (or
+                      having a case, or already viewing a past month) renders
+                      the full control exactly as before. Data untouched. */}
+                  {!hasOnboarded && !tmRevealed && !isTimeMachineActive ? (
+                    <button
+                      onClick={() => setTmRevealed(true)}
+                      className="flex items-center gap-1 active:opacity-70"
+                      style={{
+                        fontSize: '11px', fontWeight: 600, padding: '3px 8px',
+                        border: '1px solid var(--gc-rule)', borderRadius: '2px',
+                        background: 'transparent', color: 'var(--gc-muted)',
+                        lineHeight: 1.2, flexShrink: 0, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {lang === 'en' ? 'Archive' : lang === 'tw' ? '歷史存檔' : '历史存档'}
+                      <span style={{ opacity: 0.5 }}>▸</span>
+                    </button>
+                  ) : (
                   <div className="relative inline-block" style={{ flexShrink: 0 }}>
                     <button
                       onClick={() => setShowTimeMachine((v) => !v)}
@@ -18083,6 +18105,7 @@ export default function App() {
                       </>
                     )}
                   </div>
+                  )}
                 </div>
               </div>
 
