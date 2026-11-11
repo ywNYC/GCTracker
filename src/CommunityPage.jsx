@@ -496,90 +496,30 @@ const PollBlock = ({ userCase, sample = false, onNeedCase }) => {
 // design, so the divider + 「累计」 label do that work there).
 
 // ============================================================
-// BulletinTalk — 排期讨论（仿 careerengine 讨论圈）：匿名发帖 + 点赞，
-// 最新/最热两个排序。走 /api/community 的 comment/commentLike 类型。
+// BulletinTalk — 排期讨论（仿 careerengine 讨论圈）：最新/最热两个排序。
+// 走 /api/community 的 comment（读）/commentLike 类型。
+// UI-15（2026-11-11 用户拍板）：评论关闭写入、只读观察 4 周——发帖/回复入口
+// 已撤下，后端对 POST comment 同步 403（functions/api/community.js 的
+// COMMENTS_PAUSED 开关）；恢复写入时前后端同批放开，点赞全程不受影响。
 // ============================================================
 const BulletinTalk = ({ lang }) => {
   const [sortTab, setSortTab] = useState('new'); // 'new' | 'hot'
   const [talkExpanded, setTalkExpanded] = useState(false); // UI-29：默认折叠，只亮精选一条
   const [data, setData] = useState(null);
-  const [msg, setMsg] = useState('');
-  const [posting, setPosting] = useState(false);
-  // Visible rejection feedback (UI-10): a refused post used to fail silently —
-  // the text just sat in the box and the user couldn't tell whether it went up.
-  const [postError, setPostError] = useState('');
-  const postFailMsg = (status) => {
-    if (status === 429) return lang === 'en'
-      ? 'Too many posts in a short time — please wait a bit and try again.'
-      : lang === 'tw' ? '發布太頻繁——請稍等一會兒再試。' : '发布太频繁——请稍等一会儿再试。';
-    if (status === 0) return lang === 'en'
-      ? 'Post failed — network error. Please try again.'
-      : lang === 'tw' ? '發布失敗——網絡異常，請稍後重試。' : '发布失败——网络异常，请稍后重试。';
-    return lang === 'en'
-      ? 'Post rejected — it may contain a link, contact details, or a long number. Please edit and try again.'
-      : lang === 'tw' ? '發布被拒收——內容可能含連結、聯繫方式或長數字，請修改後重試。' : '发布被拒收——内容可能包含链接、联系方式或长数字，请修改后重试。';
-  };
+  // UI-15：发帖/回复的本地状态（msg/posting/postError/postFailMsg）已随写入
+  // 入口一并撤下；旧缓存页自带旧文案，收到后端 403 仍有拒收提示，不静默。
   const [liked, setLiked] = useState(() => {
     try { return new Set(JSON.parse(window.localStorage.getItem('gc_talk_liked') || '[]')); } catch { return new Set(); }
   });
-  // 昵称优先级：自己改过的 > 订阅时填的 > 自动生成的游客号。
-  // 自动游客号首位只取 1-7 —— 8/9 开头保留给站主的暖场/机器内容（内部约定，
-  // 让站主一眼分得清真人和撑场帖）。
-  const [guestName, setGuestName] = useState(() => {
-    try {
-      const own = window.localStorage.getItem('gc_talk_name');
-      if (own) return own;
-      const nick = window.localStorage.getItem('gc_nickname');
-      if (nick) return nick;
-      let g = window.localStorage.getItem('gc_talk_guest');
-      if (!g) {
-        const num = (1 + Math.floor(Math.random() * 7)) * 1000 + Math.floor(Math.random() * 1000);
-        g = `${lang === 'en' ? 'Guest' : '游客'}${num}`;
-        window.localStorage.setItem('gc_talk_guest', g);
-      }
-      return g;
-    } catch { return lang === 'en' ? 'Guest' : '游客'; }
-  });
-  const renameGuest = (v) => {
-    const clean = v.slice(0, 16);
-    setGuestName(clean);
-    try { window.localStorage.setItem('gc_talk_name', clean); } catch { /* noop */ }
-  };
+  // UI-15：昵称编辑（guestName/renameGuest）只服务于发帖框，已随发帖框撤下；
+  // 历史评论的昵称照常从记录本身渲染，不受影响。
   const load = () => {
     fetch(`${API_BASE}/api/community?type=comment`).then((r) => r.json()).then(setData).catch(() => {});
   };
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const submit = async () => {
-    const text = msg.trim();
-    if (text.length < 2 || posting) return;
-    setPosting(true);
-    try {
-      const r = await fetch(`${API_BASE}/api/community`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'comment', message: text, name: guestName.trim() || (lang === 'en' ? 'Guest' : '游客') }),
-      });
-      if (r.ok) { setMsg(''); setPostError(''); load(); }
-      else setPostError(postFailMsg(r.status));
-    } catch { setPostError(postFailMsg(0)); }
-    setPosting(false);
-  };
-  const [replyingTo, setReplyingTo] = useState(null);
-  const [replyMsg, setReplyMsg] = useState('');
-  const submitReply = async (parentId) => {
-    const text = replyMsg.trim();
-    if (text.length < 2 || posting) return;
-    setPosting(true);
-    try {
-      const r = await fetch(`${API_BASE}/api/community`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'comment', message: text, parentId, name: guestName.trim() || (lang === 'en' ? 'Guest' : '游客') }),
-      });
-      if (r.ok) { setReplyMsg(''); setReplyingTo(null); setPostError(''); load(); }
-      else setPostError(postFailMsg(r.status));
-    } catch { setPostError(postFailMsg(0)); }
-    setPosting(false);
-  };
+  // UI-15：submit/submitReply 已撤下——全站不再有任何 POST type=comment 的
+  // 发起方；后端闸（403 comments_paused）只为旧缓存页与直连调用兜底。
   const like = async (id) => {
     if (liked.has(id)) return;
     const next = new Set(liked); next.add(id);
@@ -622,35 +562,6 @@ const BulletinTalk = ({ lang }) => {
     : null;
   const visibleItems = talkExpanded || !featured ? items : items.filter((c) => c.id === featured.id);
 
-  const replyBox = (targetId, targetName) => (
-    <div style={{ marginTop: '5px' }}>
-      <textarea value={replyMsg} maxLength={300} rows={2} autoFocus
-        placeholder={(lang === 'en' ? 'Reply to ' : '回复 ') + (targetName || (lang === 'en' ? 'Guest' : '游客')) + '…'}
-        onChange={(e) => { setReplyMsg(e.target.value); if (postError) setPostError(''); }}
-        style={{
-          width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '40px',
-          padding: '6px 8px', fontSize: '12px', lineHeight: 1.5, color: 'var(--gc-ink)',
-          background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)',
-        }} />
-      <div className="flex items-center justify-end gap-2 mt-1">
-        <button type="button" onClick={() => { setReplyingTo(null); setReplyMsg(''); }}
-          style={{ padding: '4px 10px', fontSize: '11px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--gc-muted)' }}>
-          {lang === 'en' ? 'Cancel' : '取消'}
-        </button>
-        <button type="button" onClick={() => submitReply(targetId)} disabled={posting || replyMsg.trim().length < 2}
-          style={{
-            padding: '4px 14px', fontSize: '11px', fontWeight: 700, border: 'none', borderRadius: '999px', cursor: 'pointer',
-            background: replyMsg.trim().length < 2 ? 'var(--gc-rule)' : 'var(--gc-green)', color: 'var(--gc-paper)', opacity: posting ? 0.6 : 1,
-          }}>{lang === 'en' ? 'Reply' : '回复'}</button>
-      </div>
-      {postError && (
-        <div role="alert" style={{ fontSize: '11px', lineHeight: 1.5, color: 'var(--gc-red-ink)', marginTop: '4px' }}>
-          {postError}
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="mt-2.5 p-2.5 rounded-xl" style={{ border: '1px solid var(--gc-rule-soft)', background: 'var(--gc-surface)' }}>
       <div className="flex items-center justify-between flex-wrap gap-1.5 mb-2">
@@ -683,29 +594,10 @@ const BulletinTalk = ({ lang }) => {
         )}
       </div>
 
-      {/* 发帖框 — 只在展开态出现（还没有评论时也出现，让第一条能发）；
-          规则条与拒收报错都在框内，折叠不影响 UI-10 的成果 */}
+      {/* UI-15 暂停说明 — 原发帖框位置（展开态出现，还没有评论时也出现）：
+          输入与发布已撤下，只留规则条（UI-10 保留）与一行暂停说明。 */}
       {(talkExpanded || items.length === 0) && (
-      <>
       <div style={{ border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)', background: 'var(--gc-paper-soft)', padding: '8px' }}>
-        <div className="flex items-center gap-2 mb-1.5">
-          <span style={{
-            width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
-            background: avatarColor(guestName), color: '#fff', fontSize: '11px', fontWeight: 700,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          }}>{String(guestName || '?').slice(0, 1).toUpperCase()}</span>
-          <input type="text" value={guestName} maxLength={16}
-            onChange={(e) => renameGuest(e.target.value)}
-            aria-label={lang === 'en' ? 'nickname' : '称呼'}
-            style={{
-              fontSize: '11.5px', fontWeight: 700, color: 'var(--gc-ink-soft)',
-              background: 'transparent', border: 'none', borderBottom: '1px dashed var(--gc-rule)',
-              padding: '1px 2px', minWidth: 0, width: '120px', outline: 'none',
-            }} />
-          <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>
-            {lang === 'en' ? '(tap to edit)' : '（可改）'}
-          </span>
-        </div>
         {/* Rules bar (UI-10): the old hint only warned about ads/links — nothing
             told users not to post the case/receipt numbers that identify them,
             and there is no self-serve delete once a post is up. */}
@@ -720,33 +612,14 @@ const BulletinTalk = ({ lang }) => {
               ? '請勿發布案號、收據號、全名、電話等個資；他人經驗不構成個案建議。'
               : '请勿发布案号、收据号、全名、电话等个人信息；他人经验不构成个案建议。'}
         </div>
-        <textarea value={msg} maxLength={300} rows={2}
-          placeholder={lang === 'en' ? 'Say something about this bulletin… (no links)' : '聊聊这期排期…（不能带链接/联系方式）'}
-          onChange={(e) => { setMsg(e.target.value); if (postError) setPostError(''); }}
-          style={{
-            width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: '48px',
-            padding: '7px 9px', fontSize: '12px', lineHeight: 1.5, color: 'var(--gc-ink)',
-            background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)',
-          }} />
-        <div className="flex items-center justify-between mt-1.5">
-          <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>
-            {lang === 'en' ? 'Anonymous · be kind' : '匿名发布 · 文明发言，含链接/联系方式会被拒收'}
-          </span>
-          <button type="button" onClick={submit} disabled={posting || msg.trim().length < 2}
-            style={{
-              padding: '5px 16px', fontSize: '11.5px', fontWeight: 700, border: 'none',
-              borderRadius: '999px', cursor: 'pointer',
-              background: msg.trim().length < 2 ? 'var(--gc-rule)' : 'var(--gc-green)',
-              color: 'var(--gc-paper)', opacity: posting ? 0.6 : 1,
-            }}>{lang === 'en' ? 'Post' : '发布'}</button>
+        <div style={{ fontSize: '12px', lineHeight: 1.6, fontWeight: 600, color: 'var(--gc-ink-soft)' }}>
+          {lang === 'en'
+            ? "Posting is paused — past discussions stay readable. We'll announce when posting reopens."
+            : lang === 'tw'
+              ? '評論區已暫停發布——歷史討論保留只讀，恢復時間另行通知。'
+              : '评论区已暂停发布——历史讨论保留只读，恢复时间另行通知。'}
         </div>
-        {postError && (
-          <div role="alert" style={{ fontSize: '11px', lineHeight: 1.5, color: 'var(--gc-red-ink)', marginTop: '6px' }}>
-            {postError}
-          </div>
-        )}
       </div>
-      </>
       )}
 
       {/* 评论列表 */}
@@ -754,7 +627,7 @@ const BulletinTalk = ({ lang }) => {
         <div style={{ fontSize: '11.5px', color: 'var(--gc-muted)', textAlign: 'center', padding: '14px 0 6px' }}>
           {data === null
             ? (lang === 'en' ? 'Loading…' : '加载中…')
-            : (lang === 'en' ? 'No posts yet — be the first.' : '还没有评论——来抢个沙发')}
+            : (lang === 'en' ? 'No posts yet.' : lang === 'tw' ? '還沒有評論' : '还没有评论')}
         </div>
       ) : visibleItems.map((c) => (
         <div key={c.id} className="flex gap-2" style={{ padding: '10px 2px 8px', borderBottom: '1px solid var(--gc-rule-soft)' }}>
@@ -770,10 +643,6 @@ const BulletinTalk = ({ lang }) => {
               <span style={{ fontSize: '11px', color: 'var(--gc-muted)' }}>{rel(c.ts)}</span>
             </div>
             <div style={{ fontSize: '12.5px', color: 'var(--gc-ink-soft)', lineHeight: 1.55, marginTop: '2px', wordBreak: 'break-word' }}>{c.message}</div>
-            <button type="button" onClick={() => { setReplyingTo(replyingTo === c.id ? null : c.id); setReplyMsg(''); }}
-              style={{ marginTop: '3px', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'var(--gc-muted)' }}>
-              {lang === 'en' ? 'Reply' : lang === 'tw' ? '回覆' : '回复'}{(repliesOf[c.id] || []).length > 0 ? ` · ${(repliesOf[c.id] || []).length}` : ''}
-            </button>
             {(repliesOf[c.id] || []).length > 0 && (
               <div style={{ marginTop: '6px', padding: '2px 0 0 9px', borderLeft: '2px solid var(--gc-rule-soft)' }}>
                 {(repliesOf[c.id] || []).map((r) => (
@@ -786,11 +655,6 @@ const BulletinTalk = ({ lang }) => {
                       <div style={{ fontSize: '12px', color: 'var(--gc-ink-soft)', lineHeight: 1.5, marginTop: '1px', wordBreak: 'break-word' }}>
                         {r.replyTo && r.replyTo !== c.name && <span style={{ color: 'var(--gc-green-ink)', fontWeight: 700 }}>@{r.replyTo} </span>}{r.message}
                       </div>
-                      <button type="button" onClick={() => { setReplyingTo(r.id); setReplyMsg(''); }}
-                        style={{ marginTop: '2px', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: 700, color: 'var(--gc-muted)' }}>
-                        {lang === 'en' ? 'Reply' : lang === 'tw' ? '回覆' : '回复'}
-                      </button>
-                      {replyingTo === r.id && replyBox(r.id, r.name)}
                     </div>
                     <button type="button" onClick={() => like(r.id)}
                       style={{
@@ -804,7 +668,6 @@ const BulletinTalk = ({ lang }) => {
                 ))}
               </div>
             )}
-            {replyingTo === c.id && replyBox(c.id, c.name)}
           </div>
           <button type="button" onClick={() => like(c.id)}
             style={{
