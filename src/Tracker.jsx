@@ -300,7 +300,7 @@ const RankBar = ({ rank, total }) => {
           width: `${Math.max((100 / total), 8)}%`, minWidth: '26px', background: C.amber,
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
-          <span style={{ fontSize: '10.5px', fontWeight: 700, color: C.paper }}>你</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: C.paper }}>你</span>
         </div>
         {after > 0 && <div style={{ width: `${pctAfter}%`, background: 'var(--gc-paper-soft)' }} />}
       </div>
@@ -323,7 +323,7 @@ const BarHistogram = ({ dist }) => {
       <div className="flex items-end" style={{ gap: '7px', height: '72px' }}>
         {counts.map((c) => (
           <div key={c.key} className="flex flex-col items-center" style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-            <span className="gc-mono" style={{ fontSize: '10px', fontWeight: c.mine ? 700 : 500, color: c.mine ? C.amber : 'var(--gc-ink-soft)', marginBottom: '3px' }}>{c.count}</span>
+            <span className="gc-mono" style={{ fontSize: '11px', fontWeight: c.mine ? 700 : 500, color: c.mine ? C.amber : 'var(--gc-ink-soft)', marginBottom: '3px' }}>{c.count}</span>
             <div style={{
               width: '100%', maxWidth: '32px',
               height: `${Math.max(4, (c.count / (max || 1)) * 46)}px`,
@@ -336,7 +336,7 @@ const BarHistogram = ({ dist }) => {
       </div>
       <div className="flex items-start" style={{ gap: '7px', marginTop: '4px' }}>
         {counts.map((c) => (
-          <div key={c.key} style={{ flex: 1, textAlign: 'center', fontSize: '9.5px', fontWeight: c.mine ? 700 : 500, color: c.mine ? C.amber : 'var(--gc-muted)' }}>{c.label}</div>
+          <div key={c.key} style={{ flex: 1, textAlign: 'center', fontSize: '11px', fontWeight: c.mine ? 700 : 500, color: c.mine ? C.amber : 'var(--gc-muted)' }}>{c.label}</div>
         ))}
       </div>
     </div>
@@ -353,7 +353,7 @@ const StackedBarHistogram = ({ hist, stackBy }) => {
       <div className="flex items-end" style={{ gap: '7px', height: '100px' }}>
         {buckets.map((b) => (
           <div key={b.key} className="flex flex-col items-center" style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-            <span className="gc-mono" style={{ fontSize: '10px', fontWeight: b.mine ? 700 : 500, color: b.mine ? C.amber : 'var(--gc-ink-soft)', marginBottom: '3px' }}>{b.total}</span>
+            <span className="gc-mono" style={{ fontSize: '11px', fontWeight: b.mine ? 700 : 500, color: b.mine ? C.amber : 'var(--gc-ink-soft)', marginBottom: '3px' }}>{b.total}</span>
             <div style={{
               width: '100%', maxWidth: '34px', display: 'flex', flexDirection: 'column-reverse',
               height: `${Math.max(4, (b.total / (max || 1)) * 70)}px`,
@@ -370,12 +370,12 @@ const StackedBarHistogram = ({ hist, stackBy }) => {
       </div>
       <div className="flex items-start" style={{ gap: '7px', marginTop: '4px' }}>
         {buckets.map((b) => (
-          <div key={b.key} style={{ flex: 1, textAlign: 'center', fontSize: '9.5px', fontWeight: b.mine ? 700 : 500, color: b.mine ? C.amber : 'var(--gc-muted)' }}>{b.label}</div>
+          <div key={b.key} style={{ flex: 1, textAlign: 'center', fontSize: '11px', fontWeight: b.mine ? 700 : 500, color: b.mine ? C.amber : 'var(--gc-muted)' }}>{b.label}</div>
         ))}
       </div>
       <div className="flex flex-wrap" style={{ gap: '8px 12px', marginTop: '10px' }}>
         {order.map((k, i) => (
-          <span key={k} className="flex items-center gap-1" style={{ fontSize: '10.5px', color: 'var(--gc-ink-soft)' }}>
+          <span key={k} className="flex items-center gap-1" style={{ fontSize: '11px', color: 'var(--gc-ink-soft)' }}>
             <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: stackColorAt(i), display: 'inline-block', flexShrink: 0 }} />
             {stackLabel(stackBy, k)}
           </span>
