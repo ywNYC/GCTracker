@@ -43,6 +43,29 @@
           var total = function () {
             return acc + (vstart ? Date.now() - vstart : 0);
           };
+          // UI-14: page/funnel telemetry. The React app reports the current tab via
+          // gcSetTab and funnel steps (share card, copy link, subscribe click/done)
+          // via gcEv. Counters live in sessionStorage so every flush carries the
+          // session's cumulative totals — same last-write-wins shape as dwell.
+          // Only whitelisted event names ever reach the payload (beacon.js enforces
+          // its own whitelist too); no case detail or identity rides along here.
+          var curTab = '';
+          try { curTab = sessionStorage.getItem('gc_tab') || ''; } catch (e) {}
+          window.gcSetTab = function (t) {
+            curTab = String(t || '');
+            try { sessionStorage.setItem('gc_tab', curTab); } catch (e) {}
+          };
+          var readEvents = function () {
+            try { return JSON.parse(sessionStorage.getItem('gc_ev') || '{}') || {}; } catch (e) { return {}; }
+          };
+          window.gcEv = function (name) {
+            try {
+              var ev = readEvents();
+              ev[name] = (ev[name] || 0) + 1;
+              sessionStorage.setItem('gc_ev', JSON.stringify(ev));
+              send();
+            } catch (e) {}
+          };
           var send = function () {
             var hasCase = false, subscribed = false, lang = '';
             // Anonymous case shape only — category/country/subtype (already treated as
@@ -67,6 +90,7 @@
             var payload = JSON.stringify({
               vid: vid, sid: sid, dwellMs: total(), lang: lang, hasCase: hasCase, subscribed: subscribed,
               category: category, country: country, priorityDate: priorityDate, subtype: subtype,
+              tab: curTab, events: readEvents(),
             });
             if (navigator.sendBeacon) navigator.sendBeacon('/api/beacon', payload);
           };
