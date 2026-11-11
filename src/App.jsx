@@ -5593,12 +5593,12 @@ const Overview = ({ userCase, onRefineCase = null, chartsSel = null, setTab = ()
                         {blk.info.label}
                       </div>
                       {blk.cut && blk.cut !== 'C' && (
-                        <div className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '1px' }}>
-                          {lang === 'en' ? 'cutoff ' : '截止日 '}{blk.cut}
+                        <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '1px' }}>
+                          {lang === 'en' ? 'cutoff ' : '截止日 '}{/^\d{4}-\d{2}-\d{2}/.test(blk.cut) ? formatDate(blk.cut, lang) : blk.cut}
                         </div>
                       )}
                       {etaTxt && (
-                        <div className="gc-mono" style={{ fontSize: '9.5px', color: 'var(--gc-muted)', marginTop: '1px' }}>
+                        <div className="gc-mono" style={{ fontSize: '11px', color: 'var(--gc-muted)', marginTop: '1px' }}>
                           {etaTxt}
                         </div>
                       )}
@@ -17665,7 +17665,7 @@ export default function App() {
         .gc-serif { font-family: var(--gc-font-display); letter-spacing: -0.005em; }
         .gc-mono  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-variant-numeric: tabular-nums; }
         .gc-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; color: var(--gc-muted); }
-        .gc-eyebrow { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; color: var(--gc-muted); }
+        .gc-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; color: var(--gc-muted); }
 
         /* Range slider — ink-colored thumb, consistent with editorial ethos.
            Replaces default blue/platform-tinted thumb with a small solid ink pill. */
