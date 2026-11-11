@@ -25,6 +25,13 @@ const POSTGC_PLANS = ['buy-home', 'change-job', 'move-state', 'naturalize', 'non
 const TTL_S = 730 * 24 * 3600;
 const IP_DAILY_CAP = 20;
 
+// UI-15（2026-11-11 用户拍板）：评论关闭写入、只读观察 4 周（观察期自上线日
+// 起算）。开启时 POST type=comment 一律 403 {"error":"comments_paused"}；
+// commentLike 与 timeline/rfe/switch/cost/poll/wall/question/postgc 全部
+// 不受影响，GET 读取照常。恢复写入：把 COMMENTS_PAUSED 改回 false 即可
+// （仅此一处开关），前端闸在 src/CommunityPage.jsx 的 BulletinTalk，同批恢复。
+const COMMENTS_PAUSED = true;
+
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
     status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
@@ -74,6 +81,13 @@ export async function onRequestPost(context) {
   } catch { return json({ error: 'bad json' }, 400); }
 
   const type = body.type;
+
+  // UI-15 后端闸：暂停期 comment 写入直接拒绝。旧缓存页面的发帖框收到 403 后
+  // 走 UI-10 的拒收文案，不会静默失败。恢复方法见上方 COMMENTS_PAUSED 注释。
+  if (COMMENTS_PAUSED && type === 'comment') {
+    return json({ error: 'comments_paused' }, 403);
+  }
+
   const cat = CATS.includes(body.cat) ? body.cat : null;
   const country = COUNTRIES.includes(body.country) ? body.country : 'Other';
   let rec = null;
