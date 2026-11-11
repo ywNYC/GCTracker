@@ -165,15 +165,9 @@ const Forecast = ({ userCase }) => {
           </>
         )}
 
-        <div className="mt-5 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-          <div className="flex items-start gap-2">
-            <Info size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="text-[11px] font-bold text-amber-900 mb-1">{t.forecastMethodology}</div>
-              <p className="text-[11px] text-amber-800 leading-relaxed">{t.forecastMethodologyDesc}</p>
-            </div>
-          </div>
-        </div>
+        {/* UI-22: the amber methodology box that used to close this card has
+            moved to the top of ForecastHub's content (same box, same copy),
+            so the uncertainty note now precedes the probability figures. */}
       </div>
     </div>
   );
@@ -192,6 +186,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
   const [selectedCategory, setSelectedCategory] = useState('mine');
   const [showCrossoverInfo, setShowCrossoverInfo] = useState(false);
   const [showHelp, setShowHelp] = useState(false); // 说明默认折叠
+  const [showScenario, setShowScenario] = useState(false); // UI-22 freeze: 高级情景（五档倍率）默认收起
   // Forecast extension: how many MONTHS of forecast to show (8 months default, up to 600 = 50 years)
   const [forecastMonths, setForecastMonths] = useState(8);
   // Tracks whether the user has manually touched EITHER range slider — if so,
@@ -2655,10 +2650,10 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
                 <div className="flex items-start gap-1.5">
                   <span className="flex-shrink-0" style={{ color: "var(--gc-muted-soft)", fontSize: "9px", marginTop: "2px" }}>▸</span>
                   <span>{lang === 'en'
-                    ? 'Pick a forecast scenario below (Optimistic / Expected / Pessimistic) - the dashed line redraws based on your choice.'
+                    ? 'The Advanced settings below hold the forecast scenario (Optimistic / Expected / Pessimistic) - the dashed line redraws based on your choice.'
                     : lang === 'tw'
-                    ? '在下方選擇預測情景（樂觀/預期/悲觀）- 虛線會根據你的選擇重新繪製。'
-                    : '在下方选择预测情景（乐观/预期/悲观）- 虚线会根据你的选择重新绘制。'}</span>
+                    ? '下方「高級設置」裡可切換預測情景（樂觀/預期/悲觀）- 虛線會根據你的選擇重新繪製。'
+                    : '下方「高级设置」里可切换预测情景（乐观/预期/悲观）- 虚线会根据你的选择重新绘制。'}</span>
                 </div>
                 <div className="flex items-start gap-1.5">
                   <span className="flex-shrink-0" style={{ color: "var(--gc-muted-soft)", fontSize: "9px", marginTop: "2px" }}>▸</span>
@@ -3153,6 +3148,19 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
       </div>
       )}
 
+      {/* UI-22 freeze: the five-tier scenario dial is now an advanced
+          setting — collapsed by default behind this toggle and labelled as
+          such. The dial block below is byte-identical to before (freeze is
+          not deletion); the default scenario stays 'expected', so the main
+          view and its numbers are untouched until a user opens this. */}
+      <button type="button" onClick={() => setShowScenario((v) => !v)}
+        style={{ width: '100%', marginTop: '8px', padding: '9px 12px', background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: 'var(--gc-radius-sm)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>
+          {lang === 'en' ? 'Advanced · forecast scenarios (5-tier)' : lang === 'tw' ? '高級設置 · 預測情景（五檔倍率）' : '高级设置 · 预测情景（五档倍率）'}
+        </span>
+        <span style={{ fontSize: '10px', color: 'var(--gc-muted)' }}>{showScenario ? '▲' : '▼'}</span>
+      </button>
+      {showScenario && (<>
       {/* Forecast Scenario Selector — editorial dial.
           Reads as a spectrum from optimistic to pessimistic. Selection marked by
           a solid underline beneath the active cell (like newspaper section tabs)
@@ -3285,6 +3293,7 @@ const TrendChart = ({ userCase, i485ServiceCenter = 'average', completedI485Step
           </div>
         </div>
       </div>
+      </>)}
 
       {/* Chart Summary - compact cards (4 columns fits all F or EB categories on one row) */}
       <div className="mt-2 grid grid-cols-4 gap-1" style={{ width: '100%' }}>
@@ -3406,6 +3415,23 @@ const ForecastHub = ({ userCase, i485ServiceCenter = 'average', completedI485Ste
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* UI-22: uncertainty first. The amber methodology box (the site's
+          reference pattern, formerly at the bottom of the next-month view)
+          now opens the hub's content — same copy via t.forecastMethodology*,
+          moved not rewritten — ahead of every probability figure in
+          whichever sub-view is active. */}
+      <div style={{ padding: '12px 12px 0' }}>
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex items-start gap-2">
+            <Info size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="text-[11px] font-bold text-amber-900 mb-1">{t.forecastMethodology}</div>
+              <p className="text-[11px] text-amber-800 leading-relaxed">{t.forecastMethodologyDesc}</p>
+            </div>
+          </div>
         </div>
       </div>
 
