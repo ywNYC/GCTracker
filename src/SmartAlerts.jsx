@@ -326,7 +326,7 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
             }}>
               <div className="flex items-center justify-between mb-1">
                 <span className="gc-eyebrow" style={{
-                  fontSize: '8px', color: 'var(--gc-muted)', letterSpacing: '0.14em',
+                  fontSize: '11px', color: 'var(--gc-muted)', letterSpacing: '0.14em',
                 }}>
                   {lang === 'en' ? 'Subscription based on' : lang === 'tw' ? '訂閱將基於' : '订阅将基于'}
                 </span>
@@ -335,7 +335,7 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
                   onClick={() => setShowCaseEdit(true)}
                   className="flex items-center gap-0.5 flex-shrink-0"
                   style={{
-                    fontSize: '10px', fontWeight: 700,
+                    fontSize: '11px', fontWeight: 700,
                     color: 'var(--gc-green-ink)',
                     background: 'transparent', border: 'none', padding: 0,
                     cursor: 'pointer', letterSpacing: '0.02em',
@@ -381,13 +381,13 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
             <div>
               <div className="flex items-center justify-between" style={{ marginBottom: '4px' }}>
                 <label className="gc-eyebrow" style={{
-                  fontSize: '8px', color: 'var(--gc-muted)', letterSpacing: '0.14em',
+                  fontSize: '11px', color: 'var(--gc-muted)', letterSpacing: '0.14em',
                 }}>
                   {lang === 'en' ? 'Email' : lang === 'tw' ? '郵箱' : '邮箱'}
                 </label>
                 <button type="button" onClick={() => setUpdateMode((v) => !v)}
                   style={{
-                    fontSize: '10.5px', color: 'var(--gc-green-ink)', fontWeight: 600,
+                    fontSize: '11px', color: 'var(--gc-green-ink)', fontWeight: 600,
                     background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
                   }}>
                   {updateMode
@@ -397,7 +397,7 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
               </div>
               {updateMode && (
                 <div style={{
-                  fontSize: '10.5px', color: 'var(--gc-muted)', lineHeight: 1.5,
+                  fontSize: '11px', color: 'var(--gc-muted)', lineHeight: 1.5,
                   marginBottom: '6px', padding: '6px 8px',
                   background: 'var(--gc-paper-soft)', border: '1px solid var(--gc-rule-soft)', borderRadius: '3px',
                 }}>
@@ -520,7 +520,7 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
                 className="flex-shrink-0"
                 style={{
                   padding: '4px 10px',
-                  fontSize: '10px',
+                  fontSize: '11px',
                   fontWeight: 700,
                   color: 'var(--gc-green-ink)',
                   background: 'transparent',
@@ -537,7 +537,7 @@ const SmartAlerts = ({ userCase, setUserCase = () => {}, setTab = () => {}, gree
 
         <div style={{
           marginTop: '10px',
-          fontSize: '10px',
+          fontSize: '11px',
           color: 'var(--gc-muted)',
           lineHeight: 1.45,
         }}>
