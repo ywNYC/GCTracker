@@ -7246,7 +7246,7 @@ const CommunityTeaser = ({ lang, onGo }) => {
 // 访客在个人页看到的示例案件（只读展示，不写进 localStorage）
 const SAMPLE_CASE = { country: 'Taiwan', category: 'EB3', priorityDate: '2024-07-15', inUS: true, petitionerStatus: 'USC', birthYearMonth: '' };
 
-const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = () => {} }) => {
+const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = () => {}, onNeedCase = () => {} }) => {
   // 访客（没填案子）看通用视角：默认中国大陆列 + 亲属组，不渲染「你的类别」个人行，
   // category=null 让所有「我的」高亮自然失效——不能拿默认的 Taiwan EB3 冒充访客的案子
   if (!hasCase) userCase = { country: 'China', category: null, priorityDate: null };
@@ -7273,6 +7273,9 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
   const [catGroup, setCatGroup] = useState(!hasCase ? 'family' : (userCase.category?.startsWith('F') ? 'family' : 'emp'));
   // 同日期合并行（EB-4/SR、EB-5 预留）点「展开」后按 cat 记录，本次会话内保持展开
   const [expandedMerges, setExpandedMerges] = useState({});
+  // UI-19: visitors meet the plain-language summary + CTA first; the full
+  // tables start collapsed behind an explicit toggle (case users unaffected).
+  const [visitorTableOpen, setVisitorTableOpen] = useState(false);
   const chartKey = updChart === 'B' ? 'filing' : 'finalAction';
   // UI-01: the bulletin data carries REAL Mexico/Philippines columns, but
   // resolveCountry folds those users into 'Other' — so the table's primary
@@ -7343,6 +7346,12 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
     none: 'bg-slate-50 text-slate-700 border-slate-200',
     current: 'bg-emerald-50 text-emerald-900 border-emerald-200',
   }[userImpact.type];
+
+  // Same "are we looking at the newest bulletin" rule the historical-view
+  // note further down applies — the UI-19 visitor summary only makes claims
+  // about the current month, so it renders only when this is the latest one.
+  const [lvY, lvM] = DEFAULT_VIEWING_MONTH.split('-');
+  const viewingLatestNow = BULLETIN_CURRENT_MONTH.zh === `${lvY}年${parseInt(lvM, 10)}月`;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">
@@ -7415,6 +7424,77 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
           </span>
         </div>
       </div>
+      {/* UI-19: visitor first screen — one plain-language summary of this
+          month plus the case-setup CTA, ahead of every table. All numbers are
+          computed at render from the same `changes` rows and the same
+          chartsSel the table below uses; no canned copy, nothing invented.
+          Latest month only — in Time Machine the historical-view note owns
+          this slot. Case users never see it (their view is unchanged). */}
+      {!hasCase && viewingLatestNow && (() => {
+        const chartWord = (v) => (v === 'filing'
+          ? (lang === 'en' ? 'Chart B (filing dates)' : lang === 'tw' ? '表B（遞件表）' : '表B（递件表）')
+          : (lang === 'en' ? 'Chart A (final-action dates)' : lang === 'tw' ? '表A（批覆表）' : '表A（批复表）'));
+        const chartClause = chartsSel && chartsSel.confirmed
+          ? (lang === 'en'
+              ? `USCIS is using ${chartWord(chartsSel.family)} for family-sponsored and ${chartWord(chartsSel.employment)} for employment-based cases this month. `
+              : lang === 'tw'
+                ? `本月 USCIS 採用：親屬類看${chartWord(chartsSel.family)}、職業類看${chartWord(chartsSel.employment)}。`
+                : `本月 USCIS 采用：亲属类看${chartWord(chartsSel.family)}、职业类看${chartWord(chartsSel.employment)}。`)
+          : '';
+        let moveClause = '';
+        if (hasPreviousData) {
+          const adv = changes.filter((c) => c.primary && c.primary.type === 'advanced' && c.primary.days > 0);
+          const cur = changes.filter((c) => c.primary && c.primary.type === 'current');
+          const ret = changes.filter((c) => c.primary && c.primary.type === 'retrogressed');
+          if (adv.length) {
+            const best = adv.reduce((a, b) => (b.primary.days > a.primary.days ? b : a));
+            moveClause = lang === 'en'
+              ? `Biggest mover for China-born applicants: ${best.cat}, up ${best.primary.days} days.`
+              : lang === 'tw'
+                ? `本月前進最多的是 ${best.cat}（中國大陸），前進了 ${best.primary.days} 天。`
+                : `本月前进最多的是 ${best.cat}（中国大陆），前进了 ${best.primary.days} 天。`;
+          } else if (cur.length) {
+            const names = cur.map((c) => c.cat).join(lang === 'en' ? ', ' : '、');
+            moveClause = lang === 'en'
+              ? `${names} turned current this month — no wait at all.`
+              : lang === 'tw'
+                ? `${names} 本月變為無需排期。`
+                : `${names} 本月变为无需排期。`;
+          } else if (ret.length) {
+            const worst = ret.reduce((a, b) => ((b.primary.days || 0) > (a.primary.days || 0) ? b : a));
+            moveClause = lang === 'en'
+              ? `A slow month overall — ${worst.cat} (China) slipped back ${worst.primary.days || ''} days.`
+              : lang === 'tw'
+                ? `本月整體偏慢，${worst.cat}（中國大陸）倒退了 ${worst.primary.days || ''} 天。`
+                : `本月整体偏慢，${worst.cat}（中国大陆）倒退了 ${worst.primary.days || ''} 天。`;
+          } else {
+            moveClause = lang === 'en'
+              ? 'Cutoffs were mostly flat this month.'
+              : lang === 'tw' ? '本月各類別基本持平，沒有大動作。' : '本月各类别基本持平，没有大动作。';
+          }
+        }
+        return (
+          <div className="mb-2.5" style={{ background: 'var(--gc-green-soft)', border: '1px solid var(--gc-rule)', borderRadius: '6px', padding: '14px 14px 12px' }}>
+            <p style={{ fontSize: '14px', lineHeight: 1.65, color: 'var(--gc-ink)', margin: 0 }}>
+              <b>{BULLETIN_CURRENT_MONTH[lang]}</b>
+              {lang === 'en' ? ' visa bulletin is out. ' : '排期公告已发布。'}
+              {chartClause}
+              {moveClause}
+            </p>
+            <p style={{ fontSize: '12.5px', lineHeight: 1.6, color: 'var(--gc-ink-soft)', margin: '8px 0 10px' }}>
+              {lang === 'en'
+                ? 'Want to know how long YOUR priority date still has to wait? Three quick picks — category, priority date, country — and this page becomes your personal tracker.'
+                : lang === 'tw'
+                  ? '想知道你自己的優先日還要等多久？點選三項——類別、優先日、出生地——這一頁就是你的專屬進度。'
+                  : '想知道你自己的优先日还要等多久？点选三项——类别、优先日、出生地——这一页就是你的专属进度。'}
+            </p>
+            <button type="button" onClick={onNeedCase}
+              style={{ fontSize: '14px', fontWeight: 700, padding: '10px 18px', border: 'none', borderRadius: '4px', cursor: 'pointer', background: 'var(--gc-green)', color: 'var(--gc-paper)' }}>
+              {lang === 'en' ? 'Check my dates →' : lang === 'tw' ? '查我的排期 →' : '查我的排期 →'}
+            </button>
+          </div>
+        );
+      })()}
       {!hasPreviousData && (
         <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl mb-2.5 flex items-start gap-2">
           <span className="text-sm flex-shrink-0"></span>
@@ -7485,6 +7565,18 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
       })()}
       {/* 各类别变化：按 职业(人才)/亲属 分组显示，各组 5–10 行一屏放得下，所以
           不再折叠。分组默认跟用户自己的类别走——EB* 进来看职业组，F* 看亲属组。 */}
+      {/* UI-19: for visitors the full tables (category changes + trend chart)
+          start collapsed behind this toggle — the summary + CTA above own the
+          first screen. Case users skip the toggle and always see the tables. */}
+      {!hasCase && (
+        <button type="button" onClick={() => setVisitorTableOpen((v) => !v)}
+          style={{ width: '100%', padding: '10px', marginBottom: '10px', background: 'var(--gc-surface)', border: '1px solid var(--gc-rule)', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: 'var(--gc-green-ink)' }}>
+          {visitorTableOpen
+            ? (lang === 'en' ? 'Hide the full tables ⌃' : lang === 'tw' ? '收起完整排期表 ⌃' : '收起完整排期表 ⌃')
+            : (lang === 'en' ? 'See the full bulletin tables ⌄' : lang === 'tw' ? '查看本月完整排期表（各類別）⌄' : '查看本月完整排期表（各类别）⌄')}
+        </button>
+      )}
+      {(hasCase || visitorTableOpen) && (<>
       <div style={{ border: '1px solid var(--gc-rule)', borderRadius: '4px', background: 'var(--gc-surface)', padding: '8px 10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--gc-ink-soft)' }}>{t.categoryChanges}</span>
@@ -7705,6 +7797,7 @@ const MonthlyUpdate = ({ userCase, chartsSel = null, hasCase = true, setTab = ()
       <BulletinTrend lang={lang} chartKey={chartKey} catGroup={catGroup} userCountry={userCountry}
         onChartKey={(k) => setUpdChart(k === 'filing' ? 'B' : 'A')} onCatGroup={setCatGroup}
         initialCat={hasCase ? userCase.category : null} />
+      </>)}
 
       {/* UI-04：讨论区/社区小组件/换类别对比此前在最新页与社区页各挂一份，
           现已撤下镜像——社区页是唯一挂载点，最新页只留一行摘要入口。 */}
@@ -11013,7 +11106,7 @@ export default function App() {
                   no setTab/deep-link path ever sets tab to 'forecast' — and
                   has been removed.) */}
               {tab === 'trends' && <Suspense fallback={<TabFallback />}><ForecastHub userCase={userCase} i485ServiceCenter={i485ServiceCenter} completedI485Steps={completedI485Steps} stepActualDates={stepActualDates} /></Suspense>}
-              {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} setTab={handleTabChange} />}
+              {tab === 'update' && <MonthlyUpdate userCase={userCase} chartsSel={chartsSel} hasCase={hasOnboarded} setTab={handleTabChange} onNeedCase={openWizardFromSample} />}
               {tab === 'i485' && <Overview userCase={userCase} onRefineCase={() => { setOnboardingInitialMode('form'); setShowWizard(true); }} chartsSel={chartsSel} setTab={handleTabChange} completedI485Steps={completedI485Steps} setCompletedI485Steps={setCompletedI485Steps} />}
               {tab === 'alerts' && <Suspense fallback={<TabFallback />}><SmartAlerts userCase={userCase} setUserCase={setUserCase} setTab={handleTabChange} greenCardInfo={greenCardInfo} /></Suspense>}
               {tab === 'bulletin' && <BulletinTab userCase={userCase} />}
