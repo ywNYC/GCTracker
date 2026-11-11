@@ -22,6 +22,14 @@ const VALID_CATEGORIES = new Set(['EB1', 'EB2', 'EB3', 'EW', 'EB4', 'SR', 'EB5',
 const VALID_COUNTRIES = new Set(['Taiwan', 'China', 'India', 'Mexico', 'Philippines', 'Other']);
 const PD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// UI-14: page + funnel telemetry. Tab ids mirror the App.jsx tab state (nav tabs
+// plus the alias ids that also render pages: dashboard/i485 render Overview,
+// compare renders the community page). Event names are the funnel steps the
+// client counts in gcEv — anything off-whitelist is dropped, same as above,
+// so this public endpoint can't be used to stuff arbitrary keys into the stats.
+const VALID_TABS = new Set(['update', 'overview', 'dashboard', 'trends', 'compare', 'bulletin', 'index', 'alerts', 'about', 'i485', 'help']);
+const VALID_EVENTS = new Set(['share_card', 'copy_link', 'subscribe_click', 'subscribe_done']);
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -54,9 +62,22 @@ export async function onRequestPost(context) {
   const country = VALID_COUNTRIES.has(body.country) ? body.country : '';
   const priorityDate = typeof body.priorityDate === 'string' && PD_RE.test(body.priorityDate) ? body.priorityDate : '';
   const subtype = typeof body.subtype === 'string' && /^[a-z0-9]{1,20}$/.test(body.subtype) ? body.subtype : '';
+  // UI-14 additions — purely additive; every pre-existing field keeps its meaning.
+  // tab = the page the session was on at last flush; events = cumulative per-session
+  // funnel counters (the client overwrites the same record as they grow, so the
+  // stored values are the session's totals, never a per-ping increment).
+  const tab = VALID_TABS.has(body.tab) ? body.tab : '';
+  const events = {};
+  if (body.events && typeof body.events === 'object' && !Array.isArray(body.events)) {
+    for (const [k, v] of Object.entries(body.events)) {
+      if (!VALID_EVENTS.has(k)) continue;
+      const n = Math.floor(Number(v));
+      if (isFinite(n) && n > 0) events[k] = Math.min(n, 10000);
+    }
+  }
 
   const day = new Date().toISOString().slice(0, 10);
-  const rec = { vid, dwellMs, lang, hasCase, subscribed, category, country, priorityDate, subtype, ts: Date.now() };
+  const rec = { vid, dwellMs, lang, hasCase, subscribed, category, country, priorityDate, subtype, tab, events, ts: Date.now() };
   try {
     // Mirrored into KV metadata too: list() returns metadata inline, so the
     // admin analytics endpoint can read it straight off list() without an
